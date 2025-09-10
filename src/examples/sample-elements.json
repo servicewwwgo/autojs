@@ -1,0 +1,65 @@
+[
+  {
+    "name": "search_input",
+    "description": "搜索输入框",
+    "selector": "#search-input",
+    "selectorType": "css",
+    "parentName": "search_form",
+    "childrenNames": [],
+    "relatedNames": ["search_button"]
+  },
+  {
+    "name": "search_button",
+    "description": "搜索按钮",
+    "selector": "#search-button",
+    "selectorType": "css",
+    "parentName": "search_form",
+    "childrenNames": [],
+    "relatedNames": ["search_input"]
+  },
+  {
+    "name": "search_form",
+    "description": "搜索表单",
+    "selector": ".search-form",
+    "selectorType": "css",
+    "parentName": null,
+    "childrenNames": ["search_input", "search_button"],
+    "relatedNames": []
+  },
+  {
+    "name": "search_results",
+    "description": "搜索结果容器",
+    "selector": ".search-results",
+    "selectorType": "css",
+    "parentName": "main_content",
+    "childrenNames": ["result_item"],
+    "relatedNames": []
+  },
+  {
+    "name": "result_item",
+    "description": "单个搜索结果项",
+    "selector": ".result-item",
+    "selectorType": "css",
+    "parentName": "search_results",
+    "childrenNames": ["result_title", "result_description"],
+    "relatedNames": []
+  },
+  {
+    "name": "result_title",
+    "description": "搜索结果标题",
+    "selector": ".result-title",
+    "selectorType": "css",
+    "parentName": "result_item",
+    "childrenNames": [],
+    "relatedNames": ["result_description"]
+  },
+  {
+    "name": "result_description",
+    "description": "搜索结果描述",
+    "selector": ".result-description",
+    "selectorType": "css",
+    "parentName": "result_item",
+    "childrenNames": [],
+    "relatedNames": ["result_title"]
+  }
+]

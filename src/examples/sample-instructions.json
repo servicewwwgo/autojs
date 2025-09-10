@@ -1,0 +1,74 @@
+[
+  {
+    "type": "navigate",
+    "id": "nav_1",
+    "url": "https://www.example.com",
+    "delay": 2,
+    "retry": 1,
+    "timeout": 30,
+    "waitVisible": true
+  },
+  {
+    "type": "locate_element",
+    "id": "locate_1",
+    "element": {
+      "name": "search_input",
+      "description": "搜索输入框",
+      "selector": "#search-input",
+      "selectorType": "css",
+      "parentName": "search_form",
+      "childrenNames": [],
+      "relatedNames": ["search_button"]
+    },
+    "delay": 1,
+    "retry": 2,
+    "timeout": 10,
+    "waitVisible": true
+  },
+  {
+    "type": "input_text",
+    "id": "input_1",
+    "elementName": "search_input",
+    "text": "web automation",
+    "clearFirst": true,
+    "timeDelay": 0.1,
+    "delay": 0.5,
+    "retry": 1,
+    "timeout": 10,
+    "waitVisible": true
+  },
+  {
+    "type": "click",
+    "id": "click_1",
+    "elementName": "search_button",
+    "button": "left",
+    "clickType": "single",
+    "offsetX": 0,
+    "offsetY": 0,
+    "delay": 1,
+    "retry": 2,
+    "timeout": 10,
+    "waitVisible": true
+  },
+  {
+    "type": "wait",
+    "id": "wait_1",
+    "waitType": "time",
+    "value": 3,
+    "delay": 0,
+    "retry": 0,
+    "timeout": 5,
+    "waitVisible": false
+  },
+  {
+    "type": "get_text",
+    "id": "get_text_1",
+    "elementName": "search_results",
+    "textType": "innerText",
+    "includeHTML": false,
+    "delay": 1,
+    "retry": 1,
+    "timeout": 10,
+    "waitVisible": true
+  }
+]

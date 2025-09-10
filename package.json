@@ -1,0 +1,29 @@
+{
+  "name": "web-crawler-extension",
+  "description": "Web自动化爬虫Chrome扩展",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt -b chrome",
+    "dev:firefox": "wxt -b firefox",
+    "dev:edge": "wxt -b edge",
+    "build": "wxt build -b chrome",
+    "build:firefox": "wxt build -b firefox",
+    "build:edge": "wxt build -b edge",
+    "zip": "wxt zip -b chrome",
+    "zip:firefox": "wxt zip -b firefox",
+    "zip:edge": "wxt zip -b edge",
+    "compile": "vue-tsc --noEmit",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "vue": "^3.5.21"
+  },
+  "devDependencies": {
+    "@wxt-dev/module-vue": "^1.0.2",
+    "typescript": "^5.9.2",
+    "vue-tsc": "^3.0.6",
+    "wxt": "^0.20.6"
+  }
+}
