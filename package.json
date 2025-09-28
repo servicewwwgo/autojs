@@ -5,7 +5,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "wxt -b chrome",
+    "dev": "wxt -b chrome --mode development",
     "dev:firefox": "wxt -b firefox",
     "dev:edge": "wxt -b edge",
     "build": "wxt build -b chrome",

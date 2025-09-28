@@ -1,0 +1,32 @@
+{
+    // 使用 IntelliSense 了解相关属性。 
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "chrome",
+            "request": "attach",
+            "name": "调试 Chrome 扩展 - Content Script",
+            "port": 9222,
+            "webRoot": "${workspaceFolder}",
+            "sourceMaps": true,
+            "urlFilter": "chrome-extension://*",
+            "pathMapping": {
+                "/": "${workspaceFolder}/.output/chrome-mv3-dev"
+            },
+            "sourceMapPathOverrides": {
+                "webpack:///./*": "${webRoot}/*",
+                "webpack:///src/*": "${webRoot}/src/*",
+                "webpack:///./entrypoints/*": "${webRoot}/entrypoints/*",
+                "webpack:///./components/*": "${webRoot}/components/*"
+            },
+            "skipFiles": [
+                "<node_internals>/**",
+                "**/node_modules/**"
+            ],
+            "smartStep": true,
+            "trace": true,
+        }
+    ]
+}
