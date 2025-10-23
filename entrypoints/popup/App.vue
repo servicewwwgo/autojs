@@ -8,6 +8,17 @@ const results = ref<any[]>([]);
 const statistics = ref<any>(null);
 const logMessages = ref<string[]>([]);
 
+// 节点配置相关
+const nodeProfile = ref({
+  node_id: '',
+  node_name: '',
+  node_token: '',
+  node_type: 'crawler'
+});
+const showNodeConfig = ref(false);
+const editingNodeName = ref('');
+const editingNodeToken = ref('');
+
 // 示例指令
 const sampleInstructions = ref(`[
   {
@@ -49,6 +60,9 @@ onMounted(async () => {
   instructionText.value = sampleInstructions.value;
   addLog('爬虫系统已准备就绪');
   
+  // 加载节点配置
+  await loadNodeProfile();
+  
   // 测试与content script的连接，使用重试机制
   await retryConnection();
 });
@@ -66,13 +80,13 @@ function addLog(message: string) {
 // 发送消息到content script
 async function sendMessage(action: string, data?: any): Promise<any> {
   return new Promise((resolve) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, { action, data }, (response) => {
+        browser.tabs.sendMessage(tabs[0].id, { action, data }, (response) => {
           // 检查响应是否存在，如果不存在则返回错误
-          if (chrome.runtime.lastError) {
-            console.error('消息发送失败:', chrome.runtime.lastError);
-            resolve({ success: false, error: chrome.runtime.lastError.message });
+          if (browser.runtime.lastError) {
+            console.error('消息发送失败:', browser.runtime.lastError);
+            resolve({ success: false, error: browser.runtime.lastError.message });
           } else if (response) {
             resolve(response);
           } else {
@@ -230,7 +244,7 @@ async function testConnection() {
 async function checkCurrentPage() {
   try {
     const tabs = await new Promise<any[]>((resolve) => {
-      chrome.tabs.query({ active: true, currentWindow: true }, resolve);
+      browser.tabs.query({ active: true, currentWindow: true }, resolve);
     });
     
     if (tabs[0]) {
@@ -285,6 +299,72 @@ async function retryConnection(maxRetries = 3) {
   addLog('4. 尝试点击"重试连接"按钮');
   return false;
 }
+
+// 发送消息到background script
+async function sendMessageToBackground(action: string, data?: any): Promise<any> {
+  return new Promise((resolve) => {
+    browser.runtime.sendMessage({ action, data }, (response) => {
+      if (browser.runtime.lastError) {
+        console.error('消息发送失败:', browser.runtime.lastError);
+        resolve({ success: false, error: browser.runtime.lastError.message });
+      } else if (response) {
+        resolve(response);
+      } else {
+        resolve({ success: false, error: 'Background script未响应' });
+      }
+    });
+  });
+}
+
+// 加载节点配置
+async function loadNodeProfile() {
+  try {
+    const response = await sendMessageToBackground('getNodeProfile');
+    if (response && response.success) {
+      nodeProfile.value = response.data;
+      addLog(`节点配置已加载: ${nodeProfile.value.node_name} (${nodeProfile.value.node_id})`);
+    } else {
+      addLog(`加载节点配置失败: ${response?.error || '未知错误'}`);
+    }
+  } catch (error) {
+    addLog(`加载节点配置异常: ${error}`);
+  }
+}
+
+// 显示节点配置
+function showNodeConfiguration() {
+  showNodeConfig.value = true;
+  editingNodeName.value = nodeProfile.value.node_name;
+  editingNodeToken.value = nodeProfile.value.node_token;
+}
+
+// 保存节点配置
+async function saveNodeConfiguration() {
+  try {
+    const response = await sendMessageToBackground('updateNodeProfile', {
+      node_name: editingNodeName.value,
+      node_token: editingNodeToken.value
+    });
+    
+    if (response && response.success) {
+      nodeProfile.value.node_name = editingNodeName.value;
+      nodeProfile.value.node_token = editingNodeToken.value;
+      showNodeConfig.value = false;
+      addLog('节点配置已保存');
+    } else {
+      addLog(`保存节点配置失败: ${response?.error || '未知错误'}`);
+    }
+  } catch (error) {
+    addLog(`保存节点配置异常: ${error}`);
+  }
+}
+
+// 取消节点配置编辑
+function cancelNodeConfiguration() {
+  showNodeConfig.value = false;
+  editingNodeName.value = nodeProfile.value.node_name;
+  editingNodeToken.value = nodeProfile.value.node_token;
+}
 </script>
 
 <template>
@@ -297,6 +377,63 @@ async function retryConnection(maxRetries = 3) {
     </header>
 
     <div class="content">
+      <!-- 节点配置区域 -->
+      <div class="section">
+        <div class="section-header">
+          <h3>节点配置</h3>
+          <button @click="showNodeConfiguration" class="btn btn-small btn-secondary">
+            配置节点
+          </button>
+        </div>
+        <div class="node-info">
+          <div class="info-item">
+            <span class="label">节点ID:</span>
+            <span class="value">{{ nodeProfile.node_id }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">节点名称:</span>
+            <span class="value">{{ nodeProfile.node_name }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">节点类型:</span>
+            <span class="value">{{ nodeProfile.node_type }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 节点配置编辑对话框 -->
+      <div v-if="showNodeConfig" class="config-dialog">
+        <div class="dialog-content">
+          <h4>编辑节点配置</h4>
+          <div class="form-group">
+            <label>节点名称:</label>
+            <input 
+              v-model="editingNodeName" 
+              type="text" 
+              placeholder="输入节点名称"
+              class="form-input"
+            />
+          </div>
+          <div class="form-group">
+            <label>节点Token:</label>
+            <input 
+              v-model="editingNodeToken" 
+              type="text" 
+              placeholder="输入节点Token"
+              class="form-input"
+            />
+          </div>
+          <div class="dialog-actions">
+            <button @click="saveNodeConfiguration" class="btn btn-primary btn-small">
+              保存
+            </button>
+            <button @click="cancelNodeConfiguration" class="btn btn-secondary btn-small">
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- 指令输入区域 -->
       <div class="section">
         <h3>指令配置</h3>
@@ -349,7 +486,7 @@ async function retryConnection(maxRetries = 3) {
           <button @click="testConnection" class="btn btn-secondary">
             测试连接
           </button>
-          <button @click="retryConnection" class="btn btn-warning">
+          <button @click="() => retryConnection()" class="btn btn-warning">
             重试连接
           </button>
         </div>
@@ -655,5 +792,99 @@ async function retryConnection(maxRetries = 3) {
   line-height: 1.4;
   margin-bottom: 2px;
   font-family: 'Courier New', monospace;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.node-info {
+  background: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.info-item .label {
+  font-weight: 500;
+  color: #666;
+}
+
+.info-item .value {
+  font-weight: 600;
+  color: #333;
+  font-family: 'Courier New', monospace;
+}
+
+.config-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.dialog-content {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  width: 300px;
+  max-width: 90vw;
+}
+
+.dialog-content h4 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #333;
+}
+
+.form-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 </style>

@@ -16,7 +16,7 @@ export default defineContentScript({
       // 将爬虫实例暴露到全局，供popup使用
       (window as any).webCrawler = crawler;
       
-      // 监听来自popup的消息
+      // 监听来自popup和background script的消息
       chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: any) => {
         console.log('收到消息:', message);
         // 异步处理消息
@@ -107,6 +107,33 @@ async function handleMessage(message: any, crawler: WebCrawler, sendResponse: (r
         sendResponse({ success: true, data: validation });
         break;
         
+      case 'executeTask':
+        console.log('执行来自background script的任务:', message.task);
+        try {
+          // 执行任务逻辑
+          await executeTaskFromBackground(message.task, crawler);
+          
+          // 向background script报告任务完成
+          chrome.runtime.sendMessage({
+            action: 'taskCompleted',
+            taskId: message.task.id || 'unknown'
+          });
+          
+          sendResponse({ success: true, message: '任务执行完成' });
+        } catch (error) {
+          console.error('执行任务失败:', error);
+          
+          // 向background script报告任务失败
+          chrome.runtime.sendMessage({
+            action: 'taskFailed',
+            taskId: message.task.id || 'unknown',
+            error: error instanceof Error ? error.message : '未知错误'
+          });
+          
+          sendResponse({ success: false, error: error instanceof Error ? error.message : '任务执行失败' });
+        }
+        break;
+        
       default:
         console.warn('未知的操作类型:', message.action);
         sendResponse({ success: false, error: `未知的操作类型: ${message.action}` });
@@ -118,4 +145,70 @@ async function handleMessage(message: any, crawler: WebCrawler, sendResponse: (r
       error: error instanceof Error ? error.message : '未知错误' 
     });
   }
+}
+
+/**
+ * 执行来自background script的任务
+ */
+async function executeTaskFromBackground(task: any, crawler: WebCrawler) {
+  console.log('开始执行任务:', task);
+  
+  // 根据任务类型执行不同的操作
+  switch (task.type) {
+    case 'crawl':
+      // 执行爬虫任务
+      if (task.instructions) {
+        await crawler.loadAndExecuteInstructions(task.instructions);
+      }
+      break;
+      
+    case 'click':
+      // 执行点击任务
+      if (task.selector) {
+        const element = document.querySelector(task.selector);
+        if (element) {
+          (element as HTMLElement).click();
+          console.log('点击元素:', task.selector);
+        } else {
+          throw new Error(`找不到元素: ${task.selector}`);
+        }
+      }
+      break;
+      
+    case 'input':
+      // 执行输入任务
+      if (task.selector && task.value) {
+        const element = document.querySelector(task.selector) as HTMLInputElement;
+        if (element) {
+          element.value = task.value;
+          element.dispatchEvent(new Event('input', { bubbles: true }));
+          console.log('输入内容:', task.value);
+        } else {
+          throw new Error(`找不到输入元素: ${task.selector}`);
+        }
+      }
+      break;
+      
+    case 'wait':
+      // 执行等待任务
+      if (task.duration) {
+        await new Promise(resolve => setTimeout(resolve, task.duration));
+        console.log('等待完成:', task.duration + 'ms');
+      }
+      break;
+      
+    case 'navigate':
+      // 执行导航任务
+      if (task.url) {
+        window.location.href = task.url;
+        console.log('导航到:', task.url);
+      }
+      break;
+      
+    default:
+      console.warn('未知的任务类型:', task.type);
+      throw new Error(`未知的任务类型: ${task.type}`);
+  }
+  
+  console.log('任务执行完成:', task.id || 'unknown');
 }
