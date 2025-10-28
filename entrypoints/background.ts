@@ -6,18 +6,42 @@ export interface NodeProfile {
   node_type: string;
 }
 
-// 任务管理器
+// 指令接口
+export interface Instruction {
+  index: number;      // 标签页索引，从0开始
+  instruction: any;   // 指令文本，json格式
+  created_at: number; // 创建时间戳, 超时时间一小时也会删除
+}
+
+// 任务接口
+export interface Task {
+  type: string;
+  data: any;
+}
 
 export default defineBackground(() => {
   console.log('Hello background!', { id: browser.runtime.id });
 
-  let host = 'http://127.0.0.1:5000';
-  let crawler_auth_path = '/api/auth/login/crawler';
-  let crawler_task_path = '/api/task/realtime/list';
-  let crawler_data_path = '/api/task/realtime/data';
-
   // 存储JWT token
   let authToken: string | null = null;
+  // 存储节点配置信息
+  let nodeProfile: NodeProfile = {
+    node_id: '',
+    node_name: '',
+    node_token: '',
+    node_type: ''
+  };
+
+  // 存储host
+  let host: string = 'http://127.0.0.1:5000';
+  // 存储auth token路径
+  let crawler_auth_path: string = '/api/auth/login/crawler';
+  // 存储任务列表路径
+  let crawler_task_path: string = '/api/task/realtime/list';
+  // 存储指令回复路径
+  let crawler_task_reply_path: string = '/api/task/realtime/reply';
+  // 存储指令回复路径
+  let crawler_instruction_reply_path: string = '/api/instruction/realtime/reply';
 
   // 生成UUID的函数
   function generateUUID(): string {
@@ -31,52 +55,54 @@ export default defineBackground(() => {
   // 获取节点配置信息
   async function GetNodeProfile(): Promise<NodeProfile> {
     try {
-      // 从chrome.storage.local获取存储的数据
-      const result = await browser.storage.local.get(['node_id', 'node_name', 'node_token']);
-      
-      let node_id = result.node_id;
-      let node_name = result.node_name;
-      let node_token = result.node_token;
+      if (nodeProfile.node_id === '') {
+        let node_id = await browser.storage.local.get(['node_id']);
 
-      // 如果node_id不存在，生成一个随机UUID并保存
-      if (!node_id) {
-        node_id = generateUUID();
-        await browser.storage.local.set({ node_id });
-        console.log('生成新的node_id:', node_id);
+        if (node_id) {
+          nodeProfile.node_id = node_id.node_id;
+        }else{
+          nodeProfile.node_id = generateUUID();
+          await browser.storage.local.set({ node_id: nodeProfile.node_id });
+        }
       }
 
-      // 如果node_name不存在，设置为默认值并保存
-      if (!node_name) {
-        node_name = 'node';
-        await browser.storage.local.set({ node_name });
-        console.log('设置默认node_name:', node_name);
+      if (nodeProfile.node_name === '') {
+        let node_name = await browser.storage.local.get(['node_name']);
+
+        if (node_name) {
+          nodeProfile.node_name = node_name.node_name;
+        }else{
+          nodeProfile.node_name = 'node';
+          await browser.storage.local.set({ node_name: nodeProfile.node_name });
+        }
       }
 
-      // 如果node_token不存在，设置为默认值并保存
-      if (!node_token) {
-        node_token = 'P7SgH0gNoKdISoqnyx72YOcUWmium6GGSdG0SL49w';
-        await browser.storage.local.set({ node_token });
-        console.log('设置默认node_token:', node_token);
+      if (nodeProfile.node_token === '') {
+        let node_token = await browser.storage.local.get(['node_token']);
+
+        if (node_token) {
+          nodeProfile.node_token = node_token.node_token;
+        }else{
+          nodeProfile.node_token = 'fP1QjF8CJlDGe8yscsY5hz7ncPpLkBHQVxczXu67T1E';
+          await browser.storage.local.set({ node_token: nodeProfile.node_token });
+        }
       }
 
-      const profile: NodeProfile = {
-        node_id,
-        node_name,
-        node_token,
-        node_type: 'crawler'
-      };
+      if (nodeProfile.node_type === '') {
+        let node_type = await browser.storage.local.get(['node_type']);
 
-      console.log('获取节点配置:', profile);
-      return profile;
+        if (node_type) {
+          nodeProfile.node_type = node_type.node_type;
+        }else{
+          nodeProfile.node_type = 'crawler';
+          await browser.storage.local.set({ node_type: nodeProfile.node_type });
+        }
+      }
+
+      return nodeProfile;
     } catch (error) {
       console.error('获取节点配置失败:', error);
-      // 返回默认配置
-      return {
-        node_id: generateUUID(),
-        node_name: 'node',
-        node_token: 'token',
-        node_type: 'crawler'
-      };
+      throw error;
     }
   }
 
@@ -103,33 +129,193 @@ export default defineBackground(() => {
     }
   }
 
+  // ==================== 指令管理器 ====================
   
-  
+  // 添加指令
+  async function addInstructions(newInstructions: Instruction[]): Promise<number> {
+    try {
+      const now = Date.now();
 
-  // 定时任务主函数
+      // 获取现有指令列表
+      const result = await browser.storage.local.get(['instructions']);
+      const instructions: Instruction[] = result.instructions || [];
+
+      // 添加新指令
+      instructions.push(...newInstructions);
+
+      // 保存到存储
+      await browser.storage.local.set({ instructions });
+      
+      console.log('添加新指令:', newInstructions);
+      return newInstructions.length;
+    } catch (error) {
+      console.error('添加指令失败:', error);
+      return -1;
+    }
+  }
+
+  // 获取所有指令并删除
+  async function getAllInstructionsAndDelete(): Promise<Instruction[]> {
+    try {
+      // 获取所有指令
+      const result = await browser.storage.local.get(['instructions']);
+      const instructions: Instruction[] = result.instructions || [];
+      
+      console.log('获取所有指令:', instructions.length, '个');
+      
+      if(instructions.length > 0) {
+        // 删除指令
+        await browser.storage.local.set({ instructions: [] });
+        console.log('已删除指令列表');
+      }
+
+      return instructions;
+    } catch (error) {
+      console.error('获取所有指令失败:', error);
+      return [];
+    }
+  }
+
+  // 根据index获取指令并删除
+  async function getInstructionsByIndexAndDelete(index: number): Promise<Instruction[]> {
+    try {
+      // 获取现有指令列表
+      const result = await browser.storage.local.get(['tasks']);
+      const instructions: Instruction[] = result.instructions || [];
+      
+      // 过滤出指定index的指令
+      const matchedInstructions = instructions.filter(instruction => instruction.index === index);
+      
+      if(matchedInstructions.length > 0) {
+        // 过滤掉匹配的指令（删除匹配的指令）
+        const remainingInstructions = instructions.filter(instruction => instruction.index !== index);
+
+        // 保存更新后的指令列表
+        await browser.storage.local.set({ instructions: remainingInstructions });
+      }
+
+      console.log(`获取index为${index}的指令，数量:`, matchedInstructions.length, '个，已删除');
+      return matchedInstructions;
+    } catch (error) {
+      
+      console.error('获取指令失败:', error);
+      return [];
+    }
+  }
+
+  // 获取所有指令（不删除）
+  async function getAllInstructions(): Promise<Instruction[]> {
+    try {
+      const result = await browser.storage.local.get(['instructions']);
+      const instructions: Instruction[] = result.instructions || [];
+      
+      console.log('获取所有指令，数量:', instructions.length, '个');
+      return instructions;
+    } catch (error) {
+
+      console.error('获取所有指令失败:', error);
+      return [];
+    }
+  }
+
+  // 根据 index 获取指令数量
+  async function getInstructionsCountByIndex(index: number): Promise<number> {
+    try {
+      const result = await browser.storage.local.get(['instructions']);
+      const instructions: Instruction[] = result.instructions || [];
+      const count = instructions.filter(instruction => instruction.index === index).length;
+
+      console.log(`获取 index 为${ index }的指令，数量: ${ count } 个`);
+      return count;
+    } catch (error) {
+
+      console.error('获取指令数量失败:', error);
+      return -1;
+    }
+  }
+
+  // 删除创建时间超过一个小时的指令
+  async function deleteInstructionsByCreatedAt(elapsedTime: number=1000 * 60 * 60 * 1): Promise<number> {
+    try {
+      const now = Date.now();
+      const result: { instructions: Instruction[] } = await browser.storage.local.get(['instructions']);
+      const instructions: Instruction[] = result.instructions || [];
+
+      const remainingInstructions: Instruction[] = instructions.filter(instruction => now - instruction.created_at < elapsedTime);
+
+      if(instructions.length > remainingInstructions.length) {
+        // 保存剩余指令
+        await browser.storage.local.set({ instructions: remainingInstructions });
+        console.log(`删除创建时间超过${elapsedTime}毫秒的指令，数量: ${instructions.length - remainingInstructions.length} 个，剩余: ${remainingInstructions.length} 个`);
+      }
+      return instructions.length - remainingInstructions.length;
+    } catch (error) {
+
+      console.error('删除任务失败:', error);
+      return -1;
+    }
+  }
+
+  // 检查新标签页个数, 如果不够, 并创建新标签页
+  async function newTabIfNeeded(index: number, url: string): Promise<void> {
+    try {
+      const currentWindowTabs = await browser.tabs.query({ currentWindow: true });
+      for(let i = currentWindowTabs.length; i < index + 1; i++) {
+        await browser.tabs.create({ url: url });
+      }
+      console.log('创建新标签页完成:', index, '个');
+    } catch (error) {
+      console.error('检查新标签页个数失败:', error);
+    }
+  }
+
+  // 执行任务
+  async function executeTask(task: Task): Promise<void> {
+    try 
+    {
+      console.log('开始执行任务:', task.type, '，数据:', JSON.stringify(task.data));
+
+      const startTime = Date.now();
+      
+      switch(task.type) {
+        case 'open':
+          // 打开新标签页
+          await newTabIfNeeded(task.data.index, task.data.url);
+          break;
+        case 'execute':
+          // 执行 javascript 代码
+          // eval(task.data.javascript);
+          console.log('执行 javascript 代码:', task.data.javascript);
+          break;
+        default:
+          console.log('未知的任务类型:', task.type, '，不执行');
+          break;
+      }
+      
+      console.log('任务执行完成:', task.type, '，数据:', JSON.stringify(task.data), '，耗时:', Date.now() - startTime, '毫秒');
+    } catch (error) {
+
+      console.error('执行任务失败:', task.type, '，数据:', JSON.stringify(task.data), '，错误:', error);
+    }
+  }
+
+  // 定时任务主函数 - 获取任务列表，指令列表
   async function TaskPeriodicAlarm() {
     console.log('定时任务开始执行');
-    
-    try {
 
+    try {
+      
       // 第一步：检查登录状态，如果未登录则登录
       if (!authToken && await login() === false) {
         console.error('登录失败，跳过本次任务执行');
         return;
       }
 
-      // 第二步：获取任务列表
-      if (await tasks() === false) {
-        console.error('获取任务列表失败');
+      // 第二步：获取任务列表，指令列表
+      if (await getTaskListAndInstructions() === false) {
+        console.error('获取任务列表，指令列表失败');
         return;
       }
-
-      // 第三步：配置任务环境
-      if (await configure() === false) {
-        console.error('配置任务环境失败');
-        return;
-      }
-      
       
       console.log('定时任务执行完成');
     } catch (error) {
@@ -139,13 +325,13 @@ export default defineBackground(() => {
     }
   }
 
-  // 第一步：登录函数
+  // 第二步：登录函数
   async function login(): Promise<boolean> {
     try {
       console.log('开始登录...');
 
       // 获取节点配置信息
-      const nodeProfile = await GetNodeProfile();
+      const profile = await GetNodeProfile();
       
       const response = await fetch(host + crawler_auth_path, {
         method: 'POST',
@@ -153,10 +339,10 @@ export default defineBackground(() => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          node_id: nodeProfile.node_id,
-          node_name: nodeProfile.node_name,
-          node_token: nodeProfile.node_token,
-          node_type: nodeProfile.node_type
+          node_id: profile.node_id,
+          node_name: profile.node_name,
+          node_token: profile.node_token,
+          node_type: profile.node_type
         })
       });
 
@@ -177,118 +363,88 @@ export default defineBackground(() => {
     }
   }
 
-  // 第二步：获取任务列表
-  async function tasks(): Promise<boolean> {
+  // 第二步：获取任务列表, 并执行任务, 并下发指令 
+  async function getTaskListAndInstructions(): Promise<boolean> {
     try {
-      console.log('获取任务列表...');
+      console.log('获取任务列表，指令列表...');
 
       if(!authToken) {
 
-        console.error('未登录，无法获取任务列表');
+        console.error('未登录，无法获取任务列表，指令列表失败');
         return false;
       }
 
-      // 判断任务列表是否过期
-      const tasksResult = await browser.storage.local.get('tasks');
-      const tasksExpire = await browser.storage.local.get('expire');
+      const profile = await GetNodeProfile();
 
-      if(tasksResult && tasksResult.tasks && tasksResult.tasks.length > 0 && tasksExpire && tasksExpire.tasksExpire && tasksExpire.tasksExpire > Date.now()) {
-        console.log('任务列表获取成功:', tasksResult.tasks);
-        return true;
-      }
-
-      if(tasksResult && tasksResult.tasks && tasksResult.tasks.length > 0) {
-        browser.storage.local.set({ tasks: [] });
-        browser.storage.local.set({ expire: 0 });
-      }
-
-      const nodeProfile = await GetNodeProfile();
-
-      const url = new URL(host + crawler_task_path);
-      url.searchParams.append('node_id', nodeProfile.node_id);
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Authorization': authToken || '',
-      };
+      const url = new URL(host + crawler_task_path + '?node_id=' + profile.node_id);
 
       const response = await fetch(url.toString(), {
         method: 'GET',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authToken || '',
+        },
       });
 
       if (!response.ok) {
         authToken = null;
-        throw new Error(`获取任务失败: ${ response.status }`);
+        throw new Error(`获取任务列表，指令列表失败: ${ response.status } ${ response.statusText }`);
       }
 
       const responseData = await response.json();
 
-      if (responseData.data.tasks && responseData.data.tasks.length > 0) {  
-        await browser.storage.local.set({ expire: responseData.data.expire || Date.now() + 1000 * 60 * 60 * 1 });
-        await browser.storage.local.set({ tasks: responseData.data.tasks });
-      }
+      const tasks = responseData.data.tasks;
 
-      console.log('任务列表获取成功:', responseData);
-      return true;
-    } catch (error) {
-
-      console.error('获取任务列表失败:', error);
-      return false;
-    }
-  }
-
-  // 第三步：配置任务环境
-  async function configure(): Promise<boolean> {
-    try {
-      console.log('配置任务环境...');
-
-      if(!authToken) {
-        console.error('未登录，无法配置任务环境');
-        return false;
-      }
-
-
-      return true;
-    } catch (error) {
-      console.error('配置任务环境失败:', error);
-      return false;
-    }
-  }
-
-  // 第三步：执行任务 - 向 content script 发送消息
-  async function executeTasks(tasks: any[]): Promise<void> {
-    try {
-      console.log(`开始执行 ${tasks.length} 个任务`);
-      
-      for (const task of tasks) {
-        try {
-          // 向所有活动标签页的content script发送任务
-          const tabs = await browser.tabs.query({ active: true });
-          
-          for (const tab of tabs) {
-            if (tab.id) {
-              await browser.tabs.sendMessage(tab.id, {
-                action: 'executeTask',
-                task: task
-              });
-              console.log(`任务已发送到标签页 ${tab.id}:`, task);
-            }
-          }
-        } catch (error) {
-          console.error(`执行任务失败:`, task, error);
+      if(tasks && tasks.length > 0) {
+        for(const task of tasks) {
+          await executeTask(task);
         }
       }
+
+      const instructions: Instruction[] = responseData.data.instructions;
+
+      if(instructions && instructions.length > 0) {
+        await addInstructions(instructions);
+      }
+
+      // 计算 index 范围
+      const indexRange: number[] = instructions.map(instruction => instruction.index);
+      for(const index of indexRange) {
+        const tabs = await browser.tabs.query({ index: index as number, currentWindow: true });
+        if(tabs.length > 0 && tabs[0].id) {
+          browser.tabs.sendMessage(tabs[0].id, { action: 'executeInstructions' });
+        }else{
+          // 回复结果到服务器
+          await replyResultToServer(crawler_instruction_reply_path, {
+            index: index,
+            success: false,
+            error: '标签页不存在或未加载!',
+            created_at: Date.now(),
+          });
+        }
+      }
+
+      console.log('任务列表，指令列表获取成功!', responseData);
+      return true;
     } catch (error) {
-      console.error('批量执行任务失败:', error);
+
+      console.error('获取任务列表，指令列表失败! 错误:', error);
+      return false;
     }
   }
 
-  // 回复数据到服务器
-  async function replyDataToServer(data: any): Promise<void> {
+  // 回复结果到服务器
+  async function replyResultToServer(api: string, data: any): Promise<boolean> {
     try {
-      console.log('回复数据到服务器...');
-      const response = await fetch(host + crawler_data_path, {
+      console.log('回复结果到服务器...');
+
+      const profile = await GetNodeProfile();
+      data.node_id = profile.node_id;
+      data.node_name = profile.node_name;
+      data.node_type = profile.node_type;
+      data.created_at = Date.now();
+
+      const response = await fetch(host + api, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -296,8 +452,15 @@ export default defineBackground(() => {
         },
         body: JSON.stringify(data),
       });
+      if (!response.ok) {
+        throw new Error(`回复结果到服务器失败: ${ response.status } ${ response.statusText }`);
+      }
+      const responseData = await response.json();
+      return responseData.success;
     } catch (error) {
-      console.error('回复数据到服务器失败:', error);
+      authToken = null;
+      console.error('回复结果到服务器失败! 错误:', error);
+      return false;
     }
   }
 
@@ -305,30 +468,49 @@ export default defineBackground(() => {
   browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log('收到消息:', request.action, request.data);
 
-    if (request.action === 'taskCompleted') {
-
-      console.log('任务执行完成:', request.taskId);
-    } else if (request.action === 'dataCompleted') {
-
-      console.log('数据执行完成:', request.taskId);
-    } else if (request.action === 'getNodeProfile') {
-      // 获取节点配置信息
-      GetNodeProfile().then(profile => {
-        sendResponse({ success: true, data: profile });
-      }).catch(error => {
-        sendResponse({ success: false, error: error.message });
-      });
-    } else if (request.action === 'updateNodeProfile') {
-      // 更新节点配置信息
-      updateNodeProfile(request.data).then(() => {
-        sendResponse({ success: true });
-      }).catch(error => {
-        sendResponse({ success: false, error: error.message });
-      });
-    } else {
-      console.error('未知的操作类型:', request.action);
+    switch(request.action) {
+      case 'taskReply':
+        replyResultToServer(crawler_task_reply_path, request.data).then(success => {
+          console.log('任务返回结果完成!');
+        }).catch(error => {
+          console.log('任务返回结果失败:', error);
+        });
+        break;
+      case 'instructionReply':
+        replyResultToServer(crawler_instruction_reply_path, request.data).then(success => {
+          console.log('指令返回结果完成!');
+        }).catch(error => {
+          console.log('指令返回结果失败:', error);
+        });
+        break;
+        case 'getNodeProfile':
+          // 获取节点配置信息
+          GetNodeProfile().then(profile => {
+            sendResponse({ success: true, data: profile });
+          }).catch(error => {
+            console.error('获取节点配置信息失败:', error);
+          });
+          break;
+        case 'updateNodeProfile':
+          updateNodeProfile(request.data).then(success => {
+            console.log('节点配置更新完成:', success);
+          }).catch(error => {
+            console.error('节点配置更新失败:', error);
+          });
+          break;
+          case 'getInstructions':
+            const index = sender.tab?.index || -1;
+            getInstructionsByIndexAndDelete(index).then(instructions => {
+              sendResponse({ success: true, data: instructions });
+            }).catch(error => {
+              console.error('获取指令列表失败:', error);
+            });
+            break;
+        default:
+          console.log('未知消息:', request.action);
+          break;
     }
-
+    console.log('消息处理完成:', request.action);
     return true;
   });
 
@@ -336,16 +518,9 @@ export default defineBackground(() => {
   browser.runtime.onInstalled.addListener(() => { 
     console.log('扩展安装完成');
 
-    setInterval(() => {
-      login();
-    }, 10 * 1000);
-
-    //// 创建定时器
-    //browser.alarms.create('TaskPeriodicAlarm', {
-    //    periodInMinutes: 1,
-    //});
-    //
-    //console.log('定时器创建完成');
+    // 创建定时器
+    browser.alarms.create('TaskPeriodicAlarm', { periodInMinutes: 1, delayInMinutes: 10 * 1000 });
+    console.log('定时器创建完成');
   });
 
   // 监听定时器触发

@@ -13,7 +13,7 @@ export default defineContentScript({
       // 初始化爬虫系统
       const crawler = new WebCrawler();
       
-      // 将爬虫实例暴露到全局，供popup使用
+      // 将爬虫实例暴露到全局，供 popup 和 background script 使用
       (window as any).webCrawler = crawler;
       
       // 监听来自popup和background script的消息
@@ -24,6 +24,7 @@ export default defineContentScript({
           console.error('处理消息时发生错误:', error);
           sendResponse({ success: false, error: error.message || '处理消息时发生未知错误' });
         });
+        
         return true; // 保持消息通道开放，等待异步响应
       });
       
