@@ -19,6 +19,16 @@ export interface Task {
   data: any;
 }
 
+// 回复接口
+export interface Reply {
+  node_id: string;
+  node_name: string;
+  node_type: string;
+  index: number;
+  data: any;
+  created_at: number;
+}
+
 export default defineBackground(() => {
   console.log('Hello background!', { id: browser.runtime.id });
 
@@ -131,22 +141,40 @@ export default defineBackground(() => {
 
   // ==================== 指令管理器 ====================
   
-  // 添加指令
+  // 添加指令到指定标签页索引的队列
   async function addInstructions(newInstructions: Instruction[]): Promise<number> {
     try {
       const now = Date.now();
-
-      // 获取现有指令列表
-      const result = await browser.storage.local.get(['instructions']);
-      const instructions: Instruction[] = result.instructions || [];
-
-      // 添加新指令
-      instructions.push(...newInstructions);
-
-      // 保存到存储
-      await browser.storage.local.set({ instructions });
       
-      console.log('添加新指令:', newInstructions);
+      // 按index分组指令
+      const instructionsByIndex: { [key: number]: Instruction[] } = {};
+      
+      for (const instruction of newInstructions) {
+        if (!instructionsByIndex[instruction.index]) {
+          instructionsByIndex[instruction.index] = [];
+        }
+        instructionsByIndex[instruction.index].push({
+          ...instruction,
+          created_at: now
+        });
+      }
+      
+      // 为每个index的指令队列添加新指令
+      for (const [index, instructions] of Object.entries(instructionsByIndex)) {
+        const storageKey = `instructions_${index}`;
+        const result = await browser.storage.local.get([storageKey]);
+        const existingInstructions: Instruction[] = result[storageKey] || [];
+        
+        // 添加到队列末尾（先进先出）
+        existingInstructions.push(...instructions);
+        
+        // 保存到存储
+        await browser.storage.local.set({ [storageKey]: existingInstructions });
+        
+        console.log(`添加 ${instructions.length} 个指令到标签页 ${index} 队列`);
+      }
+      
+      console.log('添加新指令完成，总数:', newInstructions.length);
       return newInstructions.length;
     } catch (error) {
       console.error('添加指令失败:', error);
@@ -154,109 +182,149 @@ export default defineBackground(() => {
     }
   }
 
-  // 获取所有指令并删除
-  async function getAllInstructionsAndDelete(): Promise<Instruction[]> {
+  // 获取指定标签页索引的第一个指令并删除（先进先出）
+  async function getFirstInstructionByIndexAndDelete(index: number): Promise<Instruction | null> {
     try {
-      // 获取所有指令
-      const result = await browser.storage.local.get(['instructions']);
-      const instructions: Instruction[] = result.instructions || [];
+      const storageKey = `instructions_${index}`;
+      const result = await browser.storage.local.get([storageKey]);
+      const instructions: Instruction[] = result[storageKey] || [];
       
-      console.log('获取所有指令:', instructions.length, '个');
-      
-      if(instructions.length > 0) {
-        // 删除指令
-        await browser.storage.local.set({ instructions: [] });
-        console.log('已删除指令列表');
+      if (instructions.length === 0) {
+        console.log(`标签页 ${index} 没有待执行指令`);
+        return null;
       }
-
-      return instructions;
+      
+      // 获取第一个指令（先进先出）
+      const firstInstruction = instructions.shift();
+      
+      // 保存更新后的指令列表
+      await browser.storage.local.set({ [storageKey]: instructions });
+      
+      console.log(`获取标签页 ${index} 的第一个指令，剩余: ${instructions.length} 个`);
+      return firstInstruction || null;
     } catch (error) {
-      console.error('获取所有指令失败:', error);
-      return [];
+      
+      console.error(`获取标签页 ${index} 指令失败:`, error);
+      return null;
     }
   }
 
-  // 根据index获取指令并删除
+  // 获取指定标签页索引的所有指令并删除
   async function getInstructionsByIndexAndDelete(index: number): Promise<Instruction[]> {
     try {
-      // 获取现有指令列表
-      const result = await browser.storage.local.get(['tasks']);
-      const instructions: Instruction[] = result.instructions || [];
+      const storageKey = `instructions_${index}`;
+      const result = await browser.storage.local.get([storageKey]);
+      const instructions: Instruction[] = result[storageKey] || [];
       
-      // 过滤出指定index的指令
-      const matchedInstructions = instructions.filter(instruction => instruction.index === index);
-      
-      if(matchedInstructions.length > 0) {
-        // 过滤掉匹配的指令（删除匹配的指令）
-        const remainingInstructions = instructions.filter(instruction => instruction.index !== index);
+      if (instructions.length > 0) {
+        // 清空该标签页的指令队列
+        await browser.storage.local.set({ [storageKey]: [] });
+        console.log(`获取标签页 ${index} 的所有指令，数量: ${instructions.length} 个，已清空队列`);
 
-        // 保存更新后的指令列表
-        await browser.storage.local.set({ instructions: remainingInstructions });
+      } else {
+        console.log(`标签页 ${index} 没有待执行指令`);
       }
-
-      console.log(`获取index为${index}的指令，数量:`, matchedInstructions.length, '个，已删除');
-      return matchedInstructions;
-    } catch (error) {
       
-      console.error('获取指令失败:', error);
-      return [];
-    }
-  }
-
-  // 获取所有指令（不删除）
-  async function getAllInstructions(): Promise<Instruction[]> {
-    try {
-      const result = await browser.storage.local.get(['instructions']);
-      const instructions: Instruction[] = result.instructions || [];
-      
-      console.log('获取所有指令，数量:', instructions.length, '个');
       return instructions;
     } catch (error) {
 
-      console.error('获取所有指令失败:', error);
+      console.error(`获取标签页 ${index} 指令失败:`, error);
       return [];
     }
   }
 
-  // 根据 index 获取指令数量
+  // 获取指定标签页索引的指令数量
   async function getInstructionsCountByIndex(index: number): Promise<number> {
     try {
-      const result = await browser.storage.local.get(['instructions']);
-      const instructions: Instruction[] = result.instructions || [];
-      const count = instructions.filter(instruction => instruction.index === index).length;
-
-      console.log(`获取 index 为${ index }的指令，数量: ${ count } 个`);
-      return count;
+      const storageKey = `instructions_${index}`;
+      const result = await browser.storage.local.get([storageKey]);
+      const instructions: Instruction[] = result[storageKey] || [];
+      
+      console.log(`标签页 ${index} 的指令数量: ${instructions.length} 个`);
+      return instructions.length;
     } catch (error) {
 
-      console.error('获取指令数量失败:', error);
+      console.error(`获取标签页 ${index} 指令数量失败:`, error);
       return -1;
     }
   }
 
-  // 删除创建时间超过一个小时的指令
-  async function deleteInstructionsByCreatedAt(elapsedTime: number=1000 * 60 * 60 * 1): Promise<number> {
+  // 获取所有标签页的指令统计信息
+  async function getAllInstructionsStats(): Promise<{ [key: number]: number }> {
+    try {
+      const result = await browser.storage.local.get();
+      const stats: { [key: number]: number } = {};
+      
+      // 遍历所有存储的键，查找指令相关的键
+      for (const [key, value] of Object.entries(result)) {
+        if (key.startsWith('instructions_') && Array.isArray(value)) {
+          const index = parseInt(key.replace('instructions_', ''));
+          stats[index] = value.length;
+        }
+      }
+      
+      console.log('所有标签页指令统计:', stats);
+      return stats;
+    } catch (error) {
+
+      console.error('获取指令统计失败:', error);
+      return {};
+    }
+  }
+
+  // 清空指定标签页索引的指令队列
+  async function clearInstructionsByIndex(index: number): Promise<boolean> {
+    try {
+      const storageKey = `instructions_${index}`;
+      await browser.storage.local.set({ [storageKey]: [] });
+      console.log(`清空标签页 ${index} 的指令队列`);
+      return true;
+    } catch (error) {
+      console.error(`清空标签页 ${index} 指令队列失败:`, error);
+      return false;
+    }
+  }
+
+  // 删除创建时间超过指定时间的指令
+  async function deleteInstructionsByCreatedAt(elapsedTime: number = 1000 * 60 * 60 * 1): Promise<number> {
     try {
       const now = Date.now();
-      const result: { instructions: Instruction[] } = await browser.storage.local.get(['instructions']);
-      const instructions: Instruction[] = result.instructions || [];
-
-      const remainingInstructions: Instruction[] = instructions.filter(instruction => now - instruction.created_at < elapsedTime);
-
-      if(instructions.length > remainingInstructions.length) {
-        // 保存剩余指令
-        await browser.storage.local.set({ instructions: remainingInstructions });
-        console.log(`删除创建时间超过${elapsedTime}毫秒的指令，数量: ${instructions.length - remainingInstructions.length} 个，剩余: ${remainingInstructions.length} 个`);
+      const result = await browser.storage.local.get();
+      let totalDeleted = 0;
+      
+      // 遍历所有指令存储键
+      for (const [key, value] of Object.entries(result)) {
+        if (key.startsWith('instructions_') && Array.isArray(value)) {
+          const instructions: Instruction[] = value;
+          const remainingInstructions = instructions.filter(instruction => 
+            now - instruction.created_at < elapsedTime
+          );
+          
+          if (instructions.length > remainingInstructions.length) {
+            const deletedCount = instructions.length - remainingInstructions.length;
+            totalDeleted += deletedCount;
+            
+            // 保存剩余指令
+            await browser.storage.local.set({ [key]: remainingInstructions });
+            
+            const index = key.replace('instructions_', '');
+            console.log(`标签页 ${index} 删除过期指令: ${deletedCount} 个，剩余: ${remainingInstructions.length} 个`);
+          }
+        }
       }
-      return instructions.length - remainingInstructions.length;
+      
+      if (totalDeleted > 0) {
+        console.log(`总共删除过期指令: ${totalDeleted} 个`);
+      }
+      
+      return totalDeleted;
     } catch (error) {
-
-      console.error('删除任务失败:', error);
+      console.error('删除过期指令失败:', error);
       return -1;
     }
   }
 
-  // 检查新标签页个数, 如果不够, 并创建新标签页
+  // 检查新标签页个数, 如果不够, 创建新标签页
   async function newTabIfNeeded(index: number, url: string): Promise<void> {
     try {
       const currentWindowTabs = await browser.tabs.query({ currentWindow: true });
@@ -304,14 +372,16 @@ export default defineBackground(() => {
     console.log('定时任务开始执行');
 
     try {
-      
-      // 第一步：检查登录状态，如果未登录则登录
+      // 第一步：清理过期指令
+      await deleteInstructionsByCreatedAt();
+
+      // 第二步：检查登录状态，如果未登录则登录
       if (!authToken && await login() === false) {
         console.error('登录失败，跳过本次任务执行');
         return;
       }
 
-      // 第二步：获取任务列表，指令列表
+      // 第三步：获取任务列表，指令列表
       if (await getTaskListAndInstructions() === false) {
         console.error('获取任务列表，指令列表失败');
         return;
@@ -319,7 +389,6 @@ export default defineBackground(() => {
       
       console.log('定时任务执行完成');
     } catch (error) {
-
       console.error('定时任务执行出错:', error);
       authToken = null;
     }
@@ -409,13 +478,15 @@ export default defineBackground(() => {
 
       // 计算 index 范围
       const indexRange: number[] = instructions.map(instruction => instruction.index);
+
       for(const index of indexRange) {
         const tabs = await browser.tabs.query({ index: index as number, currentWindow: true });
-        if(tabs.length > 0 && tabs[0].id) {
+
+        if (tabs.length === 1 && tabs[0].id) {
           browser.tabs.sendMessage(tabs[0].id, { action: 'executeInstructions' });
         }else{
           // 回复结果到服务器
-          await replyResultToServer(crawler_instruction_reply_path, {
+          await replyResultToServer(crawler_instruction_reply_path, -1, {
             index: index,
             success: false,
             error: '标签页不存在或未加载!',
@@ -434,15 +505,20 @@ export default defineBackground(() => {
   }
 
   // 回复结果到服务器
-  async function replyResultToServer(api: string, data: any): Promise<boolean> {
+  async function replyResultToServer(api: string, index: number, data: any): Promise<boolean> {
     try {
       console.log('回复结果到服务器...');
 
       const profile = await GetNodeProfile();
-      data.node_id = profile.node_id;
-      data.node_name = profile.node_name;
-      data.node_type = profile.node_type;
-      data.created_at = Date.now();
+
+      const reply: Reply = {
+        node_id: profile.node_id,
+        node_name: profile.node_name,
+        node_type: profile.node_type,
+        index: index,
+        data: data,
+        created_at: Date.now()
+      }
 
       const response = await fetch(host + api, {
         method: 'POST',
@@ -450,8 +526,9 @@ export default defineBackground(() => {
           'Content-Type': 'application/json',
           'token': authToken || '',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(reply),
       });
+
       if (!response.ok) {
         throw new Error(`回复结果到服务器失败: ${ response.status } ${ response.statusText }`);
       }
@@ -467,17 +544,18 @@ export default defineBackground(() => {
   // 监听来自 content script 和 popup 的消息
   browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log('收到消息:', request.action, request.data);
+    const sender_index = sender.tab?.index || -1;
 
     switch(request.action) {
       case 'taskReply':
-        replyResultToServer(crawler_task_reply_path, request.data).then(success => {
+        replyResultToServer(crawler_task_reply_path, sender_index, request.data).then(success => {
           console.log('任务返回结果完成!');
         }).catch(error => {
           console.log('任务返回结果失败:', error);
         });
         break;
       case 'instructionReply':
-        replyResultToServer(crawler_instruction_reply_path, request.data).then(success => {
+        replyResultToServer(crawler_instruction_reply_path, sender_index, request.data).then(success => {
           console.log('指令返回结果完成!');
         }).catch(error => {
           console.log('指令返回结果失败:', error);
@@ -498,20 +576,55 @@ export default defineBackground(() => {
             console.error('节点配置更新失败:', error);
           });
           break;
-          case 'getInstructions':
-            const index = sender.tab?.index || -1;
-            getInstructionsByIndexAndDelete(index).then(instructions => {
-              sendResponse({ success: true, data: instructions });
-            }).catch(error => {
-              console.error('获取指令列表失败:', error);
-            });
-            break;
+           case 'getInstructions':
+             getInstructionsByIndexAndDelete(sender_index).then(instructions => {
+               sendResponse({ success: true, data: instructions });
+             }).catch(error => {
+               console.error('获取指令列表失败:', error);
+               sendResponse({ success: false, error: error.message });
+             });
+             return true; // 保持消息通道开放
+             
+           case 'getFirstInstruction':
+             getFirstInstructionByIndexAndDelete(sender_index).then(instruction => {
+               sendResponse({ success: true, data: instruction });
+             }).catch(error => {
+               console.error('获取第一个指令失败:', error);
+               sendResponse({ success: false, error: error.message });
+             });
+             return true; // 保持消息通道开放
+           case 'getInstructionsCount':
+             getInstructionsCountByIndex(sender_index).then(count => {
+               sendResponse({ success: true, data: { count } });
+             }).catch(error => {
+               console.error('获取指令数量失败:', error);
+               sendResponse({ success: false, error: error.message });
+             });
+             return true; // 保持消息通道开放
+             
+           case 'getAllInstructionsStats':
+             getAllInstructionsStats().then(stats => {
+               sendResponse({ success: true, data: stats });
+             }).catch(error => {
+               console.error('获取指令统计失败:', error);
+               sendResponse({ success: false, error: error.message });
+             });
+             return true; // 保持消息通道开放
+             
+           case 'clearInstructions':
+             clearInstructionsByIndex(sender_index).then(success => {
+               sendResponse({ success, message: success ? '指令队列已清空' : '清空失败' });
+             }).catch(error => {
+               console.error('清空指令队列失败:', error);
+               sendResponse({ success: false, error: error.message });
+             });
+             return true; // 保持消息通道开放
         default:
           console.log('未知消息:', request.action);
           break;
     }
     console.log('消息处理完成:', request.action);
-    return true;
+    return true; // 保持消息通道开放
   });
 
   // 监听扩展安装完成
