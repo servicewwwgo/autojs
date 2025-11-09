@@ -483,7 +483,7 @@ export default defineBackground(() => {
         const tabs = await browser.tabs.query({ index: index as number, currentWindow: true });
 
         if (tabs.length === 1 && tabs[0].id) {
-          browser.tabs.sendMessage(tabs[0].id, { action: 'executeInstructions' });
+          browser.tabs.sendMessage(tabs[0].id, { action: 'notify' });
         }else{
           // 回复结果到服务器
           await replyResultToServer(crawler_instruction_reply_path, -1, {
@@ -585,7 +585,7 @@ export default defineBackground(() => {
              });
              return true; // 保持消息通道开放
              
-           case 'getFirstInstruction':
+           case 'getSingleInstruction':
              getFirstInstructionByIndexAndDelete(sender_index).then(instruction => {
                sendResponse({ success: true, data: instruction });
              }).catch(error => {
