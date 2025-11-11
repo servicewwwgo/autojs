@@ -1,6 +1,6 @@
 import { ElementManager } from './ElementManager';
 import { Executor } from './Executor';
-import { InstructionParser } from './InstructionParser';
+import { InstructionParser } from './Parser';
 import { BaseInstruction } from '../types/Instructions';
 
 /**
@@ -45,33 +45,35 @@ export class WebCrawler {
   async loadAndExecuteInstructions(jsonData: string): Promise<void> {
     try {
       console.log('开始加载指令...');
-      
+
       // 解析指令
       const instructions = this.parser.parseFromJSON(jsonData);
-      
+
       // 清空现有指令
       this.executor.clearInstructions();
-      
+
       // 添加新指令
       this.executor.addInstructions(instructions);
-      
+
       console.log(`成功加载 ${instructions.length} 个指令`);
-      
+
       // 验证所有指令
       const validation = this.executor.validateAll();
+
       if (!validation.valid) {
         console.error('指令验证失败:', validation.errors);
         throw new Error('指令验证失败');
       }
-      
+
       // 执行指令
       console.log('开始执行指令...');
       const results = await this.executor.executeAll();
-      
+
       console.log('指令执行完成');
       console.log('执行结果:', this.executor.getStatistics());
-      
+
     } catch (error) {
+
       console.error('加载和执行指令失败:', error);
       throw error;
     }
@@ -89,6 +91,24 @@ export class WebCrawler {
       console.error('从文件加载指令失败:', error);
       throw error;
     }
+  }
+
+  /**
+   * 从JSON字符串加载指令并执行
+   */
+  async loadAndExecuteFromJSONString(jsonString: string): Promise<void> {
+    const instruction = this.parser.parseFromJSONString(jsonString);
+    this.executor.addInstruction(instruction);
+    await this.executor.executeInstruction(this.executor.instructions.length - 1);
+    console.log('指令执行完成');
+  }
+
+  /**
+   * 清除所有指令
+   */
+  clearInstructions(): void {
+    this.executor.clearInstructions();
+    console.log('所有指令已清除');
   }
 
   /**
@@ -110,6 +130,13 @@ export class WebCrawler {
    */
   async executeAll(): Promise<void> {
     await this.executor.executeAll();
+  }
+
+  /**
+   * 执行最后一条指令
+   */
+  async execute(): Promise<void> {
+    await this.executor.executeInstruction(this.executor.instructions.length - 1);
   }
 
   /**
@@ -178,7 +205,7 @@ export class WebCrawler {
   /**
    * 验证所有元素和指令
    */
-  validateAll(): { 
+  validateAll(): {
     elements: { valid: boolean; errors: string[] };
     instructions: { valid: boolean; errors: string[] };
   } {
@@ -186,5 +213,12 @@ export class WebCrawler {
       elements: this.elementManager.validateAllElements(),
       instructions: this.executor.validateAll()
     };
+  }
+
+  /**
+   * 验证最后一条指令
+   */
+  validateLastInstruction(): boolean {
+    return this.executor.validateLastInstruction();
   }
 }

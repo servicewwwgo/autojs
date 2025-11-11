@@ -62,7 +62,7 @@ export class Executor {
       console.log(`执行指令 ${i + 1}/${this.instructions.length}: ${instruction.type} (${instruction.id})`);
       
       try {
-        const result = await instruction.execute();
+        const result = await instruction.Execute();
         this.results.push(result);
         
         if (result.success) {
@@ -107,7 +107,7 @@ export class Executor {
     console.log(`执行单个指令: ${instruction.type} (${instruction.id})`);
     
     try {
-      const result = await instruction.execute();
+      const result = await instruction.Execute();
       this.results[index] = result;
       return result;
     } catch (error) {
@@ -217,7 +217,7 @@ export class Executor {
     const errors: string[] = [];
     
     this.instructions.forEach((instruction, index) => {
-      if (!instruction.validate()) {
+      if (!instruction.Validate()) {
         errors.push(`指令 ${index} (${instruction.id}): 验证失败`);
       }
     });
@@ -226,5 +226,17 @@ export class Executor {
       valid: errors.length === 0,
       errors
     };
+  }
+
+  /**
+   * 验证最后一条指令
+   */
+  validateLastInstruction(): boolean {
+    if (this.instructions.length === 0){
+      console.error('没有指令可以验证');
+      return false;
+    }
+
+    return this.instructions[this.instructions.length - 1].Validate();
   }
 }

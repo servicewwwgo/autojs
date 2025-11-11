@@ -20,11 +20,13 @@ export interface ElementObject {
   childrenNames: string[];
   /** 关联元素名称列表 */
   relatedNames: string[];
-  
+
   /** 验证方法 */
-  validate(): boolean;
+  Validate(): boolean;
   /** 执行方法 */
-  execute(): Promise<boolean>;
+  Execute(): Promise<boolean>;
+  /** 對象 */
+  ToObject(): object;
 }
 
 /**
@@ -61,43 +63,9 @@ export class Element implements ElementObject {
   }
 
   /**
-   * 验证元素是否存在且可操作
-   */
-  validate(): boolean {
-    if (!this.dom) {
-      this.findElement();
-    }
-    
-    if (!this.dom) {
-      console.error(`Element "${this.name}" not found with selector: ${this.selector}`);
-      return false;
-    }
-
-    if (!this.dom.offsetParent && this.dom.style.display !== 'none') {
-      console.warn(`Element "${this.name}" is not visible`);
-      return false;
-    }
-
-    return true;
-  }
-
-  /**
-   * 执行元素操作（基础方法，子类可重写）
-   */
-  async execute(): Promise<boolean> {
-    if (!this.validate()) {
-      return false;
-    }
-
-    // 更新文本内容
-    this.updateText();
-    return true;
-  }
-
-  /**
-   * 查找DOM元素
-   */
-  private findElement(): void {
+ * 查找DOM元素
+ */
+  private FindElement(): boolean {
     try {
       switch (this.selectorType) {
         case 'css':
@@ -121,53 +89,118 @@ export class Element implements ElementObject {
       }
     } catch (error) {
       console.error(`Error finding element "${this.name}":`, error);
-      this.dom = null;
     }
+
+    return this.dom !== null;
+  }
+
+  /**
+   * 验证元素是否存在且可操作
+   */
+  Validate(): boolean {
+    if (!this.dom) {
+      this.FindElement();
+    }
+
+    if (!this.dom) {
+      console.error(`Element "${this.name}" not found with selector: ${this.selector}`);
+      return false;
+    }
+
+    if (!this.dom.offsetParent || this.dom.style.display === 'none') {
+      console.warn(`Element "${this.name}" is not visible, selector: ${this.selector}`);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * 對象
+   */
+  ToObject(): object {
+    return {
+      name: this.name,
+      description: this.description,
+      text: this.text,
+      selector: this.selector,
+      selectorType: this.selectorType,
+      parentName: this.parentName,
+      childrenNames: this.childrenNames,
+      relatedNames: this.relatedNames,
+    };
+  }
+
+  /**
+   * 执行元素操作（基础方法，子类可重写）
+   */
+  async Execute(): Promise<boolean> {
+
+    if (!this.dom || !this.Validate()) {
+      console.error(`Element "${this.name}" not found or not valid, selector: ${this.selector}, validate failed`);
+      return false;
+    }
+
+    return this.UpdateText(); // 更新文本内容
   }
 
   /**
    * 更新元素文本内容
    */
-  private updateText(): void {
-    if (this.dom) {
-      this.text = this.dom.innerText || this.dom.textContent || '';
+  private UpdateText(): boolean {
+
+    if (!this.dom || !this.Validate()) {
+      console.error(`Element "${this.name}" not found or not valid, selector: ${this.selector}, validate failed, update text failed`);
+      return false;
     }
+
+    this.text = this.dom.innerText || this.dom.textContent || '';
+    return true;
   }
 
   /**
    * 获取元素位置信息
    */
-  getBoundingRect(): DOMRect | null {
-    if (!this.dom) return null;
+  GetBoundingRect(): DOMRect | null {
+    if (!this.dom || !this.Validate()) {
+      console.error(`Element "${this.name}" not found or not valid, selector: ${this.selector}, validate failed, get bounding rect failed`);
+      return null;
+    }
     return this.dom.getBoundingClientRect();
   }
 
   /**
    * 检查元素是否可见
    */
-  isVisible(): boolean {
-    if (!this.dom) return false;
-    const rect = this.getBoundingRect();
-    if (!rect) return false;
-    
-    return rect.width > 0 && rect.height > 0 && 
-           rect.top >= 0 && rect.left >= 0 &&
-           rect.bottom <= window.innerHeight && 
-           rect.right <= window.innerWidth;
+  IsVisible(): boolean {
+
+    if (!this.dom || !this.Validate()) {
+      console.error(`Element "${this.name}" not found or not valid, selector: ${this.selector}, validate failed, is visible failed`);
+      return false
+    }
+
+    const rect = this.GetBoundingRect();
+
+    if (!rect) {
+      console.error(`Element "${this.name}" bounding rect not found with selector: ${this.selector}`);
+      return false;
+    }
+
+    return rect.width > 0 && rect.height > 0 && rect.top >= 0 && rect.left >= 0 && rect.bottom <= window.innerHeight && rect.right <= window.innerWidth; // 元素可见
   }
 
   /**
    * 滚动到元素位置
    */
-  scrollIntoView(): boolean {
-    if (!this.dom) return false;
-    
+  ScrollIntoView(): boolean {
+
+    if (!this.dom || !this.Validate()) {
+      console.error(`Element "${this.name}" not found or not valid, selector: ${this.selector}, validate failed, scroll into view failed`);
+      return false;
+    }
+
     try {
-      this.dom.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center', 
-        inline: 'center' 
-      });
+      this.dom.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' }); // 滚动到元素位置
       return true;
     } catch (error) {
       console.error(`Error scrolling to element "${this.name}":`, error);

@@ -1,4 +1,4 @@
-import { ElementObject } from './Element';
+import { ElementObject, Element } from './Element';
 
 /**
  * 执行指令结果对象
@@ -16,10 +16,8 @@ export interface ExecutionResult {
   data?: any;
 }
 
-/**
- * 基础指令接口
- */
-export interface BaseInstruction {
+
+export interface BaseInstructionMembers {
   /** 指令类型 */
   type: string;
   /** 指令ID */
@@ -32,11 +30,20 @@ export interface BaseInstruction {
   timeout: number;
   /** 是否等待元素可见 */
   waitVisible: boolean;
-  
+}
+
+/**
+ * 基础指令接口
+ */
+export interface BaseInstruction extends BaseInstructionMembers {
   /** 验证方法 */
-  validate(): boolean;
+  Validate(): boolean;
+
   /** 执行方法 */
-  execute(): Promise<ExecutionResult>;
+  Execute(): Promise<ExecutionResult>;
+
+  /* 對象 */
+  ToObject(): object;
 }
 
 /**
@@ -50,26 +57,33 @@ export abstract class BaseInstructionImpl implements BaseInstruction {
   public timeout: number;
   public waitVisible: boolean;
 
-  constructor(config: {
-    type: string;
-    id: string;
-    delay?: number;
-    retry?: number;
-    timeout?: number;
-    waitVisible?: boolean;
-  }) {
+  constructor(config: BaseInstructionMembers) {
     this.type = config.type;
     this.id = config.id;
-    this.delay = config.delay || 0;
-    this.retry = config.retry || 0;
-    this.timeout = config.timeout || 30;
-    this.waitVisible = config.waitVisible || false;
+    this.delay = config.delay;
+    this.retry = config.retry;
+    this.timeout = config.timeout;
+    this.waitVisible = config.waitVisible;
+  }
+
+  /**
+   * 對象
+   */
+  ToObject(): object {
+    return {
+      type: this.type,
+      id: this.id,
+      delay: this.delay,
+      retry: this.retry,
+      timeout: this.timeout,
+      waitVisible: this.waitVisible
+    };
   }
 
   /**
    * 验证指令配置
    */
-  validate(): boolean {
+  Validate(): boolean {
     if (!this.type || !this.id) {
       console.error('Instruction type and id are required');
       return false;
@@ -80,79 +94,89 @@ export abstract class BaseInstructionImpl implements BaseInstruction {
   /**
    * 执行指令（抽象方法，子类必须实现）
    */
-  abstract execute(): Promise<ExecutionResult>;
+  abstract Execute(): Promise<ExecutionResult>;
 
   /**
    * 等待指定时间
    */
-  protected async wait(seconds: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, seconds * 1000));
+  protected async Delay(time: number): Promise<void> {
+    const delay_time = time || this.delay;
+
+    if (delay_time > 0) {
+      await new Promise<void>(resolve => setTimeout(resolve, delay_time * 1000));
+    }
   }
 
   /**
    * 重试执行
    */
-  protected async executeWithRetry<T>(fn: () => Promise<T>): Promise<T> {
+  protected async ExecuteWithRetry<T>(fn: () => Promise<T>): Promise<T> {
     let lastError: Error | null = null;
-    
-    for (let i = 0; i <= this.retry; i++) {
+
+    for (let i = 1; i <= this.retry; i++) {
       try {
         return await fn();
       } catch (error) {
         lastError = error as Error;
         if (i < this.retry) {
-          console.warn(`Retry ${i + 1}/${this.retry} for instruction ${this.id}`);
-          await this.wait(1); // 重试前等待1秒
+          console.warn(`Retry ${i}/${this.retry} for instruction ${this.id}`);
+          await this.Delay(1); // 重试前等待1秒
         }
       }
     }
-    
+
     throw lastError || new Error('Execution failed after retries');
   }
 }
 
 /**
  * 页面导航指令
+ * url: 页面地址
  */
 export class NavigateInstruction extends BaseInstructionImpl {
   public url: string;
 
-  constructor(config: {
-    id: string;
-    url: string;
-    delay?: number;
-    retry?: number;
-    timeout?: number;
-    waitVisible?: boolean;
-  }) {
-    super({ ...config, type: 'navigate' });
+  constructor(config: BaseInstructionMembers & { url: string }) {
+    super(config);
     this.url = config.url;
   }
 
-  validate(): boolean {
-    if (!super.validate()) return false;
+  ToObject(): object {
+    return {
+      ...super.ToObject(),
+      url: this.url
+    };
+  }
+
+  Validate(): boolean {
+
+    if (!super.Validate()) {
+      return false;
+    }
+
     if (!this.url) {
       console.error('URL is required for navigate instruction');
       return false;
     }
+
     return true;
   }
 
-  async execute(): Promise<ExecutionResult> {
+  async Execute(): Promise<ExecutionResult> {
     const startTime = Date.now();
-    
+
     try {
-      if (!this.validate()) {
+      if (!this.Validate()) {
         throw new Error('Invalid navigate instruction');
       }
 
-      await this.wait(this.delay);
-      
+      await this.Delay(this.delay);
+
       // 对于导航指令，直接跳转页面
       // 注意：这会导致content script重新加载
       console.log(`导航到: ${this.url}`);
       window.location.href = this.url;
-      
+
       // 返回成功结果，但注意页面会跳转
       return {
         instructionID: this.id,
@@ -177,50 +201,60 @@ export class NavigateInstruction extends BaseInstructionImpl {
 export class LocateElementInstruction extends BaseInstructionImpl {
   public element: ElementObject;
 
-  constructor(config: {
-    id: string;
-    element: ElementObject;
-    delay?: number;
-    retry?: number;
-    timeout?: number;
-    waitVisible?: boolean;
-  }) {
-    super({ ...config, type: 'locate_element' });
-    this.element = config.element;
+  constructor(config: BaseInstructionMembers & { element: ElementObject }) {
+    super(config);
+
+    this.element = new Element({
+      name: config.element.name,
+      description: config.element.description,
+      selector: config.element.selector,
+      selectorType: config.element.selectorType,
+      parentName: config.element.parentName,
+      childrenNames: config.element.childrenNames,
+      relatedNames: config.element.relatedNames,
+    });
   }
 
-  validate(): boolean {
-    if (!super.validate()) return false;
-    if (!this.element) {
-      console.error('Element is required for locate instruction');
+  ToObject(): object {
+    return {
+      ...super.ToObject(),
+      element: this.element.ToObject()
+    };
+  }
+
+  Validate(): boolean {
+    if (!super.Validate()) {
       return false;
     }
+
+    if (!this.element) {
+      console.error(`Element is not valid for locate instruction`);
+      return false;
+    }
+
     return true;
   }
 
-  async execute(): Promise<ExecutionResult> {
+  async Execute(): Promise<ExecutionResult> {
     const startTime = Date.now();
-    
+
     try {
-      if (!this.validate()) {
+
+      if (!this.Validate()) {
         throw new Error('Invalid locate element instruction');
       }
 
-      await this.wait(this.delay);
-      
-      const result = await this.executeWithRetry(async () => {
-        const success = this.element.validate();
-        if (!success) {
-          throw new Error(`Element "${this.element.name}" not found or not valid`);
-        }
-        return { success: true, element: this.element };
+      await this.Delay(this.delay);
+
+      const result = await this.ExecuteWithRetry(async () => {
+        return { success: this.element.Validate(), element: this.element };
       });
 
       return {
         instructionID: this.id,
-        success: true,
+        success: result.success,
         duration: Date.now() - startTime,
-        data: { elementName: this.element.name }
+        data: { element: result.element }
       };
     } catch (error) {
       return {
@@ -243,19 +277,14 @@ export class ClickInstruction extends BaseInstructionImpl {
   public offsetX: number;
   public offsetY: number;
 
-  constructor(config: {
-    id: string;
+  constructor(config: BaseInstructionMembers & {
     elementName: string;
     button?: 'left' | 'middle' | 'right';
     clickType?: 'single' | 'double';
     offsetX?: number;
     offsetY?: number;
-    delay?: number;
-    retry?: number;
-    timeout?: number;
-    waitVisible?: boolean;
   }) {
-    super({ ...config, type: 'click' });
+    super(config);
     this.elementName = config.elementName;
     this.button = config.button || 'left';
     this.clickType = config.clickType || 'single';
@@ -263,27 +292,42 @@ export class ClickInstruction extends BaseInstructionImpl {
     this.offsetY = config.offsetY || 0;
   }
 
+  ToObject(): object {
+    return {
+      ...super.ToObject(),
+      elementName: this.elementName,
+      button: this.button,
+      clickType: this.clickType,
+      offsetX: this.offsetX,
+      offsetY: this.offsetY
+    };
+  }
+
   validate(): boolean {
-    if (!super.validate()) return false;
+    if (!super.Validate()) {
+      return false;
+    }
+
     if (!this.elementName) {
       console.error('Element name is required for click instruction');
       return false;
     }
+
     return true;
   }
 
-  async execute(): Promise<ExecutionResult> {
+  async Execute(): Promise<ExecutionResult> {
     const startTime = Date.now();
-    
+
     try {
-      if (!this.validate()) {
+      if (!this.Validate()) {
         throw new Error('Invalid click instruction');
       }
 
-      await this.wait(this.delay);
-      
-      const result = await this.executeWithRetry(async () => {
-        // 这里需要从元素管理器中获取元素
+      await this.Delay(this.delay);
+
+      const result = await this.ExecuteWithRetry(async () => {
+        // TODO: 这里需要从元素管理器中获取元素
         // 暂时返回模拟结果
         return { success: true };
       });
@@ -292,10 +336,12 @@ export class ClickInstruction extends BaseInstructionImpl {
         instructionID: this.id,
         success: true,
         duration: Date.now() - startTime,
-        data: { 
+        data: {
           elementName: this.elementName,
           button: this.button,
-          clickType: this.clickType
+          clickType: this.clickType,
+          offsetX: this.offsetX,
+          offsetY: this.offsetY
         }
       };
     } catch (error) {
@@ -317,51 +363,61 @@ export class DragInstruction extends BaseInstructionImpl {
   public targetName: string;
   public duration: number;
 
-  constructor(config: {
-    id: string;
+  constructor(config: BaseInstructionMembers & {
+    type: string;
     sourceName: string;
     targetName: string;
     duration?: number;
-    delay?: number;
-    retry?: number;
-    timeout?: number;
-    waitVisible?: boolean;
   }) {
-    super({ ...config, type: 'drag' });
+    super(config);
     this.sourceName = config.sourceName;
     this.targetName = config.targetName;
     this.duration = config.duration || 1;
   }
 
-  validate(): boolean {
-    if (!super.validate()) return false;
+  ToObject(): object {
+    return {
+      ...super.ToObject(),
+      sourceName: this.sourceName,
+      targetName: this.targetName,
+      duration: this.duration
+    };
+  }
+
+  Validate(): boolean {
+    if (!super.Validate()) {
+      return false;
+    }
+
     if (!this.sourceName || !this.targetName) {
       console.error('Source and target names are required for drag instruction');
       return false;
     }
+
     return true;
   }
 
-  async execute(): Promise<ExecutionResult> {
+  async Execute(): Promise<ExecutionResult> {
     const startTime = Date.now();
-    
+
     try {
-      if (!this.validate()) {
+      if (!this.Validate()) {
         throw new Error('Invalid drag instruction');
       }
 
-      await this.wait(this.delay);
-      
-      const result = await this.executeWithRetry(async () => {
-        // 实现拖拽逻辑
+      await this.Delay(this.delay);
+
+      const result = await this.ExecuteWithRetry(async () => {
+        // TODO: 这里需要从元素管理器中获取元素
+        // 暂时返回模拟结果
         return { success: true };
       });
 
       return {
         instructionID: this.id,
-        success: true,
+        success: result.success,
         duration: Date.now() - startTime,
-        data: { 
+        data: {
           sourceName: this.sourceName,
           targetName: this.targetName,
           duration: this.duration
@@ -387,53 +443,62 @@ export class InputTextInstruction extends BaseInstructionImpl {
   public clearFirst: boolean;
   public timeDelay: number;
 
-  constructor(config: {
-    id: string;
+  constructor(config: BaseInstructionMembers & {
     elementName: string;
     text: string;
     clearFirst?: boolean;
     timeDelay?: number;
-    delay?: number;
-    retry?: number;
-    timeout?: number;
-    waitVisible?: boolean;
   }) {
-    super({ ...config, type: 'input_text' });
+    super(config);
     this.elementName = config.elementName;
     this.text = config.text;
     this.clearFirst = config.clearFirst || false;
     this.timeDelay = config.timeDelay || 0.1;
   }
 
-  validate(): boolean {
-    if (!super.validate()) return false;
+  ToObject(): object {
+    return {
+      ...super.ToObject(),
+      elementName: this.elementName,
+      text: this.text,
+      clearFirst: this.clearFirst,
+      timeDelay: this.timeDelay
+    };
+  }
+
+  Validate(): boolean {
+    if (!super.Validate()) {
+      return false;
+    }
+
     if (!this.elementName) {
       console.error('Element name is required for input text instruction');
       return false;
     }
+
     return true;
   }
 
-  async execute(): Promise<ExecutionResult> {
+  async Execute(): Promise<ExecutionResult> {
     const startTime = Date.now();
-    
+
     try {
-      if (!this.validate()) {
+      if (!this.Validate()) {
         throw new Error('Invalid input text instruction');
       }
 
-      await this.wait(this.delay);
-      
-      const result = await this.executeWithRetry(async () => {
+      await this.Delay(this.delay);
+
+      const result = await this.ExecuteWithRetry(async () => {
         // 实现文本输入逻辑
         return { success: true };
       });
 
       return {
         instructionID: this.id,
-        success: true,
+        success: result.success,
         duration: Date.now() - startTime,
-        data: { 
+        data: {
           elementName: this.elementName,
           text: this.text,
           clearFirst: this.clearFirst
@@ -458,24 +523,30 @@ export class KeyPressInstruction extends BaseInstructionImpl {
   public key: string;
   public modifiers: string[];
 
-  constructor(config: {
-    id: string;
+  constructor(config: BaseInstructionMembers & {
     elementName: string;
     key: string;
     modifiers?: string[];
-    delay?: number;
-    retry?: number;
-    timeout?: number;
-    waitVisible?: boolean;
   }) {
-    super({ ...config, type: 'key_press' });
+    super(config);
     this.elementName = config.elementName;
     this.key = config.key;
     this.modifiers = config.modifiers || [];
   }
 
-  validate(): boolean {
-    if (!super.validate()) return false;
+  ToObject(): object {
+    return {
+      ...super.ToObject(),
+      elementName: this.elementName,
+      key: this.key,
+      modifiers: this.modifiers
+    };
+  }
+
+  Validate(): boolean {
+    if (!super.Validate()) {
+      return false;
+    }
     if (!this.elementName || !this.key) {
       console.error('Element name and key are required for key press instruction');
       return false;
@@ -483,26 +554,27 @@ export class KeyPressInstruction extends BaseInstructionImpl {
     return true;
   }
 
-  async execute(): Promise<ExecutionResult> {
+  async Execute(): Promise<ExecutionResult> {
     const startTime = Date.now();
-    
+
     try {
-      if (!this.validate()) {
+      if (!this.Validate()) {
         throw new Error('Invalid key press instruction');
       }
 
-      await this.wait(this.delay);
-      
-      const result = await this.executeWithRetry(async () => {
-        // 实现按键逻辑
+      await this.Delay(this.delay);
+
+      const result = await this.ExecuteWithRetry(async () => {
+        // TODO: 这里需要从元素管理器中获取元素
+        // 暂时返回模拟结果
         return { success: true };
       });
 
       return {
         instructionID: this.id,
-        success: true,
+        success: result.success,
         duration: Date.now() - startTime,
-        data: { 
+        data: {
           elementName: this.elementName,
           key: this.key,
           modifiers: this.modifiers
@@ -526,22 +598,29 @@ export class WaitInstruction extends BaseInstructionImpl {
   public waitType: 'time' | 'element' | 'visible' | 'condition' | 'network' | 'function';
   public value: any;
 
-  constructor(config: {
-    id: string;
+  constructor(config: BaseInstructionMembers & {
     waitType: 'time' | 'element' | 'visible' | 'condition' | 'network' | 'function';
     value: any;
-    delay?: number;
-    retry?: number;
-    timeout?: number;
-    waitVisible?: boolean;
   }) {
-    super({ ...config, type: 'wait' });
+    super(config);
     this.waitType = config.waitType;
     this.value = config.value;
   }
 
+  ToObject(): object {
+    return {
+      ...super.ToObject(),
+      waitType: this.waitType,
+      value: this.value
+    };
+  }
+
   validate(): boolean {
-    if (!super.validate()) return false;
+
+    if (!super.Validate()) {
+      return false;
+    }
+
     if (!this.waitType || this.value === undefined) {
       console.error('Wait type and value are required for wait instruction');
       return false;
@@ -549,20 +628,20 @@ export class WaitInstruction extends BaseInstructionImpl {
     return true;
   }
 
-  async execute(): Promise<ExecutionResult> {
+  async Execute(): Promise<ExecutionResult> {
     const startTime = Date.now();
-    
+
     try {
       if (!this.validate()) {
         throw new Error('Invalid wait instruction');
       }
 
-      await this.wait(this.delay);
-      
-      const result = await this.executeWithRetry(async () => {
+      await this.Delay(this.delay);
+
+      const result = await this.ExecuteWithRetry(async () => {
         switch (this.waitType) {
           case 'time':
-            await this.wait(this.value);
+            await this.Delay(this.value);
             break;
           case 'element':
             // 等待元素出现
@@ -587,7 +666,7 @@ export class WaitInstruction extends BaseInstructionImpl {
         instructionID: this.id,
         success: true,
         duration: Date.now() - startTime,
-        data: { 
+        data: {
           waitType: this.waitType,
           value: this.value
         }
@@ -611,24 +690,30 @@ export class GetTextInstruction extends BaseInstructionImpl {
   public textType: 'innerText' | 'textContent' | 'value';
   public includeHTML: boolean;
 
-  constructor(config: {
-    id: string;
+  constructor(config: BaseInstructionMembers & {
     elementName: string;
     textType?: 'innerText' | 'textContent' | 'value';
     includeHTML?: boolean;
-    delay?: number;
-    retry?: number;
-    timeout?: number;
-    waitVisible?: boolean;
   }) {
-    super({ ...config, type: 'get_text' });
+    super(config);
     this.elementName = config.elementName;
     this.textType = config.textType || 'innerText';
     this.includeHTML = config.includeHTML || false;
   }
 
-  validate(): boolean {
-    if (!super.validate()) return false;
+  ToObject(): object {
+    return {
+      ...super.ToObject(),
+      elementName: this.elementName,
+      textType: this.textType,
+      includeHTML: this.includeHTML
+    };
+  }
+
+  Validate(): boolean {
+    if (!super.Validate()) {
+      return false;
+    }
     if (!this.elementName) {
       console.error('Element name is required for get text instruction');
       return false;
@@ -636,26 +721,27 @@ export class GetTextInstruction extends BaseInstructionImpl {
     return true;
   }
 
-  async execute(): Promise<ExecutionResult> {
+  async Execute(): Promise<ExecutionResult> {
     const startTime = Date.now();
-    
+
     try {
-      if (!this.validate()) {
+      if (!this.Validate()) {
         throw new Error('Invalid get text instruction');
       }
 
-      await this.wait(this.delay);
-      
-      const result = await this.executeWithRetry(async () => {
-        // 实现文本获取逻辑
+      await this.Delay(this.delay);
+
+      const result = await this.ExecuteWithRetry(async () => {
+        // TODO: 这里需要从元素管理器中获取元素
+        // 暂时返回模拟结果
         return { success: true, text: '' };
       });
 
       return {
         instructionID: this.id,
-        success: true,
+        success: result.success,
         duration: Date.now() - startTime,
-        data: { 
+        data: {
           elementName: this.elementName,
           textType: this.textType,
           includeHTML: this.includeHTML,

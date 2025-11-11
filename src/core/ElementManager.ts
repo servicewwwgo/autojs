@@ -168,7 +168,7 @@ export class ElementManager {
     const errors: string[] = [];
     
     for (const [name, element] of this.elements) {
-      if (!element.validate()) {
+      if (!element.Validate()) {
         errors.push(`元素 "${name}" 验证失败`);
       }
     }
@@ -187,7 +187,7 @@ export class ElementManager {
       if (element instanceof Element) {
         // 重新查找DOM元素
         (element as Element).dom = null;
-        element.validate();
+        element.Validate();
       }
     }
     console.log('所有元素DOM引用已刷新');

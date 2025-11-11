@@ -300,7 +300,7 @@ async function retryConnection(maxRetries = 3) {
   return false;
 }
 
-// 发送消息到background script
+// 发送消息到 background script
 async function sendMessageToBackground(action: string, data?: any): Promise<any> {
   return new Promise((resolve) => {
     browser.runtime.sendMessage({ action, data }, (response) => {
