@@ -1,37 +1,9 @@
-import { ElementObject, Element } from '../types/Element';
-import {
-  BaseInstruction,
-  NavigateInstruction,
-  LocateElementInstruction,
-  ClickInstruction,
-  DragInstruction,
-  InputTextInstruction,
-  KeyPressInstruction,
-  WaitInstruction,
-  GetTextInstruction
-} from '../types/Instructions';
-
-const INSTRUCTION_MAP = {
-  'navigate': NavigateInstruction,
-  'locate_element': LocateElementInstruction,
-  'click': ClickInstruction,
-  'drag': DragInstruction,
-  'input_text': InputTextInstruction,
-  'key_press': KeyPressInstruction,
-  'wait': WaitInstruction,
-  'get_text': GetTextInstruction
-};
+import { BaseInstruction, INSTRUCTION_MAP } from '../types/Instructions';
 
 /**
  * 指令对象解析器 - 从JSON文件中解析指令对象
  */
 export class InstructionParser {
-  private elementManager: any; // 元素管理器引用
-
-  constructor(elementManager?: any) {
-    this.elementManager = elementManager;
-  }
-
   /**
    * 解析单个指令
    */
@@ -43,13 +15,6 @@ export class InstructionParser {
     }
 
     return new InstructionClass(data);
-  }
-
-  /**
-   * 设置元素管理器
-   */
-  setElementManager(elementManager: any): void {
-    this.elementManager = elementManager;
   }
 
   /*

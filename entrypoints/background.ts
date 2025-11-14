@@ -8,25 +8,23 @@ export interface NodeProfile {
 
 // 指令接口
 export interface Instruction {
-  index: number;      // 标签页索引，从0开始
+  tabId: number;      // 标签页ID
   instruction: any;   // 指令文本，json格式
   created_at: number; // 创建时间戳, 超时时间一小时也会删除
 }
 
-// 任务接口
-export interface Task {
-  type: string;
-  data: any;
-}
+// 回复類型
+export type ReplyType = 'instruction' | 'connections' | 'expire' | 'notify';
 
 // 回复接口
 export interface Reply {
-  node_id: string;
-  node_name: string;
-  node_type: string;
-  index: number;
-  data: any;
-  created_at: number;
+  node_id: string; // 节点ID
+  node_name: string; // 节点名称
+  node_type: string; // 节点类型
+  tabId: number;  // 标签页ID
+  type: ReplyType; // 类型
+  data: any; // 数据
+  created_at: number; // 创建时间
 }
 
 // 存储已连接的 content script 信息
@@ -50,10 +48,8 @@ export default defineBackground(() => {
   let CONN_HOST: string = 'http://127.0.0.1:5000';
   // 存储auth token路径
   let CRAWLER_AUTH_PATH: string = '/api/auth/login/crawler';
-  // 存储任务列表路径
-  let CRAWLER_TASK_PATH: string = '/api/instruction/list';
-  // 存储指令回复路径
-  let CRAWLER_TASK_REPLY_PATH: string = '/api/task/reply';
+  // 存储指令列表路径
+  let CRAWLER_INSTRUCTION_PATH: string = '/api/instruction/list';
   // 存储指令回复路径
   let CRAWLER_INSTRUCTION_REPLY_PATH: string = '/api/instruction/reply';
 
@@ -61,6 +57,7 @@ export default defineBackground(() => {
 
   // 存储 JWT token
   let authToken: string | null = null;
+
   // 存储节点配置信息
   let nodeProfile: NodeProfile = {
     node_id: '',
@@ -141,74 +138,95 @@ export default defineBackground(() => {
 
     if (Object.keys(updates).length > 0) {
       await browser.storage.local.set(updates);
-      console.log('节点配置已更新:', updates);
-    }
-  }
 
+      nodeProfile.node_name = updates.node_name ?? nodeProfile.node_name;
+      nodeProfile.node_token = updates.node_token ?? nodeProfile.node_token;
+    }
+
+    console.log('节点配置已更新:', updates);
+  }
+ 
   // ==================== 指令管理器 ====================
 
-  // 使用内存 Map 存储指令列表（按标签页索引分组）
+  // 使用内存 Map 存储指令列表（按标签页ID分组）
   const instructionsMap = new Map<number, Instruction[]>();
 
-  // 添加指令到指定标签页索引的队列
+  // 添加指令到指定标签页ID的队列
   function addInstructions(newInstructions: Instruction[]): number {
     const now = Date.now();
 
-    // 按index分组指令
-    const instructionsByIndex: { [key: number]: Instruction[] } = {};
+    // 按 tabId 分组指令
+    const instructionsByTabId: { [key: number]: Instruction[] } = {};
+    let addedCount = 0; // 实际添加的指令数量
 
     for (const instruction of newInstructions) {
-      if (!instructionsByIndex[instruction.index]) {
-        instructionsByIndex[instruction.index] = [];
+
+      // 指令必须包含 tabId
+      if (!instruction.tabId) {
+        console.warn(`指令缺少 tabId，跳过该指令`);
+        continue;
       }
-      instructionsByIndex[instruction.index].push({ ...instruction, created_at: now }); // 添加到队列末尾（先进先出）
+
+      const tabId = instruction.tabId;
+      
+      if (!instructionsByTabId[tabId]) {
+        instructionsByTabId[tabId] = [];
+      }
+
+      instructionsByTabId[tabId].push({ ...instruction, created_at: now }); // 添加到队列末尾（先进先出）
+      addedCount++;
     }
 
-    // 为每个index的指令队列添加新指令
-    for (const [indexStr, instructions] of Object.entries(instructionsByIndex)) {
-      const index = parseInt(indexStr);
-      const existingInstructions = instructionsMap.get(index) || [];
+    // 为每个tabId的指令队列添加新指令
+    for (const [tabIdStr, instructions] of Object.entries(instructionsByTabId)) {
+      const tabId = parseInt(tabIdStr);
+      const existingInstructions = instructionsMap.get(tabId) || [];
       existingInstructions.push(...instructions); // 添加到队列末尾（先进先出）
-      instructionsMap.set(index, existingInstructions);
-      console.log(`添加 ${instructions.length} 个指令到标签页 ${index} 队列，总数: ${existingInstructions.length} 个`);
+      instructionsMap.set(tabId, existingInstructions);
+      console.log(`添加 ${instructions.length} 个指令到标签页 ${tabId} 队列，总数: ${existingInstructions.length} 个`);
     }
 
-    console.log(`添加新指令完成，总数: ${newInstructions.length} 个`);
-    return newInstructions.length;
+    console.log(`添加新指令完成，总数: ${newInstructions.length} 个，实际添加: ${addedCount} 个`);
+    return addedCount; // 返回实际添加的指令数量
   }
 
-  // 获取指定标签页索引的第一个指令并删除（先进先出）
-  function getFirstInstructionByIndexAndDelete(index: number): Instruction | null {
-    const instructions = instructionsMap.get(index) || [];
+  // 獲取指令的總數量
+  function getInstructionsTotalCount(): number {
+    return instructionsMap.size;
+  }
+
+  // 获取指定标签页ID的第一个指令并删除（先进先出）
+  function getFirstInstructionByTabIdAndDelete(tabId: number): Instruction | null {
+    const instructions = instructionsMap.get(tabId) || [];
 
     if (instructions.length === 0) {
-      console.log(`标签页 ${index} 没有待执行指令`);
+      console.log(`标签页 ${tabId} 没有待执行指令`);
       return null;
     }
 
     const firstInstruction = instructions.shift(); // 获取第一个指令（先进先出）
-    instructionsMap.set(index, instructions); // 保存更新后的指令列表
+    instructionsMap.set(tabId, instructions); // 保存更新后的指令列表
 
-    console.log(`获取标签页 ${index} 的第一个指令，剩余: ${instructions.length} 个`);
+    console.log(`获取标签页 ${tabId} 的第一个指令，剩余: ${instructions.length} 个`);
     return firstInstruction || null;
   }
 
-  // 获取指定标签页索引的所有指令并删除
-  function getInstructionsByIndexAndDelete(index: number): Instruction[] {
-    const instructions = instructionsMap.get(index) || [];
+  // 获取指定标签页ID的所有指令并删除
+  function getInstructionsByTabIdAndDelete(tabId: number): Instruction[] {
+    const instructions = instructionsMap.get(tabId) || [];
 
     if (instructions.length > 0) {
-      instructionsMap.set(index, []); // 清空队列
+      instructionsMap.set(tabId, []); // 清空队列
     }
 
-    console.log(`获取标签页 ${index} 的所有指令，数量: ${instructions.length} 个，已清空队列`);
+    console.log(`获取标签页 ${tabId} 的所有指令，数量: ${instructions.length} 个，已清空队列`);
     return instructions;
   }
 
-  // 获取指定标签页索引的指令数量
-  function getInstructionsCountByIndex(index: number): number {
-    const instructions = instructionsMap.get(index) || [];
-    console.log(`标签页 ${index} 的指令数量: ${instructions.length} 个`);
+  // 获取指定标签页ID的指令数量
+  function getInstructionsCountByTabId(tabId: number): number {
+    const instructions = instructionsMap.get(tabId) || [];
+    console.log(`标签页 ${tabId} 的指令数量: ${instructions.length} 个`);
     return instructions.length;
   }
 
@@ -216,19 +234,19 @@ export default defineBackground(() => {
   function getAllInstructionsStats(): { [key: number]: number } {
     const stats: { [key: number]: number } = {};
 
-    // 遍历所有索引，获取每个索引的指令数量
-    for (const [index, instructions] of instructionsMap.entries()) {
-      stats[index] = instructions.length;
+    // 遍历所有tabId，获取每个tabId的指令数量
+    for (const [tabId, instructions] of instructionsMap.entries()) {
+      stats[tabId] = instructions.length;
     }
 
     console.log('所有标签页指令统计:', stats);
     return stats;
   }
 
-  // 清空指定标签页索引的指令队列
-  function clearInstructionsByIndex(index: number): boolean {
-    instructionsMap.set(index, []);
-    console.log(`清空标签页 ${index} 的指令队列`);
+  // 清空指定标签页ID的指令队列
+  function clearInstructionsByTabId(tabId: number): boolean {
+    instructionsMap.set(tabId, []);
+    console.log(`清空标签页 ${tabId} 的指令队列`);
     return true;
   }
 
@@ -237,15 +255,15 @@ export default defineBackground(() => {
     let totalDeleted = 0; // 删除指令总数
     const now = Date.now();
 
-    // 遍历所有索引
-    for (const [index, allInstructions] of instructionsMap.entries()) {
+    // 遍历所有tabId
+    for (const [tabId, allInstructions] of instructionsMap.entries()) {
       const remainingInstructions = allInstructions.filter(instruction => now - instruction.created_at < elapsedTime); // 剩余指令
       const deletedCount = allInstructions.length - remainingInstructions.length; // 删除指令数量
 
       if (deletedCount > 0) {
         totalDeleted += deletedCount; // 累加删除指令数量
-        instructionsMap.set(index, remainingInstructions); // 保存剩余指令
-        console.log(`标签页 ${index} 删除过期指令 ${deletedCount} 个，剩余 ${remainingInstructions.length} 个`);
+        instructionsMap.set(tabId, remainingInstructions); // 保存剩余指令
+        console.log(`标签页 ${tabId} 删除过期指令 ${deletedCount} 个，剩余 ${remainingInstructions.length} 个`);
       }
     }
 
@@ -287,14 +305,44 @@ export default defineBackground(() => {
     }
   }
 
-  // 获取所有已连接的 content script 信息
-  function getConnectedContentScripts(): ConnectedContentScript[] {
-    return Array.from(connectedContentScripts.values());
+  // 獲取所有已連接的 content script 的 tabId
+  function getAllConnectedContentScriptTabIds(): number[] {
+    return Array.from(connectedContentScripts.keys());
+  }
+
+  // 獲取所有已連接的 content script 的 tabId, index, url
+  function getAllConnectedContentScriptTabIdsAndIndexAndUrl(): { tabId: number, index: number, url: string }[] {
+    return Array.from(connectedContentScripts.values()).map(connInfo => ({ tabId: connInfo.tabId, index: connInfo.tabIndex, url: connInfo.url ?? '' }));
   }
 
   // 检查指定标签页是否已连接
   function isContentScriptConnected(tabId: number): boolean {
     return connectedContentScripts.has(tabId);
+  }
+
+  // 获取所有已连接的 content script 信息
+  function getConnectedContentScripts(): ConnectedContentScript[] {
+    return Array.from(connectedContentScripts.values());
+  }
+
+  // 根據tabid獲取對象
+  function getConnectedContentScriptByTabId(tabId: number): ConnectedContentScript | undefined {
+    return connectedContentScripts.get(tabId);
+  }
+
+  // 根據tabid獲取url
+  function getUrlByTabId(tabId: number): string | undefined {
+    return getConnectedContentScriptByTabId(tabId)?.url ?? undefined;
+  }
+
+  // 根據tabid獲取index
+  function getIndexByTabId(tabId: number): number | undefined {
+    return getConnectedContentScriptByTabId(tabId)?.tabIndex ?? undefined;
+  }
+
+  // 根据 index 获取对应的 tabId
+  function getTabIdByIndex(index: number): number | null {
+    return Array.from(connectedContentScripts.values()).find(connInfo => connInfo.tabIndex === index)?.tabId ?? null;
   }
 
   // ==================== 任务管理器 ====================
@@ -379,8 +427,8 @@ export default defineBackground(() => {
     return false;
   }
 
-  // 执行任务
-  async function executeTask(task: Task): Promise<void> {
+  // 执行 service worker 任务
+  async function executeTask(task: any): Promise<void> {
     console.log('开始执行任务:', task.type, '，数据:', JSON.stringify(task.data));
 
     const startTime = Date.now();
@@ -393,10 +441,25 @@ export default defineBackground(() => {
         console.log('执行 javascript 代码，不执行');
         break;
       case 'clear':
-        clearInstructionsByIndex(task.data.index); // 清空指定标签页索引的指令队列
+        {
+          // task.data 必须包含 tabId
+          const tabId = task.data.tabId;
+          if (tabId) {
+            clearInstructionsByTabId(tabId); // 清空指定标签页ID的指令队列
+          } else {
+            console.warn(`任务缺少 tabId，跳过清空操作`);
+          }
+        }
         break;
       case 'expire':
-        deleteInstructionsByCreatedAt(task.data.elapsedTime); // 删除过期指令
+        {
+          deleteInstructionsByCreatedAt(task.data.elapsedTime); // 删除过期指令
+        }
+        break;
+      case 'connections':
+        {
+          replyResultToServer(CRAWLER_INSTRUCTION_REPLY_PATH, -1, 'connections', { connections: getConnectedContentScripts() });
+        }
         break;
       default:
         console.log('未知的任务类型:', task.type, '，不执行'); // 打印未知的任务类型，不执行
@@ -431,9 +494,11 @@ export default defineBackground(() => {
       if (pendingInstructionsCount === 0) {
         // 获取任务列表，指令列表
         pendingInstructionsCount = await task();
+        // 执行 service worker 任务
+        await execute();
       }
 
-      if (pendingInstructionsCount > 0) {
+      if (getInstructionsTotalCount() > 0) {
         // 通知 content script 处理待执行指令
         if (await notify() === false) {
           console.error('通知 content script 处理待执行指令失败');
@@ -501,24 +566,28 @@ export default defineBackground(() => {
     const responseData = await response.json();
     authToken = responseData.data.token;
 
-    console.log('登录成功，获得token!' + responseData.data);
+    console.log('登录成功，获得token:', responseData.data);
     return true;
   }
 
-  // 第三步：获取任务列表, 并执行任务, 并保存指令
+  // 第三步：获取指令列表
   async function task(): Promise<number> {
     console.log('获取任务列表，指令列表...');
 
     const profile = await GetNodeProfile();
 
-    const url = new URL(CONN_HOST + CRAWLER_TASK_PATH + '?node_id=' + profile.node_id);
+    const data = getAllConnectedContentScriptTabIdsAndIndexAndUrl();
 
-    const response = await fetch(url.toString(), {
-      method: 'GET',
+    const response = await fetch(CONN_HOST + CRAWLER_INSTRUCTION_PATH, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + (authToken || ''),
       },
+      body: JSON.stringify({
+        node_id: profile.node_id,
+        tabs: data
+      }),
     });
 
     if (!response.ok) {
@@ -528,62 +597,55 @@ export default defineBackground(() => {
 
     const responseData = await response.json();
 
-    const tasks = responseData.data.tasks;
-
-    if (tasks && tasks.length > 0) {
-      for (const task of tasks) {
-        await executeTask(task);
-      }
-    }
-
-    const instructions: Instruction[] = responseData.data.instructions;
-
-    if (instructions && instructions.length > 0) {
-      addInstructions(instructions);
-    }
-
     console.log('任务列表，指令列表获取成功!', responseData);
-    return instructions ? instructions.length : 0;
+
+    // 添加指令
+    return addInstructions(responseData.data.instructions); // 返回添加的指令数量
   }
 
   // 第三步: 通知 content script 获取消息
   async function notify(): Promise<boolean> {
     console.log('开始通知 content script...');
 
-    const results: { index: number; success: boolean; error?: string }[] = [];
+    const results: { tabId: number; success: boolean; error?: string }[] = [];
 
     const instructionsStats = getAllInstructionsStats();  // 获取所有标签页的指令统计信息
 
-    const indexesWithInstructions = Object.keys(instructionsStats).map(index => parseInt(index)).filter(index => instructionsStats[index] > 0); // 找出有待执行指令的标签页索引（指令数量 > 0）
+    const tabIdsWithInstructions = Object.keys(instructionsStats).map(tabId => parseInt(tabId)).filter(tabId => instructionsStats[tabId] > 0); // 找出有待执行指令的标签页ID（指令数量 > 0）
 
-    if (indexesWithInstructions.length === 0) {
+    if (tabIdsWithInstructions.length === 0) {
       console.log('没有待执行的指令，无需通知 content script');
       return true;
     }
 
-    console.log(`有待执行指令的标签页索引: ${indexesWithInstructions.join(', ')}`);
+    console.log(`有待执行指令的标签页ID: ${tabIdsWithInstructions.join(', ')}`);
 
     const connectedScripts = getConnectedContentScripts();  // 获取所有已连接的 content script 信息
     console.log(`已连接的 content script 列表:`, connectedScripts.map(cs => `标签页 ${cs.tabId} (index: ${cs.tabIndex})`).join(', '));
 
-    const indexToConnection = new Map<number, typeof connectedScripts[0]>();  // 创建索引到连接信息的映射
+    const tabIdToConnection = new Map<number, typeof connectedScripts[0]>();  // 创建tabId到连接信息的映射
 
     for (const connInfo of connectedScripts) {
-      indexToConnection.set(connInfo.tabIndex, connInfo);
+      tabIdToConnection.set(connInfo.tabId, connInfo);
     }
 
-    if (indexToConnection.size === 0) {
+    if (tabIdToConnection.size === 0) {
       console.log('没有已连接的 content script，无需通知');
       return true;
     }
 
     // 只通知有待执行指令的标签页
-    for (const index of indexesWithInstructions) {
-      const connInfo = indexToConnection.get(index);
+    for (const tabId of tabIdsWithInstructions) {
+
+      if(tabId === -1){
+        continue;
+      }
+
+      const connInfo = tabIdToConnection.get(tabId);
 
       if (!connInfo) {
-        console.warn(`标签页索引 ${index} 有待执行指令，但未找到已连接的 content script`);
-        results.push({ index, success: false, error: '未找到已连接的 content script' });
+        console.warn(`标签页ID ${tabId} 有待执行指令，但未找到已连接的 content script`);
+        results.push({ tabId, success: false, error: '未找到已连接的 content script' });
         continue;
       }
 
@@ -592,34 +654,27 @@ export default defineBackground(() => {
         let tab: Browser.tabs.Tab;
 
         try {
-          tab = await browser.tabs.get(connInfo.tabId);
+          tab = await browser.tabs.get(tabId);
         } catch (error) {
-          console.warn(`标签页 ${connInfo.tabId} 不存在，移除连接记录`);
-          removeContentScriptConnection(connInfo.tabId);
-          results.push({ index, success: false, error: '标签页不存在' });
+          console.warn(`标签页 ${tabId} 不存在，移除连接记录`);
+          removeContentScriptConnection(tabId);
+          results.push({ tabId, success: false, error: '标签页不存在' });
           continue;
         }
 
         // 检查标签页状态
         if (tab.status !== 'complete') {
-          console.warn(`标签页 ${connInfo.tabId} 状态: ${tab.status}, 等待加载完成...`);
+          console.warn(`标签页 ${tabId} 状态: ${tab.status}, 等待加载完成...`);
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
         // 直接向已连接的标签页发送通知（无需测试连接）
-        const success = await sendNotifyToConnected(connInfo.tabId, 3);
-
-        if (success) {
-          console.log(`标签页 ${connInfo.tabId} (index: ${index}, 指令数: ${instructionsStats[index]}) 通知成功`);
-          results.push({ index, success: true });
-        } else {
-          console.error(`标签页 ${connInfo.tabId} (index: ${index}) 通知失败`);
-          results.push({ index, success: false, error: '发送通知失败' });
-        }
-
+        const success = await sendNotifyToConnected(tabId, 3);
+        results.push({ tabId, success: success, error: success ? undefined : '发送通知失败' });
+        console.log(`标签页 ${tabId} 通知结果:`, results.find(r => r.tabId === tabId));
       } catch (error: any) {
-        console.error(`处理已连接标签页 ${connInfo.tabId} (index: ${index}) 时出错:`, error);
-        results.push({ index, success: false, error: error.message || '处理标签页时发生未知错误' });
+        console.error(`处理已连接标签页 ${tabId} 时出错:`, error);
+        results.push({ tabId, success: false, error: error.message || '处理标签页时发生未知错误' });
       }
     }
 
@@ -631,16 +686,30 @@ export default defineBackground(() => {
     console.log(`详细结果:`, results);
 
     if (failureCount > 0) {
-      await replyResultToServer(CRAWLER_INSTRUCTION_REPLY_PATH, -1, { success: false, error: 'content script 连接失败', results: results });
+      await replyResultToServer(CRAWLER_INSTRUCTION_REPLY_PATH, -1, 'notify', { success: false, error: 'content script 通知失败', results: results });
     }
 
     return successCount > 0;
   }
 
+  // 第四步: 執行服務器下發的指令
+  async function execute(): Promise<void> {
+    console.log('开始执行服务器下发的指令...');
+
+    const profile = await GetNodeProfile();
+
+    // 获取所有服务器下发的指令, tabId 為 -1 的指令
+    const instructions = getInstructionsByTabIdAndDelete(-1);
+
+    for (const instruction of instructions) {
+      await executeTask(instruction);
+    }
+  }
+
   // 回复结果到服务器
-  async function replyResultToServer(api: string, index: number, data: any): Promise<boolean> {
+  async function replyResultToServer(api: string, tabId: number, type: ReplyType, data: any): Promise<boolean> {
     try {
-      console.log('回复结果到服务器...');
+      console.log('开始回复结果到服务器...', api, tabId, type, data);
       return true;
 
       const profile = await GetNodeProfile();
@@ -649,7 +718,8 @@ export default defineBackground(() => {
         node_id: profile.node_id,
         node_name: profile.node_name,
         node_type: profile.node_type,
-        index: index,
+        tabId: tabId,
+        type: type,
         data: data,
         created_at: Date.now()
       }
@@ -666,8 +736,9 @@ export default defineBackground(() => {
       if (!response.ok) {
         throw new Error(`回复结果到服务器失败: ${response.status} ${response.statusText}`);
       }
+
       const responseData = await response.json();
-      return responseData.success;
+      return responseData.success !== false;
     } catch (error) {
       authToken = null;
       console.error('回复结果到服务器失败! 错误:', error);
@@ -685,8 +756,8 @@ export default defineBackground(() => {
     });
 
     // 创建定时器
-    browser.alarms.create('TaskPeriodicAlarm', { periodInMinutes: 10, delayInMinutes: 1 });
-    console.log('定时器创建完成'); // 打印定时器创建完成
+    // browser.alarms.create('TaskPeriodicAlarm', { periodInMinutes: 10, delayInMinutes: 1 });
+    // console.log('定时器创建完成'); // 打印定时器创建完成
   });
 
   // 监听来自 content script 和 popup 的消息
@@ -694,35 +765,24 @@ export default defineBackground(() => {
 
     try {
       console.log('收到消息:', request.action, request.data);
-      const sender_index = sender.tab?.index ?? -1;
-      const sender_tabId = sender.tab?.id;
+      const sender_tabId = sender.tab?.id ?? -1;
 
       switch (request.action) {
         case 'contentScriptReady':
           {
             // 先立即响应，保持消息通道开放
-            console.log(`收到内容脚本就绪消息，标签页 ${sender_tabId} (index: ${sender_index})`);
+            console.log(`收到内容脚本就绪消息，标签页 ${sender_tabId}`);
             sendResponse({ success: true, message: '连接已记录' });
-            break;
-          }
-        case 'taskReply':
-          {
-            console.log('任务返回结果开始...');
-            replyResultToServer(CRAWLER_TASK_REPLY_PATH, sender_index, request.data).then((success: boolean) => {
-              sendResponse({ success: success, message: success ? '任务返回结果完成' : '任务返回结果失败' });
-            }).catch((error: any) => {
-              sendResponse({ success: false, error: error.message || '任务返回结果失败', message: '任务返回结果失败' });
-            });
             break;
           }
         case 'instructionReply':
           {
             console.log('指令返回结果开始...');
-            replyResultToServer(CRAWLER_INSTRUCTION_REPLY_PATH, sender_index, request.data).then((success: boolean) => {
+            replyResultToServer(CRAWLER_INSTRUCTION_REPLY_PATH, sender_tabId, 'instruction', request.data).then((success: boolean) => {
               sendResponse({ success: success, message: success ? '指令返回结果完成' : '指令返回结果失败' });
             }).catch((error: any) => {
               sendResponse({ success: false, error: error.message || '指令返回结果失败', message: '指令返回结果失败' });
-            });
+            }); 
             break;
           }
         case 'getNodeProfile':
@@ -748,22 +808,22 @@ export default defineBackground(() => {
         case 'getInstructions':
           {
             console.log('获取指令列表开始...');
-            const instructions = getInstructionsByIndexAndDelete(sender_index);
+            const instructions = getInstructionsByTabIdAndDelete(sender_tabId);
             sendResponse({ success: true, data: instructions, message: '指令列表获取完成' });
             break;
           }
         case 'getSingleInstruction':
           {
             console.log('获取第一个指令开始...');
-            const instruction = getFirstInstructionByIndexAndDelete(sender_index);
+            const instruction = getFirstInstructionByTabIdAndDelete(sender_tabId);
             sendResponse({ success: true, data: instruction, message: '第一个指令获取完成' });
             break;
           }
         case 'getInstructionsCount':
           {
             console.log('获取指令数量开始...');
-            const count = getInstructionsCountByIndex(sender_index);
-            sendResponse({ success: true, data: { count }, message: '指令数量获取完成' });
+            const count = getInstructionsCountByTabId(sender_tabId);
+            sendResponse({ success: true, data: { count: count }, message: '指令数量获取完成' });
             break;
           }
         case 'getAllInstructionsStats':
@@ -776,8 +836,8 @@ export default defineBackground(() => {
         case 'clearInstructions':
           {
             console.log('清空指令队列开始...');
-            const success = clearInstructionsByIndex(sender_index);
-            sendResponse({ success, message: success ? '指令队列已清空' : '清空失败' });
+            const success = clearInstructionsByTabId(sender_tabId);
+            sendResponse({ success: success, message: success ? '指令队列已清空' : '清空失败' });
             break;
           }
         case 'getConnectedContentScripts':
@@ -793,7 +853,7 @@ export default defineBackground(() => {
           break;
       }
 
-      if (sender_tabId && sender.tab) {
+      if (sender_tabId > 0 && sender.tab) {
         recordContentScriptConnection(sender_tabId).catch(error => {
           console.error('记录连接失败:', error);
         });

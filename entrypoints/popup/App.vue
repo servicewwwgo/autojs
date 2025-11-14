@@ -1,5 +1,7 @@
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue';
+import { BaseInstruction, LocateElementInstruction, WaitInstruction, NavigateInstruction , INSTRUCTION_MAP, ClickInstruction, InputTextInstruction, KeyPressInstruction, GetTextInstruction } from '@/src/types/Instructions';
+import { ElementObject, Element } from '@/src/types/Element';
 
 // 响应式数据
 const isRunning = ref(false);
@@ -15,44 +17,88 @@ const nodeProfile = ref({
   node_token: '',
   node_type: 'crawler'
 });
+
 const showNodeConfig = ref(false);
 const editingNodeName = ref('');
 const editingNodeToken = ref('');
 
+const navigateInstruction_nav_1 = new NavigateInstruction({
+  type: 'navigate',
+  id: 'nav_1',
+  url: 'https://www.google.com',
+  delay: 1,
+  retry: 1,
+  timeout: 30,
+  waitVisible: true
+});
+
+const locateElementInstruction_locate_1 = new LocateElementInstruction({
+  type: 'locate',
+  id: 'locate_1',
+  element: {
+    name: 'search_input',
+    description: '搜索输入框',
+    selector: '[aria-label="搜索"]',
+    selectorType: 'css',
+    text: '',
+  },
+  delay: 0,
+  retry: 1,
+  timeout: 30,
+  waitVisible: true
+});
+
+const waitInstruction_wait_1 = new WaitInstruction({
+  type: 'wait',
+  id: 'wait_1',
+  waitType: 'time',
+  value: 3,
+  delay: 0,
+  retry: 1,
+  timeout: 5,
+  waitVisible: false
+});
+
+const locateElementInstruction_locate_2 = new LocateElementInstruction({
+  type: 'locate',
+  id: 'locate_2',
+  element: {
+    name: 'search_button',
+    description: '搜索按钮',
+    selector: '[aria-label="Google 搜索"]',
+    selectorType: 'css',
+    text: '',
+  },
+  delay: 0,
+  retry: 1,
+  timeout: 30,
+  waitVisible: true
+});
+
+const clickInstruction_click_2 = new ClickInstruction({
+  type: 'click',
+  id: 'click_2',
+  elementName: 'search_button',
+  button: 'left',
+  clickType: 'single',
+  offsetX: 0,
+  offsetY: 0,
+  delay: 0,
+  retry: 1,
+  timeout: 30,
+  waitVisible: true
+});
+
 // 示例指令
 const sampleInstructions = ref(`[
-  {
-    "type": "navigate",
-    "id": "nav_1",
-    "url": "https://www.google.com",
-    "delay": 1,
-    "retry": 1,
-    "timeout": 30,
-    "waitVisible": true
-  }
+  ${JSON.stringify(locateElementInstruction_locate_1.ToObject(), null, 2)}
 ]`);
 
 // 复杂示例指令（包含多个操作）
+// locate 元素的selector为 [aria-label='搜索']
 const complexSampleInstructions = ref(`[
-  {
-    "type": "navigate",
-    "id": "nav_1",
-    "url": "https://www.google.com",
-    "delay": 1,
-    "retry": 1,
-    "timeout": 30,
-    "waitVisible": true
-  },
-  {
-    "type": "wait",
-    "id": "wait_1",
-    "waitType": "time",
-    "value": 3,
-    "delay": 0,
-    "retry": 0,
-    "timeout": 5,
-    "waitVisible": false
-  }
+  ${JSON.stringify(locateElementInstruction_locate_2.ToObject(), null, 2)} ,
+  ${JSON.stringify(clickInstruction_click_2.ToObject(), null, 2)}  
 ]`);
 
 // 组件挂载时初始化

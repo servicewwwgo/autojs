@@ -1,4 +1,5 @@
-import { ElementObject, Element } from './Element';
+import { ElementObject, Element, ElementMember } from './Element';
+import { elementManager } from '../core/ElementManager';
 
 /**
  * 执行指令结果对象
@@ -112,14 +113,17 @@ export abstract class BaseInstructionImpl implements BaseInstruction {
    */
   protected async ExecuteWithRetry<T>(fn: () => Promise<T>): Promise<T> {
     let lastError: Error | null = null;
+    
+    // 确保至少执行一次，即使 retry 为 0
+    const maxAttempts = Math.max(1, this.retry || 1);
 
-    for (let i = 1; i <= this.retry; i++) {
+    for (let i = 1; i <= maxAttempts; i++) {
       try {
         return await fn();
       } catch (error) {
         lastError = error as Error;
-        if (i < this.retry) {
-          console.warn(`Retry ${i}/${this.retry} for instruction ${this.id}`);
+        if (i < maxAttempts) {
+          console.warn(`Retry ${i}/${maxAttempts} for instruction ${this.id}`);
           await this.Delay(1); // 重试前等待1秒
         }
       }
@@ -201,7 +205,7 @@ export class NavigateInstruction extends BaseInstructionImpl {
 export class LocateElementInstruction extends BaseInstructionImpl {
   public element: ElementObject;
 
-  constructor(config: BaseInstructionMembers & { element: ElementObject }) {
+  constructor(config: BaseInstructionMembers & { element: ElementMember }) {
     super(config);
 
     this.element = new Element({
@@ -209,6 +213,7 @@ export class LocateElementInstruction extends BaseInstructionImpl {
       description: config.element.description,
       selector: config.element.selector,
       selectorType: config.element.selectorType,
+      text: '',
       parentName: config.element.parentName,
       childrenNames: config.element.childrenNames,
       relatedNames: config.element.relatedNames,
@@ -246,15 +251,19 @@ export class LocateElementInstruction extends BaseInstructionImpl {
 
       await this.Delay(this.delay);
 
-      const result = await this.ExecuteWithRetry(async () => {
-        return { success: this.element.Validate(), element: this.element };
+      const success = await this.ExecuteWithRetry(async () => {
+        return this.element.Validate();
       });
+
+      if (success) {
+        elementManager.setElement(this.element);
+      }
 
       return {
         instructionID: this.id,
-        success: result.success,
+        success: success,
         duration: Date.now() - startTime,
-        data: { element: result.element }
+        data: { element: success ? this.element.ToObject() : undefined }
       };
     } catch (error) {
       return {
@@ -491,6 +500,9 @@ export class InputTextInstruction extends BaseInstructionImpl {
 
       const result = await this.ExecuteWithRetry(async () => {
         // 实现文本输入逻辑
+
+
+
         return { success: true };
       });
 
@@ -685,7 +697,7 @@ export class WaitInstruction extends BaseInstructionImpl {
 /**
  * 文本获取输出指令
  */
-export class GetTextInstruction extends BaseInstructionImpl {
+export class GetTextInstruction extends BaseInstructionImpl {  
   public elementName: string;
   public textType: 'innerText' | 'textContent' | 'value';
   public includeHTML: boolean;
@@ -758,3 +770,18 @@ export class GetTextInstruction extends BaseInstructionImpl {
     }
   }
 }
+
+/**
+ * 指令映射
+ * 用于根据指令类型创建指令对象
+ */
+export const INSTRUCTION_MAP = {
+  'navigate': NavigateInstruction,
+  'locate': LocateElementInstruction,
+  'click': ClickInstruction,
+  'drag': DragInstruction,
+  'input_text': InputTextInstruction,
+  'key_press': KeyPressInstruction,
+  'wait': WaitInstruction,
+  'get_text': GetTextInstruction
+};

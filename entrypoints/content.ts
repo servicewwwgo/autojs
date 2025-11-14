@@ -110,7 +110,7 @@ function handleMessage(message: any, crawler: WebCrawler, sendResponse: (respons
       case 'importElements':
         console.log('导入元素:', message.data);
         if (crawler.importElements(message.data)) {
-          sendResponse({ success: true, data: crawler.getElementManager().getStatistics(), message: '元素导入完成' });
+          sendResponse({ success: true, data: crawler.getManager().getStatistics(), message: '元素导入完成' });
         } else {
           sendResponse({ success: false, error: '元素导入失败', message: '元素导入失败, 请检查元素配置格式是否正确' });
         }

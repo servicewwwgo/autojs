@@ -17,8 +17,8 @@ export class ElementManager {
   /**
    * 获取元素对象
    */
-  getElement(name: string): ElementObject | null {
-    return this.elements.get(name) || null;
+  getElement(name: string): ElementObject | undefined {
+    return this.elements.get(name);
   }
 
   /**
@@ -132,13 +132,14 @@ export class ElementManager {
   /**
    * 获取元素的父元素
    */
-  getParentElement(childName: string): ElementObject | null {
+  getParentElement(childName: string): ElementObject | undefined {
     const child = this.elements.get(childName);
+
     if (!child || !child.parentName) {
-      return null;
+      return undefined;
     }
     
-    return this.elements.get(child.parentName) || null;
+    return this.elements.get(child.parentName);
   }
 
   /**
@@ -151,7 +152,7 @@ export class ElementManager {
     }
     
     const related: ElementObject[] = [];
-    element.relatedNames.forEach(name => {
+    element.relatedNames?.forEach(name => {
       const relatedElement = this.elements.get(name);
       if (relatedElement) {
         related.push(relatedElement);
@@ -185,9 +186,7 @@ export class ElementManager {
   refreshAllElements(): void {
     for (const element of this.elements.values()) {
       if (element instanceof Element) {
-        // 重新查找DOM元素
-        (element as Element).dom = null;
-        element.Validate();
+        element.RefreshDom();
       }
     }
     console.log('所有元素DOM引用已刷新');
@@ -226,6 +225,7 @@ export class ElementManager {
         const element = new Element({
           name: elementData.name,
           description: elementData.description,
+          text: elementData.text,
           selector: elementData.selector,
           selectorType: elementData.selectorType,
           parentName: elementData.parentName,
@@ -252,14 +252,14 @@ export class ElementManager {
     if (element.parentName) {
       const parent = this.elements.get(element.parentName);
       if (parent) {
-        if (!parent.childrenNames.includes(element.name)) {
-          parent.childrenNames.push(element.name);
+        if (!parent.childrenNames?.includes(element.name)) {
+          parent.childrenNames?.push(element.name);
         }
       }
     }
     
     // 更新子元素关系
-    element.childrenNames.forEach(childName => {
+    element.childrenNames?.forEach(childName => {
       const child = this.elements.get(childName);
       if (child) {
         child.parentName = element.name;
@@ -267,10 +267,10 @@ export class ElementManager {
     });
     
     // 更新关联元素关系
-    element.relatedNames.forEach(relatedName => {
+    element.relatedNames?.forEach(relatedName => {
       const related = this.elements.get(relatedName);
-      if (related && !related.relatedNames.includes(element.name)) {
-        related.relatedNames.push(element.name);
+      if (related && !related.relatedNames?.includes(element.name)) {
+        related.relatedNames?.push(element.name);
       }
     });
   }
@@ -281,15 +281,15 @@ export class ElementManager {
   private cleanupReferences(removedName: string): void {
     for (const element of this.elements.values()) {
       // 清理子元素引用
-      const childIndex = element.childrenNames.indexOf(removedName);
+      const childIndex = element.childrenNames?.indexOf(removedName) ?? -1;
       if (childIndex > -1) {
-        element.childrenNames.splice(childIndex, 1);
+        element.childrenNames?.splice(childIndex, 1);
       }
       
       // 清理关联元素引用
-      const relatedIndex = element.relatedNames.indexOf(removedName);
+      const relatedIndex = element.relatedNames?.indexOf(removedName) ?? -1;
       if (relatedIndex > -1) {
-        element.relatedNames.splice(relatedIndex, 1);
+        element.relatedNames?.splice(relatedIndex, 1);
       }
     }
   }
@@ -318,10 +318,25 @@ export class ElementManager {
       
       // 统计关系
       if (element.parentName) stats.withParent++;
-      if (element.childrenNames.length > 0) stats.withChildren++;
-      if (element.relatedNames.length > 0) stats.withRelated++;
+      if (element.childrenNames?.length) stats.withChildren++;
+      if (element.relatedNames?.length) stats.withRelated++;
     }
     
     return stats;
   }
 }
+
+/**
+ * 全局單一实例对象
+ */
+export class ElementManagerSingleton {
+  private static instance: ElementManager;
+  public static getInstance(): ElementManager {
+    if (!ElementManagerSingleton.instance) {
+      ElementManagerSingleton.instance = new ElementManager();
+    }
+    return ElementManagerSingleton.instance;
+  }
+}
+
+export const elementManager: ElementManager = ElementManagerSingleton.getInstance();

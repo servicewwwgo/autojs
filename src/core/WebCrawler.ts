@@ -1,4 +1,4 @@
-import { ElementManager } from './ElementManager';
+import { ElementManager, elementManager } from './ElementManager';
 import { Executor } from './Executor';
 import { InstructionParser } from './Parser';
 import { BaseInstruction } from '../types/Instructions';
@@ -8,21 +8,21 @@ import { BaseInstruction } from '../types/Instructions';
  * 整合元素管理器、指令解析器和执行器
  */
 export class WebCrawler {
-  private elementManager: ElementManager;
+  private manager: ElementManager;
   private executor: Executor;
   private parser: InstructionParser;
 
   constructor() {
-    this.elementManager = new ElementManager();
+    this.manager = elementManager;
     this.executor = new Executor();
-    this.parser = new InstructionParser(this.elementManager);
+    this.parser = new InstructionParser();
   }
 
   /**
    * 获取元素管理器
    */
-  getElementManager(): ElementManager {
-    return this.elementManager;
+  getManager(): ElementManager {
+    return this.manager;
   }
 
   /**
@@ -56,14 +56,6 @@ export class WebCrawler {
       this.executor.addInstructions(instructions);
 
       console.log(`成功加载 ${instructions.length} 个指令`);
-
-      // 验证所有指令
-      const validation = this.executor.validateAll();
-
-      if (!validation.valid) {
-        console.error('指令验证失败:', validation.errors);
-        throw new Error('指令验证失败');
-      }
 
       // 执行指令
       console.log('开始执行指令...');
@@ -178,14 +170,14 @@ export class WebCrawler {
    * 导出元素配置
    */
   exportElements(): string {
-    return this.elementManager.exportElements();
+    return this.manager.exportElements();
   }
 
   /**
    * 导入元素配置
    */
   importElements(jsonData: string): boolean {
-    return this.elementManager.importElements(jsonData);
+    return this.manager.importElements(jsonData);
   }
 
   /**
@@ -199,7 +191,7 @@ export class WebCrawler {
    * 刷新所有元素
    */
   refreshElements(): void {
-    this.elementManager.refreshAllElements();
+    this.manager.refreshAllElements();
   }
 
   /**
@@ -210,7 +202,7 @@ export class WebCrawler {
     instructions: { valid: boolean; errors: string[] };
   } {
     return {
-      elements: this.elementManager.validateAllElements(),
+      elements: this.manager.validateAllElements(),
       instructions: this.executor.validateAll()
     };
   }

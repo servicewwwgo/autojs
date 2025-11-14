@@ -1,9 +1,9 @@
 /**
- * 元素对象 - 用来管理需要操作的页面元素
+ * 元素对象成员
  */
-export interface ElementObject {
+export interface ElementMember {
   /** DOM对象，用于表示具体的目标元素 */
-  dom: HTMLElement | null;
+  dom?: HTMLElement;
   /** 名称 */
   name: string;
   /** 描述，便于日志记录和调试 */
@@ -17,48 +17,50 @@ export interface ElementObject {
   /** 父元素名称 */
   parentName?: string;
   /** 子元素名称列表 */
-  childrenNames: string[];
+  childrenNames?: string[];
   /** 关联元素名称列表 */
-  relatedNames: string[];
+  relatedNames?: string[];
+}
 
+/**
+ * 元素对象 - 用来管理需要操作的页面元素
+ */
+export interface ElementObject extends ElementMember {
   /** 验证方法 */
   Validate(): boolean;
   /** 执行方法 */
-  Execute(): Promise<boolean>;
+  Execute(): boolean;
   /** 對象 */
   ToObject(): object;
+  /** 刷新dom */
+  RefreshDom(): void;
+  /** 获取元素文本 */
+  GetText(): string;
 }
 
 /**
  * 元素对象实现类
  */
 export class Element implements ElementObject {
-  public dom: HTMLElement | null = null;
+  public dom?: HTMLElement;
   public name: string;
   public description: string;
   public text: string;
   public selector: string;
   public selectorType: 'css' | 'xpath' | 'id';
   public parentName?: string;
-  public childrenNames: string[] = [];
-  public relatedNames: string[] = [];
+  public childrenNames?: string[];
+  public relatedNames?: string[];
 
-  constructor(config: {
-    name: string;
-    description: string;
-    selector: string;
-    selectorType: 'css' | 'xpath' | 'id';
-    parentName?: string;
-    childrenNames?: string[];
-    relatedNames?: string[];
-  }) {
+  constructor(config: ElementMember) {
+    this.dom = undefined;
     this.name = config.name;
     this.description = config.description;
     this.selector = config.selector;
     this.selectorType = config.selectorType;
     this.parentName = config.parentName;
-    this.childrenNames = config.childrenNames || [];
-    this.relatedNames = config.relatedNames || [];
+    this.childrenNames = config.childrenNames;
+    this.relatedNames = config.relatedNames;
     this.text = '';
   }
 
@@ -134,28 +136,21 @@ export class Element implements ElementObject {
   /**
    * 执行元素操作（基础方法，子类可重写）
    */
-  async Execute(): Promise<boolean> {
-
-    if (!this.dom || !this.Validate()) {
-      console.error(`Element "${this.name}" not found or not valid, selector: ${this.selector}, validate failed`);
-      return false;
-    }
-
-    return this.UpdateText(); // 更新文本内容
+  Execute(): boolean {
+    return this.FindElement();
   }
 
   /**
-   * 更新元素文本内容
+   * 获取元素文本
    */
-  private UpdateText(): boolean {
-
+  GetText(): string {
     if (!this.dom || !this.Validate()) {
       console.error(`Element "${this.name}" not found or not valid, selector: ${this.selector}, validate failed, update text failed`);
-      return false;
+      return '';
     }
 
     this.text = this.dom.innerText || this.dom.textContent || '';
-    return true;
+    return this.text;
   }
 
   /**
@@ -206,5 +201,13 @@ export class Element implements ElementObject {
       console.error(`Error scrolling to element "${this.name}":`, error);
       return false;
     }
+  }
+
+  /**
+   * 刷新dom
+   */
+  RefreshDom(): void {
+    this.dom = undefined;
+    this.Validate();
   }
 }
