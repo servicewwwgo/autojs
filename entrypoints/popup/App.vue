@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue';
-import { BaseInstruction, LocateElementInstruction, WaitInstruction, NavigateInstruction , INSTRUCTION_MAP, ClickInstruction, InputTextInstruction, KeyPressInstruction, GetTextInstruction } from '@/src/types/Instructions';
+import { BaseInstruction, LocateElementInstruction, WaitInstruction, NavigateInstruction , INSTRUCTION_MAP, ClickInstruction, InputTextInstruction, KeyPressInstruction, GetTextInstruction, DragInstruction } from '@/src/types/Instructions';
 import { ElementObject, Element } from '@/src/types/Element';
 
 // 响应式数据
@@ -52,7 +52,7 @@ const waitInstruction_wait_1 = new WaitInstruction({
   type: 'wait',
   id: 'wait_1',
   waitType: 'time',
-  value: 3,
+  value: 5,
   delay: 0,
   retry: 1,
   timeout: 5,
@@ -89,6 +89,108 @@ const clickInstruction_click_2 = new ClickInstruction({
   waitVisible: true
 });
 
+// src="/NMediaFile/2022/1023/MAIN202210232150441133647845491.jpg"
+const locateElementInstruction_locate_3 = new LocateElementInstruction({
+  type: 'locate',
+  id: 'locate_3',
+  element: {
+    name: 'image',
+    description: '图片',
+    selector: 'img[src="/NMediaFile/2022/1023/MAIN202210232150441133647845491.jpg"]',
+    selectorType: 'css',
+    text: '',
+  },
+  delay: 0,
+  retry: 1,
+  timeout: 30,
+  waitVisible: true
+});
+
+const clickInstruction_click_3 = new ClickInstruction({
+  type: 'click',
+  id: 'click_3',
+  elementName: 'image',
+  button: 'left',
+  clickType: 'single',
+  offsetX: 0,
+  offsetY: 0,
+  delay: 0,
+  retry: 1,
+  timeout: 30,
+  waitVisible: true
+});
+
+// alt="百度经验"
+const locateElementInstruction_locate_4_0 = new LocateElementInstruction({
+  type: 'locate',
+  id: 'locate_4',
+  element: {
+    name: 'baidu_experience',
+    description: '百度经验',
+    selector: 'img[alt="百度经验"]',
+    selectorType: 'css',
+    text: '',
+  },
+  delay: 0,
+  retry: 1,
+  timeout: 30,
+  waitVisible: true
+});
+
+// name="word"
+const locateElementInstruction_locate_4_1 = new LocateElementInstruction({
+  type: 'locate',
+  id: 'locate_5',
+  element: {
+    name: 'word_input',
+    description: 'word',
+    selector: 'input[name="word"]',
+    selectorType: 'css',
+    text: '',
+  },
+  delay: 0,
+  retry: 1,
+  timeout: 30,
+  waitVisible: true
+});
+
+const DragInstruction_drag_4 = new DragInstruction({
+  type: 'drag',
+  id: 'drag_4',
+  sourceName: 'baidu_experience',
+  targetName: 'word_input',
+  duration: 3,
+  delay: 0,
+  retry: 1,
+  timeout: 30,
+  waitVisible: true
+});
+
+const TextInstruction_text_5 = new InputTextInstruction({
+  type: 'input_text',
+  id: 'text_5',
+  elementName: 'word_input',
+  text: '百度经验',
+  delay: 0,
+  retry: 1,
+  timeout: 30,
+  waitVisible: true,
+  clearFirst: true,
+  timeDelay: 0.5
+});
+
+const KeyPressInstruction_key_6 = new KeyPressInstruction({
+  type: 'key_press',
+  id: 'key_6',
+  elementName: 'word_input',
+  key: 'd',
+  modifiers: [],
+  delay: 0,
+  retry: 1,
+  timeout: 30,
+  waitVisible: true
+});
+
 // 示例指令
 const sampleInstructions = ref(`[
   ${JSON.stringify(locateElementInstruction_locate_1.ToObject(), null, 2)}
@@ -97,8 +199,8 @@ const sampleInstructions = ref(`[
 // 复杂示例指令（包含多个操作）
 // locate 元素的selector为 [aria-label='搜索']
 const complexSampleInstructions = ref(`[
-  ${JSON.stringify(locateElementInstruction_locate_2.ToObject(), null, 2)} ,
-  ${JSON.stringify(clickInstruction_click_2.ToObject(), null, 2)}  
+  ${JSON.stringify(locateElementInstruction_locate_4_1.ToObject(), null, 2)} ,
+  ${JSON.stringify(KeyPressInstruction_key_6.ToObject(), null, 2)}
 ]`);
 
 // 组件挂载时初始化

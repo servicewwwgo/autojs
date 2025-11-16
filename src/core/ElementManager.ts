@@ -30,6 +30,12 @@ export class ElementManager {
       return;
     }
 
+    // 如果元素已存在，先清理旧关系
+    const existingElement = this.elements.get(element.name);
+    if (existingElement) {
+      this.cleanupReferences(element.name);
+    }
+
     this.elements.set(element.name, element);
     
     // 更新关系映射
@@ -199,6 +205,7 @@ export class ElementManager {
     const elementsData = Array.from(this.elements.entries()).map(([name, element]) => ({
       name: element.name,
       description: element.description,
+      text: element.text || '',
       selector: element.selector,
       selectorType: element.selectorType,
       parentName: element.parentName,
@@ -217,27 +224,59 @@ export class ElementManager {
       const elementsData = JSON.parse(jsonData);
       
       if (!Array.isArray(elementsData)) {
-        console.error('Invalid elements data format');
+        console.error('Invalid elements data format: expected array');
         return false;
       }
+
+      const errors: string[] = [];
+      let successCount = 0;
       
-      elementsData.forEach(elementData => {
-        const element = new Element({
-          name: elementData.name,
-          description: elementData.description,
-          text: elementData.text,
-          selector: elementData.selector,
-          selectorType: elementData.selectorType,
-          parentName: elementData.parentName,
-          childrenNames: elementData.childrenNames,
-          relatedNames: elementData.relatedNames
-        });
-        
-        this.setElement(element);
+      elementsData.forEach((elementData, index) => {
+        // 验证必需字段
+        if (!elementData.name) {
+          errors.push(`元素 ${index + 1}: 缺少 name 字段`);
+          return;
+        }
+        if (!elementData.selector) {
+          errors.push(`元素 "${elementData.name}": 缺少 selector 字段`);
+          return;
+        }
+        if (!elementData.selectorType) {
+          errors.push(`元素 "${elementData.name}": 缺少 selectorType 字段`);
+          return;
+        }
+        if (!['css', 'xpath', 'id'].includes(elementData.selectorType)) {
+          errors.push(`元素 "${elementData.name}": 无效的 selectorType "${elementData.selectorType}"`);
+          return;
+        }
+
+        try {
+          const element = new Element({
+            name: elementData.name,
+            description: elementData.description || '',
+            text: elementData.text || '',
+            selector: elementData.selector,
+            selectorType: elementData.selectorType,
+            parentName: elementData.parentName,
+            childrenNames: elementData.childrenNames,
+            relatedNames: elementData.relatedNames
+          });
+          
+          this.setElement(element);
+          successCount++;
+        } catch (error) {
+          errors.push(`元素 "${elementData.name}": 创建失败 - ${error instanceof Error ? error.message : '未知错误'}`);
+        }
       });
       
-      console.log(`成功导入 ${elementsData.length} 个元素`);
-      return true;
+      if (errors.length > 0) {
+        console.warn(`导入完成，成功: ${successCount}, 失败: ${errors.length}`);
+        errors.forEach(error => console.error(error));
+      } else {
+        console.log(`成功导入 ${successCount} 个元素`);
+      }
+      
+      return successCount > 0;
     } catch (error) {
       console.error('导入元素配置失败:', error);
       return false;
@@ -252,8 +291,13 @@ export class ElementManager {
     if (element.parentName) {
       const parent = this.elements.get(element.parentName);
       if (parent) {
-        if (!parent.childrenNames?.includes(element.name)) {
-          parent.childrenNames?.push(element.name);
+        // 确保 childrenNames 数组已初始化
+        if (!parent.childrenNames) {
+          parent.childrenNames = [];
+        }
+        // 如果子元素名称不在列表中，则添加
+        if (!parent.childrenNames.includes(element.name)) {
+          parent.childrenNames.push(element.name);
         }
       }
     }
@@ -269,8 +313,15 @@ export class ElementManager {
     // 更新关联元素关系
     element.relatedNames?.forEach(relatedName => {
       const related = this.elements.get(relatedName);
-      if (related && !related.relatedNames?.includes(element.name)) {
-        related.relatedNames?.push(element.name);
+      if (related) {
+        // 确保 relatedNames 数组已初始化
+        if (!related.relatedNames) {
+          related.relatedNames = [];
+        }
+        // 如果关联元素名称不在列表中，则添加
+        if (!related.relatedNames.includes(element.name)) {
+          related.relatedNames.push(element.name);
+        }
       }
     });
   }

@@ -26,7 +26,8 @@ export default defineContentScript({
       // 内容脚本加载完成，立即向 background 发送消息通知连接已建立
       notifyBackgroundReady().catch(error => {
         console.error('向 background 发送就绪消息失败:', error);
-        window.location.reload(); // 重载页面
+        // 不自动重载页面，让用户决定是否重载
+        // 重载页面会导致内容脚本重新加载，可能造成循环
       });
 
       console.log('爬虫系统初始化完成');
@@ -71,20 +72,38 @@ function handleMessage(message: any, crawler: WebCrawler, sendResponse: (respons
         break;
       case 'executeInstructions':
         console.log('执行指令:', message.data);
+        if (!message.data) {
+          sendResponse({ success: false, error: '缺少指令数据', message: '缺少指令数据' });
+          return true;
+        }
         crawler.loadAndExecuteInstructions(message.data).then(() => {
           sendResponse({ success: true, results: crawler.getResults(), message: '指令执行完成' });
         }).catch((error: any) => {
-          sendResponse({ success: false, error: error.message || '指令执行失败', message: '指令执行失败' });
+          console.error('执行指令失败:', error);
+          sendResponse({ 
+            success: false, 
+            error: error instanceof Error ? error.message : '指令执行失败', 
+            message: '指令执行失败' 
+          });
         });
-        break;
+        return true; // 保持通道开放，等待异步响应
       case 'executeFromFile':
         console.log('从文件执行:', message.filePath);
+        if (!message.filePath) {
+          sendResponse({ success: false, error: '缺少文件路径', message: '缺少文件路径' });
+          return true;
+        }
         crawler.loadAndExecuteFromFile(message.filePath).then(() => {
           sendResponse({ success: true, results: crawler.getResults(), message: '文件执行完成' });
         }).catch((error: any) => {
-          sendResponse({ success: false, error: error.message || '文件执行失败', message: '文件执行失败' });
+          console.error('从文件执行失败:', error);
+          sendResponse({ 
+            success: false, 
+            error: error instanceof Error ? error.message : '文件执行失败', 
+            message: '文件执行失败' 
+          });
         });
-        break;
+        return true; // 保持通道开放，等待异步响应
       case 'getStatistics':
         console.log('获取统计信息');
         sendResponse({ success: true, data: crawler.getStatistics(), message: '统计信息获取完成' });
@@ -109,6 +128,10 @@ function handleMessage(message: any, crawler: WebCrawler, sendResponse: (respons
         break;
       case 'importElements':
         console.log('导入元素:', message.data);
+        if (!message.data) {
+          sendResponse({ success: false, error: '缺少元素数据', message: '缺少元素数据' });
+          return true;
+        }
         if (crawler.importElements(message.data)) {
           sendResponse({ success: true, data: crawler.getManager().getStatistics(), message: '元素导入完成' });
         } else {
@@ -128,11 +151,15 @@ function handleMessage(message: any, crawler: WebCrawler, sendResponse: (respons
         console.log('收到通知，开始执行指令');
         sendResponse({ success: true, message: '指令执行开始' });
         executeTaskFromBackground(message.data, crawler).then(() => {
-          sendResponse({ success: true, message: '指令执行完成' });
+          // 注意：这里不能再次调用 sendResponse，因为已经调用过了
+          // 如果需要返回结果，应该在 executeTaskFromBackground 中处理
+          console.log('指令执行完成');
         }).catch((error: any) => {
-          sendResponse({ success: false, error: error.message || '指令执行失败', message: '指令执行失败' });
+          console.error('执行任务失败:', error);
+          // 注意：这里不能再次调用 sendResponse，因为已经调用过了
+          // 错误应该通过其他方式通知（如日志或事件）
         });
-        break;
+        return true; // 保持通道开放，等待异步响应
       default:
         console.warn('未知的操作类型:', message.action);
         sendResponse({ success: false, error: `未知的操作类型: ${message.action}`, message: `未知的操作类型: ${message.action}` });
@@ -156,22 +183,42 @@ async function executeTaskFromBackground(task: any, crawler: WebCrawler) {
 
     // 向 background script 发送消息, 获取每一条指令，直到获取到所有指令
     let hasMore = true;
+    let instructionCount = 0;
+    const maxInstructions = 1000; // 防止无限循环
 
-    while (hasMore) {
-      const response = await browser.runtime.sendMessage({ action: 'getSingleInstruction' });
+    while (hasMore && instructionCount < maxInstructions) {
+      try {
+        const response = await browser.runtime.sendMessage({ action: 'getSingleInstruction' });
 
-      if (response && response.success && response.data) {
-        const instruction = response.data;
-        await crawler.loadAndExecuteFromJSONString(instruction.instruction);
-      } else {
-        console.log('没有更多指令');  // 没有更多指令或获取失败
+        if (response && response.success && response.data) {
+          const instruction = response.data;
+          
+          // 验证指令数据
+          if (!instruction.instruction) {
+            console.warn('收到无效指令数据，跳过');
+            hasMore = false;
+            break;
+          }
+
+          await crawler.loadAndExecuteFromJSONString(instruction.instruction);
+          instructionCount++;
+        } else {
+          console.log('没有更多指令');
+          hasMore = false;
+        }
+      } catch (error) {
+        console.error('获取或执行指令时发生错误:', error);
+        // 继续尝试下一条指令，而不是立即失败
         hasMore = false;
       }
     }
 
-    console.log('任务执行完成');
+    if (instructionCount >= maxInstructions) {
+      console.warn(`达到最大指令数量限制 (${maxInstructions})，停止执行`);
+    }
+
+    console.log(`任务执行完成，共执行 ${instructionCount} 条指令`);
   } catch (error) {
-    
     console.error('执行任务时发生错误:', error);
     throw error;
   }
