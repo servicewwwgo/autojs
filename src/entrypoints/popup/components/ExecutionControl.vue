@@ -84,6 +84,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
+import { BackgroundScriptMessageType, ExecutorStatus, TabInfo } from '../../../types';
+import { SendMessageToBackgroundScript } from '../../../utils';
 
 const wsUrl = ref('ws://localhost:8080');
 const isConnected = ref(false);
@@ -91,7 +93,7 @@ const selectedTabId = ref<number | ''>('');
 const tabs = ref<Array<{ tabId: number; url: string }>>([]);
 const connectionStatus = ref('');
 const connectionStatusType = ref<'success' | 'error' | 'info'>('info');
-const executorStatus = ref({
+const executorStatus = ref<ExecutorStatus>({
     isRunning: false,
     isPaused: false,
     currentTabId: null as number | null,
@@ -105,11 +107,12 @@ let statusInterval: number | null = null;
 
 const loadTabs = async () => {
     try {
-        const response = await browser.runtime.sendMessage({
+        const response = await SendMessageToBackgroundScript({
             type: 'get_tabs'
-        });
+        } as BackgroundScriptMessageType);
+
         if (response.success) {
-            tabs.value = response.data.map((tab: any) => ({
+            tabs.value = response.data?.map((tab: TabInfo) => ({
                 tabId: tab.tabId,
                 url: tab.url || 'about:blank'
             }));
@@ -123,12 +126,13 @@ const testConnection = async () => {
     try {
         connectionStatus.value = '正在测试连接...';
         connectionStatusType.value = 'info';
-        const response = await browser.runtime.sendMessage({
+        const response = await SendMessageToBackgroundScript({
             type: 'test_websocket',
-            url: wsUrl.value
-        });
+            params: { url: wsUrl.value }
+        } as BackgroundScriptMessageType);
+
         if (response.success) {
-            if (response.data.connected) {
+            if (response.data?.connected) {
                 connectionStatus.value = '连接测试成功';
                 connectionStatusType.value = 'success';
             } else {
@@ -149,10 +153,11 @@ const connect = async () => {
     try {
         connectionStatus.value = '正在连接...';
         connectionStatusType.value = 'info';
-        const response = await browser.runtime.sendMessage({
+        const response = await SendMessageToBackgroundScript({
             type: 'connect_websocket',
-            url: wsUrl.value
-        });
+            params: { url: wsUrl.value as string }
+        } as BackgroundScriptMessageType);
+
         if (response.success) {
             isConnected.value = true;
             connectionStatus.value = '连接成功';
@@ -169,9 +174,10 @@ const connect = async () => {
 
 const disconnect = async () => {
     try {
-        const response = await browser.runtime.sendMessage({
+        const response = await SendMessageToBackgroundScript({
             type: 'disconnect_websocket'
-        });
+        } as BackgroundScriptMessageType);
+
         if (response.success) {
             isConnected.value = false;
             connectionStatus.value = '已断开连接';
@@ -183,16 +189,18 @@ const disconnect = async () => {
 };
 
 const startExecution = async () => {
-    if (!selectedTabId.value) {
-        return;
-    }
+
     try {
-        const response = await browser.runtime.sendMessage({
+        if (!selectedTabId.value) {
+            throw new Error('请选择标签页');
+        }
+
+        const response = await SendMessageToBackgroundScript({
             type: 'execute_instructions',
-            tabId: selectedTabId.value
-        });
+            params: { tabId: selectedTabId.value as number }
+        } as BackgroundScriptMessageType);
         if (response.success) {
-            loadStatus();
+            await loadStatus();
         }
     } catch (error) {
         console.error('开始执行失败:', error);
@@ -201,11 +209,12 @@ const startExecution = async () => {
 
 const pauseExecution = async () => {
     try {
-        const response = await browser.runtime.sendMessage({
+        const response = await SendMessageToBackgroundScript({
             type: 'pause_execution'
-        });
+        } as BackgroundScriptMessageType);
+
         if (response.success) {
-            loadStatus();
+            await loadStatus();
         }
     } catch (error) {
         console.error('暂停执行失败:', error);
@@ -214,11 +223,12 @@ const pauseExecution = async () => {
 
 const stopExecution = async () => {
     try {
-        const response = await browser.runtime.sendMessage({
+        const response = await SendMessageToBackgroundScript({
             type: 'stop_execution'
-        });
+        } as BackgroundScriptMessageType);
+
         if (response.success) {
-            loadStatus();
+            await loadStatus();
         }
     } catch (error) {
         console.error('停止执行失败:', error);
@@ -227,9 +237,10 @@ const stopExecution = async () => {
 
 const loadStatus = async () => {
     try {
-        const response = await browser.runtime.sendMessage({
+        const response = await SendMessageToBackgroundScript({
             type: 'get_executor_status'
-        });
+        } as BackgroundScriptMessageType);
+
         if (response.success) {
             executorStatus.value = response.data;
         }

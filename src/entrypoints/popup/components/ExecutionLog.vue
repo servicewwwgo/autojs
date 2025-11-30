@@ -46,7 +46,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import type { InstructionResult } from '../../../types';
+import { BackgroundScriptMessageType, InstructionResult } from '../../../types';
+import { SendMessageToBackgroundScript } from '../../../utils';
 
 let logInterval: number | null = null;
 
@@ -67,11 +68,12 @@ const filteredLogs = computed(() => {
 
 const loadLogs = async () => {
     try {
-        const response = await browser.runtime.sendMessage({
+        const response = await SendMessageToBackgroundScript({
             type: 'get_results'
-        });
+        } as BackgroundScriptMessageType);
+
         if (response.success) {
-            logs.value = response.data;
+            logs.value = response.data as InstructionResult[];
         }
     } catch (error) {
         console.error('加载日志失败:', error);
@@ -81,11 +83,12 @@ const loadLogs = async () => {
 const clearLogs = async () => {
     if (confirm('确定要清空所有日志吗？')) {
         try {
-            const response = await browser.runtime.sendMessage({
+            const response = await SendMessageToBackgroundScript({
                 type: 'clear_results'
-            });
+            } as BackgroundScriptMessageType);
+
             if (response.success) {
-                logs.value = [];
+                logs.value = [] as InstructionResult[];
             }
         } catch (error) {
             console.error('清空日志失败:', error);
@@ -95,9 +98,10 @@ const clearLogs = async () => {
 
 const sendToServer = async () => {
     try {
-        const response = await browser.runtime.sendMessage({
+        const response = await SendMessageToBackgroundScript({
             type: 'send_results_to_server'
-        });
+        } as BackgroundScriptMessageType);
+
         if (response.success) {
             alert('日志已发送到服务器');
         } else {
@@ -109,10 +113,9 @@ const sendToServer = async () => {
 };
 
 onMounted(() => {
-    loadLogs();
     // 定期刷新日志
     logInterval = setInterval(() => {
-        loadLogs();
+        loadLogs().catch((error) => console.error('刷新日志失败:', error));
     }, 2000) as any;
 });
 

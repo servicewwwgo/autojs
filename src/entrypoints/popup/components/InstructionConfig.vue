@@ -50,6 +50,23 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { BackgroundScriptMessageType, TabInfo } from '../../../types';
+import { SendMessageToBackgroundScript } from '../../../utils';
+
+// 导入所有指令类型，用于测试用例
+import type {
+    NavigateInstruction,
+    FindElementInstruction,
+    MouseInstruction,
+    InputInstruction,
+    KeyboardInstruction,
+    GetAttributeInstruction,
+    ScreenshotInstruction,
+    ExecuteScriptInstruction
+} from '../../../types';
+
+import { InstructionFactory } from '../../../instructions';
+import { elementManager } from '../../../managers';
 
 const selectedTabId = ref<number | ''>('');
 const instructionsJson = ref('');
@@ -57,13 +74,127 @@ const tabs = ref<Array<{ tabId: number; url: string }>>([]);
 const message = ref('');
 const messageType = ref<'success' | 'error'>('success');
 
+// ========== 测试用例：各种指令类型 ==========
+
+// 1. 导航指令测试用例
+const navigateInstruction_nav_1 = ref<NavigateInstruction>({
+    type: 'navigate',
+    tabId: 0,
+    instructionID: 'inst_nav_1',
+    url: 'https://www.google.com',
+    delay: 1,
+    retry: 1,
+    timeout: 30,
+    ignoreError: false,
+    created_at: Date.now()
+});
+
+// 2.0 查找元素指令测试用例 - aria-label="Google 搜索"
+const findElementInstruction_find_2_0 = ref<FindElementInstruction>({
+    type: 'find_element',
+    tabId: 0,
+    instructionID: 'inst_find_2_0',
+    element: {
+        tabId: selectedTabId.value as number,
+        name: 'searchButton',
+        description: 'Google 搜索按钮',
+        backup: 'Google 搜索',
+        selector: 'input[aria-label="Google 搜索"]',
+        selectorType: 'css'
+    },
+    created_at: Date.now()
+});
+
+// 2.1 查找元素指令测试用例 - aria-label="搜索"
+const findElementInstruction_find_2_1 = ref<FindElementInstruction>({
+    type: 'find_element',
+    tabId: 0,
+    instructionID: 'inst_find_2_1',
+    element: {
+        tabId: selectedTabId.value as number,
+        name: 'searchInput',
+        description: 'Google 搜索输入框',
+        backup: '',
+        selector: 'textarea[aria-label="搜索"]',
+        selectorType: 'css'
+    },
+    created_at: Date.now()
+});
+
+// 3. 文本输入指令测试用例 - aria-label="搜索"
+const inputInstruction_input_3_0 = ref<InputInstruction>({
+    type: 'input',
+    tabId: 0,
+    instructionID: 'inst_input_3_0',
+    elementName: 'searchButton',
+    text: '電腦',
+    clear: true,
+    delay: 0.1,
+    retry: 1,
+    created_at: Date.now()
+});
+
+// 4. 鼠标操作指令测试用例
+const clickInstruction_click_4_0 = ref<MouseInstruction>({
+    type: 'mouse',
+    tabId: 0,
+    instructionID: 'inst_click_4_0',
+    elementName: 'searchButton',
+    action: 'click',
+    created_at: Date.now()
+});
+
+// 5. 键盘操作指令测试用例
+const keyboardInstruction_key_1 = ref<KeyboardInstruction>({
+    type: 'keyboard',
+    tabId: 0,
+    instructionID: 'inst_key_1',
+    elementName: 'searchInput',
+    action: 'press',
+    key: 'Enter',
+    delay: 0.5,
+    created_at: Date.now()
+});
+
+// 6. 获取元素属性指令测试用例
+const getAttributeInstruction_attr_1 = ref<GetAttributeInstruction>({
+    type: 'get_attribute',
+    tabId: 0,
+    instructionID: 'inst_attr_1',
+    elementName: 'searchInput',
+    attribute: 'value',
+    created_at: Date.now()
+});
+
+// 7. 截图指令测试用例
+const screenshotInstruction_screen_1 = ref<ScreenshotInstruction>({
+    type: 'screenshot',
+    tabId: 0,
+    instructionID: 'inst_screen_1',
+    format: 'png',
+    quality: 100,
+    fullPage: false,
+    created_at: Date.now()
+});
+
+// 8. 执行脚本指令测试用例
+const executeScriptInstruction_script_1 = ref<ExecuteScriptInstruction>({
+    type: 'execute_script',
+    tabId: 0,
+    instructionID: 'inst_script_1',
+    script: 'return document.title;',
+    args: [],
+    created_at: Date.now()
+});
+
 const loadTabs = async () => {
     try {
-        const response = await browser.runtime.sendMessage({
+        const response = await SendMessageToBackgroundScript({
             type: 'get_tabs'
-        });
+        } as BackgroundScriptMessageType);
+
         if (response.success) {
-            tabs.value = response.data.map((tab: any) => ({
+            tabs.value = response.data.map((tab: TabInfo) => ({
                 tabId: tab.tabId,
                 url: tab.url || 'about:blank'
             }));
@@ -76,8 +207,9 @@ const loadTabs = async () => {
 const validateJson = () => {
     try {
         const parsed = JSON.parse(instructionsJson.value);
+
         if (Array.isArray(parsed)) {
-            showMessage(`验证成功，共 ${parsed.length} 条指令`, 'success');
+            showMessage(`验证成功，共 ${parsed.length as number} 条指令`, 'success');
         } else {
             showMessage('JSON格式错误：必须是数组', 'error');
         }
@@ -89,81 +221,55 @@ const validateJson = () => {
 const sendInstructions = async () => {
     try {
         if (!selectedTabId.value) {
-            showMessage('请先选择标签页', 'error');
-            return;
+            throw new Error('请先选择标签页');
         }
 
         // 验证JSON格式，但不解析
-        try {
-            const parsed = JSON.parse(instructionsJson.value);
-            if (!Array.isArray(parsed)) {
-                showMessage('JSON格式错误：必须是数组', 'error');
-                return;
-            }
-        } catch (error) {
-            showMessage('JSON格式错误: ' + (error instanceof Error ? error.message : String(error)), 'error');
-            return;
+        const parsed = JSON.parse(instructionsJson.value);
+
+        if (!Array.isArray(parsed)) {
+            throw new Error('JSON格式错误：必须是数组');
         }
+
+        const tabId = selectedTabId.value as number;
+        const instructionsJsonString = instructionsJson.value as string;
 
         // 直接发送JSON字符串，不进行反序列化
-        const response = await browser.runtime.sendMessage({
+        const response = await SendMessageToBackgroundScript({
             type: 'add_instructions',
-            tabId: selectedTabId.value,
-            instructionsJson: instructionsJson.value
-        });
+            params: {
+                tabId: tabId,
+                instructionsJsonString: instructionsJsonString
+            }
+        } as BackgroundScriptMessageType);
 
         if (response.success) {
-            const count = response.count || 0;
-            showMessage(`成功发送 ${count} 条指令`, 'success');
-        } else {
-            showMessage('发送指令失败: ' + response.error, 'error');
+            showMessage(`成功发送 ${response.count as number} 条指令`, 'success');
         }
     } catch (error) {
-        showMessage('发送指令失败: ' + (error instanceof Error ? error.message : String(error)), 'error');
+        console.error('发送指令失败:', error);
     }
 };
 
+/**
+ * 加载完整的测试用例示例
+ * 包含所有指令类型的测试用例
+ */
 const loadExample = () => {
     const example = [
-        {
-            type: 'navigate',
-            tabId: 0,
-            instructionID: 'inst_nav_1',
-            url: 'https://www.example.com',
-            waitUntil: 'load',
-            created_at: Date.now()
-        },
-        {
-            type: 'find_element',
-            tabId: 0,
-            instructionID: 'inst_find_1',
-            selector: 'input[type="text"]',
-            selectorType: 'css',
-            name: 'searchInput',
-            description: '搜索输入框',
-            waitForVisible: true,
-            created_at: Date.now() + 1
-        },
-        {
-            type: 'input',
-            tabId: 0,
-            instructionID: 'inst_input_1',
-            elementName: 'searchInput',
-            text: 'Hello World',
-            clear: true,
-            created_at: Date.now() + 2
-        },
-        {
-            type: 'keyboard',
-            tabId: 0,
-            instructionID: 'inst_key_1',
-            action: 'press',
-            key: 'Enter',
-            created_at: Date.now() + 3
-        }
+        // 1. 导航指令 - 打开网页
+        InstructionFactory.toObject(navigateInstruction_nav_1.value, elementManager),
+        // 2. 查找元素指令 - 搜索按钮
+        InstructionFactory.toObject(findElementInstruction_find_2_0.value, elementManager),
+        // 2.1 查找元素指令 - 搜索输入框
+        InstructionFactory.toObject(findElementInstruction_find_2_1.value, elementManager),
+        // 3. 文本输入指令 - 搜索输入框
+        InstructionFactory.toObject(inputInstruction_input_3_0.value, elementManager),
+        // 4. 鼠标操作指令 - 搜索按钮
+        InstructionFactory.toObject(clickInstruction_click_4_0.value, elementManager),
     ];
     instructionsJson.value = JSON.stringify(example, null, 2);
-    showMessage('示例已加载', 'success');
+    showMessage(`已加载 ${example.length} 个测试用例，包含所有指令类型`, 'success');
 };
 
 const showMessage = (msg: string, type: 'success' | 'error') => {
