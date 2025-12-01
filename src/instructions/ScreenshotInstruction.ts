@@ -18,9 +18,20 @@ export class ScreenshotInstructionClass extends BaseInstructionClass {
     this.fullPage = instruction.fullPage;
   }
 
+  ToObject(): object {
+    return {
+      ...super.ToObject(),
+      format: this.format,
+      quality: this.quality,
+      fullPage: this.fullPage
+    } as object;
+  }
+
   public async Execute(): Promise<InstructionResult> {
 
     const result = await this.Retry(async () => {
+      let defaultResult: InstructionResult = { instructionID: this.instructionID, success: false, duration: 0 };
+
       const format = this.format || 'png';
       const quality = this.quality || 100;
 
@@ -32,29 +43,12 @@ export class ScreenshotInstructionClass extends BaseInstructionClass {
         throw new Error('无法获取标签页');
       }
 
-      const dataUrl = await browser.tabs.captureVisibleTab(Number(tab.windowId), {
-        format,
-        quality: format === 'jpeg' ? quality : undefined
-      });
+      const dataUrl = await browser.tabs.captureVisibleTab(Number(tab.windowId), { format, quality: format === 'jpeg' ? quality : undefined });
 
-      return {
-        instructionID: this.instructionID,
-        success: true,
-        duration: 0,
-        data: { dataUrl, format, quality }
-      } as InstructionResult;
+      return { ...defaultResult, success: true, data: { dataUrl, format, quality } };
     });
 
     return result;
-  }
-
-  ToObject(): object {
-    return {
-      ...super.ToObject(),
-      format: this.format,
-      quality: this.quality,
-      fullPage: this.fullPage
-    } as object;
   }
 }
 

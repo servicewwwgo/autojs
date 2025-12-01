@@ -53,7 +53,7 @@ import { ref, onMounted } from 'vue';
 import { BackgroundScriptMessageType, TabInfo } from '../../../types';
 import { SendMessageToBackgroundScript } from '../../../utils';
 
-import { example } from './Test.vue';
+import { example } from '../../../example';
 
 const selectedTabId = ref<number | ''>('');
 const instructionsJson = ref('');
@@ -139,6 +139,19 @@ const showMessage = (msg: string, type: 'success' | 'error') => {
 };
 
 const loadExample = () => {
+
+    // 將 example 對象中，所有的子對象 tabId 設置為 當前選擇的 tabId, 遞歸處理
+    const setTabId = (obj: any) => {
+        if (obj.tabId) {
+            obj.tabId = selectedTabId.value as number;
+        }
+        if (Array.isArray(obj)) {
+            obj.forEach(setTabId);
+        }
+    };
+
+    setTabId(example);
+
     instructionsJson.value = JSON.stringify(example, null, 2);
     showMessage(`已加载 ${example.length} 个测试用例，包含所有指令类型`, 'success');
 };
@@ -146,6 +159,7 @@ const loadExample = () => {
 onMounted(() => {
     loadTabs();
 });
+
 </script>
 
 <style scoped>

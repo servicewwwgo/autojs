@@ -162,7 +162,7 @@ export type Instruction =
  * 内容脚本消息類型
  */
 export interface ContentScriptMessageType {
-  type: 'find_element' | 'scroll_into_view' | 'get_attribute' | 'execute_script' | 'get_text' | 'is_visible';
+  type: 'scroll_into_view' | 'get_attribute' | 'execute_script' | 'get_text' | 'is_visible';
   params?: any;
 }
 

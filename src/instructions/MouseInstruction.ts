@@ -21,191 +21,14 @@ export class MouseInstructionClass extends BaseInstructionClass {
         this.simulate = instruction.simulate;
     }
 
-    public async Execute(): Promise<InstructionResult> {
-        const result = await this.Retry(async () => {
-            try {
-                let x = this.x || 0;
-                let y = this.y || 0;
-
-                // 如果指定了元素，获取元素位置
-                if (this.elementName) {
-                    // 从 elementManager 获取元素
-                    const element = this._elementManager.GetElementByName(this.tabId, this.elementName);
-
-                    if (!element) {
-                        return {
-                            instructionID: this.instructionID,
-                            success: false,
-                            error: `Element "${this.elementName}" not found in element manager`,
-                            duration: 0,
-                            data: null
-                        } as InstructionResult;
-                    }
-
-                    // 获取元素的 nodeId
-                    const nodeId = element.GetNodeId();
-
-                    if (!nodeId) {
-                        return {
-                            instructionID: this.instructionID,
-                            success: false,
-                            error: `Element "${this.elementName}" has no nodeId. Make sure the element was found using FindElementInstruction first.`,
-                            duration: 0,
-                            data: null
-                        } as InstructionResult;
-                    }
-
-                    // 使用 CDP 获取元素的边界框
-                    try {
-                        await this.ExecuteCDPCommand('DOM.enable');
-                        const boxModel = await this.ExecuteCDPCommand('DOM.getBoxModel', {
-                            nodeId: nodeId
-                        });
-
-                        if (boxModel?.model?.content && boxModel.model.content.length >= 8) {
-                            // content 数组格式: [x1, y1, x2, y2, x3, y3, x4, y4]
-                            // 计算中心点
-                            const left = Math.min(boxModel.model.content[0], boxModel.model.content[2], boxModel.model.content[4], boxModel.model.content[6]);
-                            const top = Math.min(boxModel.model.content[1], boxModel.model.content[3], boxModel.model.content[5], boxModel.model.content[7]);
-                            const right = Math.max(boxModel.model.content[0], boxModel.model.content[2], boxModel.model.content[4], boxModel.model.content[6]);
-                            const bottom = Math.max(boxModel.model.content[1], boxModel.model.content[3], boxModel.model.content[5], boxModel.model.content[7]);
-
-                            x = left + (right - left) / 2;
-                            y = top + (bottom - top) / 2;
-                        }
-                    } catch (error) {
-                        console.warn(`Failed to get element bounding rect for "${this.elementName}":`, error);
-                        // 如果获取位置失败，使用默认值或指定的 x, y
-                    }
-                }
-
-                // 执行鼠标操作
-                switch (this.action) {
-                    case 'click':
-                        await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
-                            type: 'mousePressed',
-                            x,
-                            y,
-                            button: 'left',
-                            clickCount: 1
-                        });
-                        await this.Delay(50);
-                        await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
-                            type: 'mouseReleased',
-                            x,
-                            y,
-                            button: 'left',
-                            clickCount: 1
-                        });
-                        break;
-
-                    case 'dblclick':
-                        for (let i = 0; i < 2; i++) {
-                            await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
-                                type: 'mousePressed',
-                                x,
-                                y,
-                                button: 'left',
-                                clickCount: i + 1
-                            });
-                            await this.Delay(50);
-                            await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
-                                type: 'mouseReleased',
-                                x,
-                                y,
-                                button: 'left',
-                                clickCount: i + 1
-                            });
-                            if (i === 0) await this.Delay(100);
-                        }
-                        break;
-
-                    case 'rightclick':
-                        await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
-                            type: 'mousePressed',
-                            x,
-                            y,
-                            button: 'right',
-                            clickCount: 1
-                        });
-                        await this.Delay(50);
-                        await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
-                            type: 'mouseReleased',
-                            x,
-                            y,
-                            button: 'right',
-                            clickCount: 1
-                        });
-                        break;
-
-                    case 'hover':
-                        // hover 操作也使用模拟鼠标轨迹，更真实
-                        await this.MoveMouseTo(x, y);
-                        break;
-
-                    case 'left_mousedown':
-                        await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
-                            type: 'mousePressed',
-                            x,
-                            y,
-                            button: 'left',
-                            clickCount: 1
-                        });
-                        break;
-
-                    case 'left_mouseup':
-                        await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
-                            type: 'mouseReleased',
-                            x,
-                            y,
-                            button: 'left',
-                            clickCount: 1
-                        });
-                        break;
-
-                    case 'right_mousedown':
-                        await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
-                            type: 'mousePressed',
-                            x,
-                            y,
-                            button: 'right',
-                            clickCount: 1
-                        });
-                        break;
-
-                    case 'right_mouseup':
-                        await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
-                            type: 'mouseReleased',
-                            x,
-                            y,
-                            button: 'right',
-                            clickCount: 1
-                        });
-                        break;
-
-                    case 'move_to':
-                        // 使用模拟鼠标轨迹移动到目标位置
-                        await this.MoveMouseTo(x, y);
-                        break;
-                }
-
-                return {
-                    instructionID: this.instructionID,
-                    success: true,
-                    duration: 0,
-                    data: { x, y, action: this.action }
-                } as InstructionResult;
-            } catch (error) {
-                return {
-                    instructionID: this.instructionID,
-                    success: false,
-                    error: (error as Error).message || 'Unknown error',
-                    duration: 0,
-                    data: null
-                } as InstructionResult;
-            }
-        });
-        return result;
+    ToObject(): object {
+        return {
+            ...super.ToObject(),
+            action: this.action,
+            elementName: this.elementName,
+            x: this.x,
+            y: this.y
+        } as object;
     }
 
     /**
@@ -471,14 +294,167 @@ export class MouseInstructionClass extends BaseInstructionClass {
         }
     }
 
-    ToObject(): object {
-        return {
-            ...super.ToObject(),
-            action: this.action,
-            elementName: this.elementName,
-            x: this.x,
-            y: this.y
-        } as object;
+    /**
+     * 執行鼠標操作指令
+     * @returns 指令結果
+     */
+    public async Execute(): Promise<InstructionResult> {
+        const result = await this.Retry(async () => {
+            let defaultResult: InstructionResult = { instructionID: this.instructionID, success: false, duration: 0 };
+
+            let x = this.x || 0;
+            let y = this.y || 0;
+
+            // 如果指定了元素，获取元素位置
+            if (this.elementName) {
+                // 从 elementManager 获取元素
+                const element = this._elementManager.GetElementByName(this.tabId, this.elementName);
+
+                if (!element) {
+                    return { ...defaultResult, error: `Element "${this.elementName}" not found in element manager` };
+                }
+
+                // 获取元素的 nodeId
+                const nodeId = element.GetNodeId();
+
+                if (!nodeId) {
+                    return { ...defaultResult, error: `Element "${this.elementName}" has no nodeId. Make sure the element was found using FindElementInstruction first.` };
+                }
+
+                // 使用 CDP 获取元素的边界框
+                await this.ExecuteCDPCommand('DOM.enable');
+
+                const boxModel = await this.ExecuteCDPCommand('DOM.getBoxModel', {
+                    nodeId: nodeId
+                });
+
+                if (boxModel?.model?.content && boxModel.model.content.length >= 8) {
+                    // content 数组格式: [x1, y1, x2, y2, x3, y3, x4, y4]
+                    // 计算中心点
+                    const left = Math.min(boxModel.model.content[0], boxModel.model.content[2], boxModel.model.content[4], boxModel.model.content[6]);
+                    const top = Math.min(boxModel.model.content[1], boxModel.model.content[3], boxModel.model.content[5], boxModel.model.content[7]);
+                    const right = Math.max(boxModel.model.content[0], boxModel.model.content[2], boxModel.model.content[4], boxModel.model.content[6]);
+                    const bottom = Math.max(boxModel.model.content[1], boxModel.model.content[3], boxModel.model.content[5], boxModel.model.content[7]);
+
+                    x = left + (right - left) / 2;
+                    y = top + (bottom - top) / 2;
+                }
+            }
+
+            // 执行鼠标操作
+            switch (this.action) {
+                case 'click':
+                    await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
+                        type: 'mousePressed',
+                        x,
+                        y,
+                        button: 'left',
+                        clickCount: 1
+                    });
+                    await this.Delay(0.1);
+                    await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
+                        type: 'mouseReleased',
+                        x,
+                        y,
+                        button: 'left',
+                        clickCount: 1
+                    });
+                    break;
+
+                case 'rightclick':
+                    await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
+                        type: 'mousePressed',
+                        x,
+                        y,
+                        button: 'right',
+                        clickCount: 1
+                    });
+                    await this.Delay(0.1);
+                    await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
+                        type: 'mouseReleased',
+                        x,
+                        y,
+                        button: 'right',
+                        clickCount: 1
+                    });
+                    break;
+
+                case 'dblclick':
+                    for (let i = 0; i < 2; i++) {
+                        await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
+                            type: 'mousePressed',
+                            x,
+                            y,
+                            button: 'left',
+                            clickCount: i + 1
+                        });
+                        await this.Delay(0.1);
+                        await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
+                            type: 'mouseReleased',
+                            x,
+                            y,
+                            button: 'left',
+                            clickCount: i + 1
+                        });
+                        if (i === 0) await this.Delay(0.5);
+                    }
+                    break;
+
+                case 'hover':
+                    // hover 操作也使用模拟鼠标轨迹，更真实
+                    await this.MoveMouseTo(x, y);
+                    break;
+
+                case 'left_mousedown':
+                    await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
+                        type: 'mousePressed',
+                        x,
+                        y,
+                        button: 'left',
+                        clickCount: 1
+                    });
+                    break;
+
+                case 'left_mouseup':
+                    await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
+                        type: 'mouseReleased',
+                        x,
+                        y,
+                        button: 'left',
+                        clickCount: 1
+                    });
+                    break;
+
+                case 'right_mousedown':
+                    await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
+                        type: 'mousePressed',
+                        x,
+                        y,
+                        button: 'right',
+                        clickCount: 1
+                    });
+                    break;
+
+                case 'right_mouseup':
+                    await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
+                        type: 'mouseReleased',
+                        x,
+                        y,
+                        button: 'right',
+                        clickCount: 1
+                    });
+                    break;
+
+                case 'move_to':
+                    // 使用模拟鼠标轨迹移动到目标位置
+                    await this.MoveMouseTo(x, y);
+                    break;
+            }
+
+            return { ...defaultResult, success: true, data: { x, y, action: this.action } };
+        });
+
+        return result;
     }
 }
 

@@ -24,10 +24,10 @@ export class NavigateInstructionClass extends BaseInstructionClass {
      */
     public async Execute(): Promise<InstructionResult> {
         const result = await this.Retry(async () => {
+            let defaultResult: InstructionResult = { instructionID: this.instructionID, success: false, duration: 0 };
+
             // 如果设置了延迟，先等待
-            if (this.delay && this.delay > 0) {
-                await this.Delay(this.delay);
-            }
+            await this.Delay(this.delay);
 
             // 使用 browser.tabs API 导航到指定 URL
             await browser.tabs.update(this.tabId, { url: this.url });
@@ -38,12 +38,7 @@ export class NavigateInstructionClass extends BaseInstructionClass {
             // 等待 content script 准备好（最多等待 5 秒）
             // await this.WaitForContentScriptReady();
 
-            return {
-                instructionID: this.instructionID,
-                success: true,
-                duration: 0, // Retry 方法会计算总时间
-                data: { url: this.url }
-            } as InstructionResult;
+            return { ...defaultResult, success: true, data: { url: this.url } };
         });
 
         return result;

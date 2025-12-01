@@ -111,6 +111,8 @@ export class InstructionExecutor {
           break;
         }
       }
+
+      await this.disconnectCDP(tabId);
     } catch (error) {
       console.error('指令执行错误:', error);
     } finally {
@@ -213,6 +215,23 @@ export class InstructionExecutor {
           console.warn('CDP连接警告:', errorMsg);
         }
       }
+    }
+  }
+
+  /**
+   * 断开 CDP 连接
+   * @param tabId - 要断开的标签页 ID
+   * @remarks
+   * 使用 browser.debugger.detach API 断开 CDP 连接
+   * 如果断开失败，会抛出错误
+   */
+  public async disconnectCDP(tabId: number): Promise<void> {
+    try {
+      const target: Browser.debugger.Debuggee = { tabId };
+      // 断开 CDP 连接
+      await browser.debugger.detach(target);
+    } catch (error) {
+      console.error('断开 CDP 连接错误:', error);
     }
   }
 

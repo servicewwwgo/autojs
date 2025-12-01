@@ -7,6 +7,7 @@ import { instructionManager, resultManager, elementManager, nodeConfig, tabManag
 /// <reference types="chrome" />
 
 import { InstructionExecutor, WebSocketConnector } from '../managers';
+import { example } from '../example';
 
 // @ts-ignore - WXT会自动注入defineBackground
 export default defineBackground(() => {
@@ -15,6 +16,36 @@ export default defineBackground(() => {
 
     // 初始化WebSocket连接器
     let wsConnector: WebSocketConnector | null = null;
+
+    async function add_example_instructions(tabId: number) {
+        const now = Date.now();
+
+        const processedInstructions: BaseInstructionClass[] = example.map((inst, index) => {
+            const instruction: Instruction = { ...inst } as Instruction;
+
+            // 如果指令没有指定 tabId，使用传入的 tabId
+            if (!instruction.tabId) {
+                instruction.tabId = tabId;
+            }
+
+            // 如果指令没有 instructionID，生成一个唯一的 ID
+            // 格式：inst_时间戳_索引
+            if (!instruction.instructionID) {
+                instruction.instructionID = `inst_${now}_${index}`;
+            }
+
+            // 如果指令没有 created_at，使用当前时间 + 索引（确保顺序）
+            // 每个指令间隔 1 毫秒，保证排序正确
+            if (!instruction.created_at) {
+                instruction.created_at = now + index;
+            }
+
+            // 使用工厂方法创建指令实例
+            return InstructionFactory.create(instruction, executor.GetElementManager());
+        });
+
+        instructionManager.AddUnfilteredInstructions(processedInstructions);
+    }
 
     async function get_tabs(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 获取所有标签页
@@ -41,6 +72,10 @@ export default defineBackground(() => {
             const tabIndex = sender.tab.index;
             const url = message.params?.url as string || sender.tab.url as string || '';
             tabManager.RecordActivatedTab(tabId, tabIndex, url);
+            // 添加測試指令
+            instructionManager.DeleteInstructionsByTabId(tabId);
+            await add_example_instructions(tabId);
+
             sendResponse({ success: true, data: { tabId, tabIndex, url } });
         } else {
             sendResponse({ success: false, error: '无法获取标签页ID' });

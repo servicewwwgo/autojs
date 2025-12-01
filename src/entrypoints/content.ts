@@ -3,6 +3,19 @@ import { BackgroundScriptMessageType, ContentScriptMessageType, ElementTag } fro
 import { SendMessageToBackgroundScript, EscapeCSSSelector } from '../utils';
 
 /**
+ * 通知 background script 内容脚本已加载完成
+ */
+async function notifyContentScriptReady() {
+  const response = await SendMessageToBackgroundScript({ type: 'contentScriptReady', params: { url: window.location.href } } as BackgroundScriptMessageType);
+
+  if (response.success) {
+    console.log('Notified background script successfully');
+  } else {
+    console.error('Failed to notify background script:', response.error);
+  }
+}
+
+/**
  * 隐藏 navigator.webdriver 属性
  * 用于防止网站检测到自动化工具
  * 
@@ -25,154 +38,208 @@ function hideWebdriver(): void {
 }
 
 /**
- * 执行脚本
- * @param script - 脚本字符串
- * @returns 执行结果
- */
-function ExecuteScript(script: string): any {
-  /*
-  return eval(script);
-  */
-}
-
-/**
  * 查找元素（使用 DOM API）
  * @param selector - 选择器字符串
  * @param selectorType - 选择器类型
  * @returns 找到的 DOM 元素节点，如果未找到则返回 null
  */
 function FindElement(selector: string, selectorType: 'css' | 'xpath' | 'id'): HTMLElement | undefined {
-  try {
-    let element: HTMLElement | undefined;
 
-    switch (selectorType) {
-      case 'css':
+  let element: HTMLElement | undefined;
+
+  switch (selectorType) {
+    case 'css':
+      {
         element = document.querySelector(selector) as HTMLElement;
         break;
-
-      case 'xpath':
-        {
-          const result = document.evaluate(selector, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-          const node = result.singleNodeValue;
-          element = node ? (node as HTMLElement) : undefined;
-        }
+      }
+    case 'xpath':
+      {
+        const result = document.evaluate(selector, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        const node = result.singleNodeValue;
+        element = node ? (node as HTMLElement) : undefined;
         break;
-
-      case 'id':
+      }
+    case 'id':
+      {
         element = document.getElementById(selector) as HTMLElement;
         break;
-
-      default:
-        console.error(`Unsupported selector type: ${selectorType}`);
-        return undefined;
-    }
-
-    return element;
-  } catch (error) {
-    console.error(`Error finding element with selector "${selector}" (type: ${selectorType}):`, error);
-    return undefined;
-  }
-}
-
-/**
- * 使用標記查找元素(由 background script 設置的標記)
- * @param tag - 標記
- * @returns 找到的 DOM 元素节点，如果未找到则返回 undefined
- */
-function FindElementByTag(tag: string): HTMLElement | undefined {
-  if (!tag || typeof tag !== 'string') {
-    console.error('Invalid tag parameter');
-    return undefined;
+      }
+    default:
+      console.error(`Unsupported selector type: ${selectorType}`);
   }
 
-  // 转义 tag 中的特殊字符，防止 CSS 选择器注入
-  const escapedTag = EscapeCSSSelector(tag);
-  const element: HTMLElement | undefined = FindElement(`[${ElementTag}="${escapedTag}"]`, 'css');
   return element;
 }
 
 /**
- * 滚动到元素位置
- * @param tag - 元素标记（由 background script 设置的标记）
- * @returns 是否成功滚动到元素位置
+ * 查找元素（使用標記）
+ * @param tag - 標記
+ * @returns 找到的 DOM 元素节点，如果未找到则返回 undefined
  */
-function ScrollIntoView(tag: string): boolean {
+function FindElementByTag(tag: any): HTMLElement | undefined {
+  if (!tag || typeof tag !== 'string') {
+    return undefined;
+  }
+  const escapedTag = EscapeCSSSelector(tag);
+  return FindElement(`[${ElementTag}="${escapedTag}"]`, 'css');
+}
+
+/**
+ * 执行脚本
+ * @param message - 消息
+ * @param sender - 发送者
+ * @param sendResponse - 发送响应
+ */
+async function ExecuteScript(message: ContentScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void): Promise<void> {
+  const script = message.params.script;
+  const result = await eval(script);
+  sendResponse({ success: result !== undefined, data: result ?? undefined });
+}
+
+/**
+ * 滚动到元素位置
+ * @param message - 消息
+ * @param sender - 发送者
+ * @param sendResponse - 发送响应
+ */
+async function ScrollIntoView(message: ContentScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void): Promise<void> {
+  const tag = message.params.tag;
   const element: HTMLElement | undefined = FindElementByTag(tag);
 
-  if (element === undefined) {
-    console.error(`Element not found with tag: ${tag}`);
-    return false;
+  if (!element) {
+    sendResponse({ success: false, error: 'Element not found' });
+    return;
   }
 
-  try {
-    // 滚动到元素位置，使用平滑滚动并居中显示
-    element.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-      inline: 'center'
-    });
-    return true;
-  } catch (error) {
-    console.error(`Error scrolling to element with tag "${tag}":`, error);
-    return false;
-  }
+  // 滚动到元素位置，使用平滑滚动并居中显示
+  element?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+    inline: 'center'
+  });
+
+  sendResponse({ success: true });
 }
 
 /**
  * 獲取元素的屬性
- * @param tag - 元素标记（由 background script 设置的标记）
- * @param attribute - 屬性名稱
- * @returns 屬性值
+ * @param message - 消息
+ * @param sender - 发送者
+ * @param sendResponse - 发送响应
+ * @remarks
+ * 支持的属性类型：
+ * 1. 标准 HTML 属性：使用 element.getAttribute() 获取
+ * 2. 图片相关：
+ *    - 'src' 或 'image' - 获取 <img> 标签的 src 属性
+ *    - 'background-image' 或 'backgroundImage' - 从计算样式中获取背景图片 URL
+ *    - 'image' - 智能检测：优先获取 src，如果没有则获取 background-image
+ * 3. 计算样式属性：使用 window.getComputedStyle() 获取
  */
-function GetAttribute(tag: string, attribute: string): string | undefined {
+async function GetAttribute(message: ContentScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void): Promise<void> {
+  const tag = message.params.tag;
+  const attribute = message.params.attribute || 'text';
   const element: HTMLElement | undefined = FindElementByTag(tag);
-  return element?.getAttribute(attribute) ?? undefined;
+
+  if (!element) {
+    sendResponse({ success: false, error: 'Element not found' });
+    return;
+  }
+
+  let attributeValue: string | null | undefined = undefined;
+
+  // 特殊处理：图片获取
+  if (attribute === 'image' || attribute === 'src' || attribute === 'background-image' || attribute === 'backgroundImage') {
+    // 1. 如果是 <img> 标签，优先获取 src 属性
+    if (element.tagName === 'IMG' || element.tagName === 'img') {
+      const imgElement = element as HTMLImageElement;
+      // 尝试多种方式获取图片 URL
+      attributeValue = imgElement.src ||
+        imgElement.getAttribute('src') ||
+        imgElement.getAttribute('data-src') ||
+        imgElement.getAttribute('data-lazy-src') ||
+        null;
+    }
+
+    // 2. 如果还没有获取到，尝试从背景图片中获取
+    if (!attributeValue && (attribute === 'image' || attribute === 'background-image' || attribute === 'backgroundImage')) {
+      try {
+        const style = window.getComputedStyle(element);
+        const backgroundImage = style.backgroundImage || style.getPropertyValue('background-image');
+
+        if (backgroundImage && backgroundImage !== 'none') {
+          // 从 backgroundImage 中提取 URL
+          // 格式可能是: url("http://example.com/image.jpg") 或 url('http://example.com/image.jpg') 或 url(http://example.com/image.jpg)
+          const urlMatch = backgroundImage.match(/url\(['"]?([^'"]+)['"]?\)/);
+          if (urlMatch && urlMatch[1]) {
+            attributeValue = urlMatch[1];
+          } else {
+            attributeValue = backgroundImage;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to get background-image:', error);
+      }
+    }
+
+    // 3. 如果是指定获取 src 但元素不是 img，返回 null
+    if (!attributeValue && attribute === 'src' && element.tagName !== 'IMG' && element.tagName !== 'img') {
+      attributeValue = null;
+    }
+  }
+  // 特殊处理：计算样式属性（CSS 属性）
+  else if (attribute.includes('-') || ['display', 'visibility', 'opacity', 'color', 'backgroundColor', 'width', 'height', 'fontSize'].includes(attribute)) {
+    try {
+      const style = window.getComputedStyle(element);
+      // 尝试直接获取属性
+      attributeValue = (style as any)[attribute] || style.getPropertyValue(attribute) || null;
+
+      // 如果还是没有，尝试驼峰命名
+      if (!attributeValue) {
+        const camelCase = attribute.replace(/-([a-z])/g, (g: string) => g[1].toUpperCase());
+        attributeValue = (style as any)[camelCase] || null;
+      }
+    } catch (error) {
+      console.warn(`Failed to get computed style property "${attribute}":`, error);
+      attributeValue = null;
+    }
+  }
+  // 标准 HTML 属性
+  else {
+    attributeValue = element.getAttribute(attribute);
+
+    // 如果 getAttribute 返回 null，尝试直接访问元素属性（如 value, checked 等）
+    if (attributeValue === null) {
+      const directValue = (element as any)[attribute];
+      if (directValue !== undefined) {
+        attributeValue = String(directValue);
+      }
+    }
+  }
+
+  sendResponse({
+    success: attributeValue !== null && attributeValue !== undefined,
+    data: attributeValue ?? undefined
+  });
 }
 
 /**
  * 获取元素文本
- * @param tag - 元素标记（由 background script 设置的标记）
- * @returns 元素文本
+ * @param message - 消息
+ * @param sender - 发送者
+ * @param sendResponse - 发送响应
  */
-function GetText(tag: string): string | undefined {
+async function GetText(message: ContentScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void): Promise<void> {
+  const tag = message.params.tag;
   const element: HTMLElement | undefined = FindElementByTag(tag);
 
   if (!element) {
-    return undefined;
+    sendResponse({ success: false, error: 'Element not found' });
+    return;
   }
 
-  try {
-    // 根据元素类型获取文本内容
-    if (element instanceof HTMLInputElement) {
-      return element.value || '';
-    } else if (element instanceof HTMLTextAreaElement) {
-      return element.value || '';
-    } else if (element instanceof HTMLSelectElement) {
-      // 对于 select 元素，返回选中的 option 的文本
-      const selectedOption = element.options[element.selectedIndex];
-      return selectedOption ? (selectedOption.textContent || selectedOption.value || '') : '';
-    } else if (element instanceof HTMLButtonElement) {
-      // button 元素的 value 属性可能不存在，优先使用 textContent
-      return element.textContent || element.value || element.innerText || '';
-    } else if (element instanceof HTMLAnchorElement) {
-      return element.textContent || element.innerText || '';
-    } else if (element instanceof HTMLImageElement) {
-      // 对于图片，优先返回 alt 文本，如果没有则返回 src
-      return element.alt || element.src || '';
-    } else if (element instanceof HTMLVideoElement) {
-      // 对于视频，返回文本内容或 poster
-      return element.textContent || element.poster || '';
-    } else if (element instanceof HTMLAudioElement) {
-      // 对于音频，返回文本内容或 src
-      return element.textContent || element.src || '';
-    } else {
-      // 对于其他元素，优先使用 textContent，如果没有则使用 innerText
-      return element.textContent || element.innerText || '';
-    }
-  } catch (error) {
-    console.error(`Error getting text for element with tag "${tag}":`, error);
-    return undefined;
-  }
+  const text = element.textContent || element.innerText || '';
+  sendResponse({ success: text !== undefined, data: text ?? undefined });
 }
 
 /**
@@ -215,15 +282,10 @@ function checkParentVisibility(element: HTMLElement): boolean {
 
 /**
  * 判断元素是否可见（采用权威且全面的检查方法）
- * @param tag - 元素标记（由 background script 设置的标记）
+ * @param element - 元素
  * @returns 是否可见
  */
-function IsVisible(tag: string): boolean {
-  const element: HTMLElement | undefined = FindElementByTag(tag);
-
-  if (!element) {
-    return false;
-  }
+function IsVisible(element: HTMLElement): boolean {
 
   // 1. 检查元素是否已连接到 DOM
   if (!element.isConnected) {
@@ -354,101 +416,22 @@ function IsVisible(tag: string): boolean {
 }
 
 /**
- * 处理来自popup的消息
+ * 检查元素是否可见
  * @param message - 消息
  * @param sender - 发送者
  * @param sendResponse - 发送响应
- * @returns 处理结果
  */
-async function handleMessage(message: ContentScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
-  console.log('Received message:', message);
+async function CheckElementVisible(message: ContentScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void): Promise<void> {
+  const tag = message.params.tag;
+  const element: HTMLElement | undefined = FindElementByTag(tag);
 
-  try {
-    switch (message.type) {
-      case 'execute_script':
-        // 执行脚本
-        const executeScriptResult = ExecuteScript(
-          message.params.script
-        );
-        sendResponse({ success: executeScriptResult !== undefined, data: executeScriptResult });
-        break;
-
-      case 'find_element':
-        // 查找元素（作为 CDP 查找失败时的回退方案）
-        if (!message.params?.selector || !message.params?.selectorType) {
-          sendResponse({ success: false, error: 'Missing selector or selectorType parameter' });
-          break;
-        }
-        const element = FindElement(
-          message.params.selector,
-          message.params.selectorType
-        );
-        sendResponse({ success: element !== undefined, data: element });
-        break;
-
-      case 'scroll_into_view':
-        // 滚动到元素位置
-        if (!message.params?.tag) {
-          sendResponse({ success: false, error: 'Missing tag parameter' });
-          break;
-        }
-        const scrollResult = ScrollIntoView(message.params.tag);
-        sendResponse({ success: scrollResult, data: scrollResult });
-        break;
-
-      case 'get_attribute':
-        // 获取元素属性
-        if (!message.params?.tag || !message.params?.attribute) {
-          sendResponse({ success: false, error: 'Missing tag or attribute parameter' });
-          break;
-        }
-        const attributeValue = GetAttribute(
-          message.params.tag,
-          message.params.attribute
-        );
-        sendResponse({ success: attributeValue !== undefined, data: attributeValue });
-        break;
-
-      case 'get_text':
-        // 获取元素文本
-        if (!message.params?.tag) {
-          sendResponse({ success: false, error: 'Missing tag parameter' });
-          break;
-        }
-        const text = GetText(message.params.tag);
-        sendResponse({ success: text !== undefined, data: text });
-        break;
-
-      case 'is_visible':
-        // 判断元素是否可见
-        if (!message.params?.tag) {
-          sendResponse({ success: false, error: 'Missing tag parameter' });
-          break;
-        }
-        const isVisible = IsVisible(message.params.tag);
-        sendResponse({ success: isVisible, data: isVisible });
-        break;
-
-      default:
-        sendResponse({ success: false, error: `Unknown message type: ${message.type}` });
-        break;
-    }
-  } catch (error) {
-    sendResponse({ success: false, error: `Failed to handle message: ${error instanceof Error ? error.message : String(error)}` });
+  if (!element) {
+    sendResponse({ success: false, error: 'Element not found' });
+    return;
   }
-}
 
-/**
- * 通知 background script 内容脚本已加载完成
- */
-async function notifyContentScriptReady() {
-  const response = await SendMessageToBackgroundScript({ type: 'contentScriptReady', params: { url: window.location.href } } as BackgroundScriptMessageType);
-
-  if (response.success) {
-    console.log('Notified background script successfully');
-  } else {
-    console.error('Failed to notify background script:', response.error);
-  }
+  const isVisible = IsVisible(element);
+  sendResponse({ success: isVisible, data: isVisible });
 }
 
 /**
@@ -464,9 +447,23 @@ export default defineContentScript({
     // 立即隐藏 navigator.webdriver 属性（在页面脚本运行之前）
     hideWebdriver();
 
+    let mapTypeToFunction: { [key: string]: (message: ContentScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) => Promise<void> } = {
+      'scroll_into_view': ScrollIntoView,
+      'get_attribute': GetAttribute,
+      'get_text': GetText,
+      'is_visible': CheckElementVisible,
+      'execute_script': ExecuteScript
+    };
+
     // 监听来自popup和background script的消息
     browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      handleMessage(message as ContentScriptMessageType, sender, sendResponse).catch(console.error);
+      const handler = mapTypeToFunction[message.type as keyof typeof mapTypeToFunction];
+
+      if (handler) {
+        handler(message, sender, sendResponse).catch((error) => sendResponse({ success: false, error: `Failed to handle message: ${error instanceof Error ? error.message : String(error)}` }));
+      } else {
+        sendResponse({ success: false, error: `Unknown message type: ${message.type}` });
+      }
     });
 
     // 等待 DOM 加载完成后再通知 background script
