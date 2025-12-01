@@ -198,9 +198,14 @@ const loadTabs = async () => {
                 tabId: tab.tabId,
                 url: tab.url || 'about:blank'
             }));
+            showMessage('加载标签页成功', 'success');
         }
+        else {
+            showMessage('加载标签页失败: ' + (response.error || '未知错误'), 'error');
+        }
+
     } catch (error) {
-        console.error('加载标签页失败:', error);
+        showMessage('加载标签页失败: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
 };
 
@@ -247,7 +252,7 @@ const sendInstructions = async () => {
             showMessage(`成功发送 ${response.count as number} 条指令`, 'success');
         }
     } catch (error) {
-        console.error('发送指令失败:', error);
+        showMessage('发送指令失败: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
 };
 
@@ -277,7 +282,7 @@ const showMessage = (msg: string, type: 'success' | 'error') => {
     messageType.value = type;
     setTimeout(() => {
         message.value = '';
-    }, 3000);
+    }, 5000);
 };
 
 onMounted(() => {

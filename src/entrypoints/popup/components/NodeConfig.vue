@@ -93,7 +93,7 @@ const showMessage = (msg: string, type: 'success' | 'error') => {
   messageType.value = type;
   setTimeout(() => {
     message.value = '';
-  }, 3000);
+  }, 5000);
 };
 
 onMounted(() => {

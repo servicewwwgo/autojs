@@ -79,6 +79,9 @@
                 </div>
             </div>
         </div>
+        <div v-if="message" :class="['message', messageType]">
+            {{ message }}
+        </div>
     </div>
 </template>
 
@@ -88,6 +91,8 @@ import { BackgroundScriptMessageType, ExecutorStatus, TabInfo } from '../../../t
 import { SendMessageToBackgroundScript } from '../../../utils';
 
 const wsUrl = ref('ws://localhost:8080');
+const message = ref('');
+const messageType = ref<'success' | 'error'>('success');
 const isConnected = ref(false);
 const selectedTabId = ref<number | ''>('');
 const tabs = ref<Array<{ tabId: number; url: string }>>([]);
@@ -116,9 +121,13 @@ const loadTabs = async () => {
                 tabId: tab.tabId,
                 url: tab.url || 'about:blank'
             }));
+            showMessage('加载标签页成功', 'success');
+        }
+        else {
+            showMessage('加载标签页失败: ' + (response.error || '未知错误'), 'error');
         }
     } catch (error) {
-        console.error('加载标签页失败:', error);
+        showMessage('加载标签页失败: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
 };
 
@@ -184,7 +193,7 @@ const disconnect = async () => {
             connectionStatusType.value = 'info';
         }
     } catch (error) {
-        console.error('断开连接失败:', error);
+        showMessage('断开连接失败: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
 };
 
@@ -203,7 +212,7 @@ const startExecution = async () => {
             await loadStatus();
         }
     } catch (error) {
-        console.error('开始执行失败:', error);
+        showMessage('开始执行失败: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
 };
 
@@ -217,7 +226,7 @@ const pauseExecution = async () => {
             await loadStatus();
         }
     } catch (error) {
-        console.error('暂停执行失败:', error);
+        showMessage('暂停执行失败: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
 };
 
@@ -231,7 +240,7 @@ const stopExecution = async () => {
             await loadStatus();
         }
     } catch (error) {
-        console.error('停止执行失败:', error);
+        showMessage('停止执行失败: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
 };
 
@@ -245,7 +254,7 @@ const loadStatus = async () => {
             executorStatus.value = response.data;
         }
     } catch (error) {
-        console.error('加载状态失败:', error);
+        showMessage('加载状态失败: ' + (error instanceof Error ? error.message : String(error)), 'error');
     }
 };
 
@@ -264,6 +273,15 @@ onUnmounted(() => {
         clearInterval(statusInterval);
     }
 });
+
+const showMessage = (msg: string, type: 'success' | 'error') => {
+    message.value = msg;
+    messageType.value = type;
+    setTimeout(() => {
+        message.value = '';
+    }, 5000);
+};
+
 </script>
 
 <style scoped>
@@ -440,5 +458,23 @@ label {
 
 .value.error {
     color: #dc3545;
+}
+
+.message {
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.message.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.message.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
 }
 </style>
