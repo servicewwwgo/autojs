@@ -4,21 +4,63 @@ import { ElementManager } from '../managers';
 
 /**
  * 页面JavaScript执行指令
+ * 
  */
 export class ExecuteScriptInstructionClass extends BaseInstructionClass {
-  public script: string;
-  public args?: any[];
+  public expression: string;
+  public objectGroup?: string;
+  public includeCommandLineAPI?: boolean;
+  public silent?: boolean;
+  public contextId?: any;
+  public returnByValue?: boolean;
+  public generatePreview?: boolean;
+  public userGesture?: boolean;
+  public awaitPromise?: boolean;
+  public throwOnSideEffect?: boolean;
+  public disableBreaks?: boolean;
+  public replMode?: boolean;
+  public allowUnsafeEvalBlockedByCSP?: boolean;
+  public uniqueContextId?: string;
+  public serializationOptions?: any;
 
   constructor(instruction: ExecuteScriptInstruction, elementManager: ElementManager) {
     super(instruction, elementManager);
-    this.script = instruction.script;
-    this.args = instruction.args;
+
+    this.expression = instruction.expression;
+    this.objectGroup = instruction.objectGroup;
+    this.includeCommandLineAPI = instruction.includeCommandLineAPI;
+    this.silent = instruction.silent;
+    this.contextId = instruction.contextId;
+    this.returnByValue = instruction.returnByValue;
+    this.generatePreview = instruction.generatePreview;
+    this.userGesture = instruction.userGesture;
+    this.awaitPromise = instruction.awaitPromise;
+    this.throwOnSideEffect = instruction.throwOnSideEffect;
+    this.disableBreaks = instruction.disableBreaks;
+    this.replMode = instruction.replMode;
+    this.allowUnsafeEvalBlockedByCSP = instruction.allowUnsafeEvalBlockedByCSP;
+    this.uniqueContextId = instruction.uniqueContextId;
+    this.serializationOptions = instruction.serializationOptions;
   }
 
   ToObject(): object {
     return {
       ...super.ToObject(),
-      script: this.script
+      expression: this.expression,
+      objectGroup: this.objectGroup,
+      includeCommandLineAPI: this.includeCommandLineAPI,
+      silent: this.silent,
+      contextId: this.contextId,
+      returnByValue: this.returnByValue,
+      generatePreview: this.generatePreview,
+      userGesture: this.userGesture,
+      awaitPromise: this.awaitPromise,
+      throwOnSideEffect: this.throwOnSideEffect,
+      disableBreaks: this.disableBreaks,
+      replMode: this.replMode,
+      allowUnsafeEvalBlockedByCSP: this.allowUnsafeEvalBlockedByCSP,
+      uniqueContextId: this.uniqueContextId,
+      serializationOptions: this.serializationOptions
     } as object;
   }
 
@@ -26,35 +68,30 @@ export class ExecuteScriptInstructionClass extends BaseInstructionClass {
     const result = await this.Retry(async () => {
       let defaultResult: InstructionResult = { instructionID: this.instructionID, success: false, duration: 0 };
 
+      // 构建 Runtime.evaluate 参数对象，尽可能原样还原 CDP 接口
+      const params: any = {
+        expression: this.expression
+      };
+
+      // 添加所有可选参数（仅当已定义时）
+      if (this.objectGroup !== undefined) params.objectGroup = this.objectGroup;
+      if (this.includeCommandLineAPI !== undefined) params.includeCommandLineAPI = this.includeCommandLineAPI;
+      if (this.silent !== undefined) params.silent = this.silent;
+      if (this.contextId !== undefined) params.contextId = this.contextId;
+      if (this.returnByValue !== undefined) params.returnByValue = this.returnByValue;
+      if (this.generatePreview !== undefined) params.generatePreview = this.generatePreview;
+      if (this.userGesture !== undefined) params.userGesture = this.userGesture;
+      if (this.awaitPromise !== undefined) params.awaitPromise = this.awaitPromise;
+      if (this.throwOnSideEffect !== undefined) params.throwOnSideEffect = this.throwOnSideEffect;
+      if (this.disableBreaks !== undefined) params.disableBreaks = this.disableBreaks;
+      if (this.replMode !== undefined) params.replMode = this.replMode;
+      if (this.allowUnsafeEvalBlockedByCSP !== undefined) params.allowUnsafeEvalBlockedByCSP = this.allowUnsafeEvalBlockedByCSP;
+      if (this.uniqueContextId !== undefined) params.uniqueContextId = this.uniqueContextId;
+      if (this.serializationOptions !== undefined) params.serializationOptions = this.serializationOptions;
+      if (this.timeout !== undefined) params.timeout = this.timeout;
+
       // 执行JavaScript代码
-      let results: any;
-
-      if (typeof this.script === 'string') {
-        // 先启用 Runtime 域
-        await this.ExecuteCDPCommand('Runtime.enable', {});
-
-        let wrappedScript = this.script;
-
-        // 如果有参数，将脚本包装成函数调用
-        if (this.args && this.args.length > 0) {
-          // 将参数序列化为 JSON，然后在脚本中解析
-          wrappedScript = `(function() { const args = ${JSON.stringify(this.args)}; return ${wrappedScript} })()`;
-        }
-
-        const evalResult = await this.ExecuteCDPCommand('Runtime.evaluate', { expression: wrappedScript, returnByValue: true, timeout: this.timeout });
-
-        if (evalResult?.result?.value !== undefined) {
-          results = [{ result: evalResult.result.value }];
-        } else if (evalResult?.result) {
-          results = [{ result: evalResult.result }];
-        } else {
-          throw new Error('Failed to execute script: no result returned');
-        }
-      } else {
-        // 如果是函数对象，使用 browser.scripting.executeScript
-        // 函数对象不需要序列化，可以直接传递
-        results = await browser.scripting.executeScript({ target: { tabId: this.tabId }, func: this.script as any, args: this.args || [] });
-      }
+      let results: any = await this.ExecuteCDPCommand('Runtime.evaluate', params);
 
       return { ...defaultResult, success: true, data: { results } };
     });

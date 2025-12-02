@@ -133,8 +133,14 @@ const executeScriptInstruction_script_1: ExecuteScriptInstruction = {
     type: 'execute_script',
     tabId: 0,
     instructionID: 'inst_script_1',
-    script: 'alert("Hello, world!");',
-    args: [],
+    expression: 'alert("Hello, world!");',
+    returnByValue: true,
+    timeout: 30,
+    disableBreaks: false,
+    replMode: false,
+    allowUnsafeEvalBlockedByCSP: false,
+    uniqueContextId: '',
+    serializationOptions: {},
     created_at: Date.now()
 };
 
