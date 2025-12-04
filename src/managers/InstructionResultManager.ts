@@ -51,8 +51,3 @@ export class ResultManager {
       .filter((result): result is InstructionResult => result !== undefined);
   }
 }
-
-/**
- * 导出全局指令结果管理器
- */
-export let resultManager: ResultManager = new ResultManager();

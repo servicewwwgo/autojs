@@ -1,8 +1,7 @@
-import type { ElementData, FindElementInstruction, InstructionResult } from '../types';
-import { ElementTag } from '../types';
-import { BaseInstructionClass } from './BaseInstruction';
-import { ElementClass, ElementManager } from '../managers';
+import { ElementData, ElementTag, FindElementInstruction, InstructionResult } from '../types';
 import { GenerateRandomString } from '../utils';
+import { ElementClass, elementManager } from '../managers';
+import { BaseInstructionClass } from './BaseInstruction';
 
 /**
  * 元素查找指令
@@ -10,8 +9,8 @@ import { GenerateRandomString } from '../utils';
 export class FindElementInstructionClass extends BaseInstructionClass {
     public elementData: ElementData;
 
-    constructor(instruction: FindElementInstruction, elementManager: ElementManager) {
-        super(instruction, elementManager);
+    constructor(instruction: FindElementInstruction) {
+        super(instruction);
         this.elementData = instruction.element;
     }
 
@@ -172,7 +171,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
     private async selectElementByChildren(nodeIds: number[], childrenName: string): Promise<number | undefined> {
         try {
             // 获取子元素
-            const childrenElement = this._elementManager.GetElementByName(this.tabId, childrenName);
+            const childrenElement = elementManager.GetElementByName(this.tabId, childrenName);
 
             if (!childrenElement || !childrenElement.elementData.nodeId) {
                 console.warn(`Children element "${childrenName}" not found in manager`);
@@ -206,7 +205,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
     private async selectElementByParent(nodeIds: number[], parentName: string): Promise<number | undefined> {
         try {
             // 获取父元素
-            const parentElement = this._elementManager.GetElementByName(this.tabId, parentName);
+            const parentElement = elementManager.GetElementByName(this.tabId, parentName);
 
             if (!parentElement || !parentElement.elementData.nodeId) {
                 console.warn(`Parent element "${parentName}" not found in manager`);
@@ -260,7 +259,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
     private async selectElementBySibling(nodeIds: number[], siblingName: string, siblingOffset?: number): Promise<number | undefined> {
         try {
             // 获取兄弟元素
-            const siblingElement = this._elementManager.GetElementByName(this.tabId, siblingName);
+            const siblingElement = elementManager.GetElementByName(this.tabId, siblingName);
 
             if (!siblingElement || !siblingElement.elementData.nodeId) {
                 console.warn(`Sibling element "${siblingName}" not found in manager`);
@@ -600,7 +599,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
                 const element = new ElementClass(elementDataWithNodeId);
 
                 // 添加到 elementManager
-                this._elementManager.SetElementByName(this.tabId, this.elementData.name, element);
+                elementManager.SetElementByName(this.tabId, this.elementData.name, element);
 
                 return { ...defaultResult, success: true, data: element };
             }

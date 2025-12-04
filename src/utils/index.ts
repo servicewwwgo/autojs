@@ -126,3 +126,45 @@ export async function ExecuteCDPCommand(tabId: number, method: string, params?: 
         });
     });
 }
+
+/**
+ * 确保 Chrome DevTools Protocol (CDP) 已连接到指定标签页
+ * @param tabId - 要连接的标签页 ID
+ * @remarks
+ * 使用 browser.debugger API 连接到标签页，版本为 1.3
+ * 如果已经连接（可能是其他扩展或 DevTools），会忽略相关错误
+ * 这是执行 CDP 命令的前提条件
+ */
+export async function EnsureCDPConnected(tabId: number): Promise<void> {
+    try {
+        const target: Browser.debugger.Debuggee = { tabId };
+        // 连接到标签页，使用 CDP 版本 1.3
+        await browser.debugger.attach(target, '1.3');
+    } catch (error) {
+        // 如果已经连接，忽略错误（可能是其他扩展或 DevTools 已连接）
+        if (browser.runtime.lastError) {
+            const errorMsg = browser.runtime.lastError.message || '';
+            // 忽略"另一个调试器已连接"的错误（可能是其他扩展或DevTools）
+            if (!errorMsg.includes('Another debugger') && !errorMsg.includes('already attached')) {
+                console.warn('CDP连接警告:', errorMsg);
+            }
+        }
+    }
+}
+
+/**
+ * 断开 CDP 连接
+ * @param tabId - 要断开的标签页 ID
+ * @remarks
+ * 使用 browser.debugger.detach API 断开 CDP 连接
+ * 如果断开失败，会抛出错误
+ */
+export async function DisconnectCDP(tabId: number): Promise<void> {
+    try {
+        const target: Browser.debugger.Debuggee = { tabId };
+        // 断开 CDP 连接
+        await browser.debugger.detach(target);
+    } catch (error) {
+        console.error('断开 CDP 连接错误:', error);
+    }
+}

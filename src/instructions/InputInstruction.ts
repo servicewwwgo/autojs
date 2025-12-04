@@ -1,6 +1,6 @@
 import type { InputInstruction, InstructionResult, ContentScriptMessageType } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
-import { ElementManager } from '../managers';
+import { elementManager } from '../managers';
 
 /**
  * 文本输入指令
@@ -10,8 +10,8 @@ export class InputInstructionClass extends BaseInstructionClass {
     public text: string;
     public clear?: boolean;
 
-    constructor(instruction: InputInstruction, elementManager: ElementManager) {
-        super(instruction, elementManager);
+    constructor(instruction: InputInstruction) {
+        super(instruction);
 
         this.elementName = instruction.elementName;
         this.text = instruction.text;
@@ -23,7 +23,7 @@ export class InputInstructionClass extends BaseInstructionClass {
             let defaultResult: InstructionResult = { instructionID: this.instructionID, success: false, duration: 0 };
 
             // 从 elementManager 获取元素
-            const element = this._elementManager.GetElementByName(this.tabId, this.elementName);
+            const element = elementManager.GetElementByName(this.tabId, this.elementName);
 
             if (!element) {
                 return { ...defaultResult, error: `Element "${this.elementName}" not found in element manager` };
@@ -126,4 +126,3 @@ export class InputInstructionClass extends BaseInstructionClass {
         } as object;
     }
 }
-

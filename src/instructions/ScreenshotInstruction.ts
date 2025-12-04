@@ -10,8 +10,8 @@ export class ScreenshotInstructionClass extends BaseInstructionClass {
   public quality?: number;
   public fullPage?: boolean;
 
-  constructor(instruction: ScreenshotInstruction, elementManager: ElementManager) {
-    super(instruction, elementManager);
+  constructor(instruction: ScreenshotInstruction) {
+    super(instruction);
 
     this.format = instruction.format;
     this.quality = instruction.quality;
@@ -51,4 +51,3 @@ export class ScreenshotInstructionClass extends BaseInstructionClass {
     return result;
   }
 }
-

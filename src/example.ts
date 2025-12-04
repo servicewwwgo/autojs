@@ -11,7 +11,6 @@ import type {
 } from './types';
 
 import { InstructionFactory } from './instructions';
-import { elementManager } from './managers';
 
 // ========== 测试用例：各种指令类型 ==========
 
@@ -171,5 +170,5 @@ export const example = [
     */
 
     // 7. 截图指令测试用例
-    InstructionFactory.toObject(screenshotInstruction_screen_1, elementManager),
+    InstructionFactory.toObject(screenshotInstruction_screen_1),
 ];

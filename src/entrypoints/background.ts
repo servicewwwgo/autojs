@@ -1,21 +1,18 @@
 import { defineBackground } from 'wxt/utils/define-background';
-import { BackgroundScriptMessageType, ExecutorStatus, TabInfo, Instruction } from '../types';
+import { BackgroundScriptMessageType, ExecutorStatus, TabInfo, Instruction, WSMessage } from '../types';
 import { InstructionFactory, BaseInstructionClass } from '../instructions';
-import { instructionManager, resultManager, elementManager, nodeConfig, tabManager } from '../managers';
+import { nodeConfig, tabManager } from '../managers';
+import { InstructionExecutor, CdpExecutor, wsConnector } from '../executor';
+import { example } from '../example';
 
 // Background script entry point
 /// <reference types="chrome" />
 
-import { InstructionExecutor, WebSocketConnector } from '../managers';
-import { example } from '../example';
-
 // @ts-ignore - WXT会自动注入defineBackground
 export default defineBackground(() => {
     // 初始化管理器
-    const executor = new InstructionExecutor(instructionManager, resultManager, elementManager);
-
-    // 初始化WebSocket连接器
-    let wsConnector: WebSocketConnector | null = null;
+    const instructionExecutor = new InstructionExecutor();
+    const cdpExecutor = new CdpExecutor();
 
     async function add_example_instructions(tabId: number) {
         const now = Date.now();
@@ -41,10 +38,10 @@ export default defineBackground(() => {
             }
 
             // 使用工厂方法创建指令实例
-            return InstructionFactory.create(instruction, executor.GetElementManager());
+            return InstructionFactory.create(instruction);
         });
 
-        instructionManager.AddUnfilteredInstructions(processedInstructions);
+        instructionExecutor.GetInstructionManager().AddUnfilteredInstructions(processedInstructions);
     }
 
     async function get_tabs(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
@@ -73,7 +70,7 @@ export default defineBackground(() => {
             const url = message.params?.url as string || sender.tab.url as string || '';
             tabManager.RecordActivatedTab(tabId, tabIndex, url);
             // 添加測試指令
-            instructionManager.DeleteInstructionsByTabId(tabId);
+            instructionExecutor.GetInstructionManager().DeleteInstructionsByTabId(tabId);
             await add_example_instructions(tabId);
 
             sendResponse({ success: true, data: { tabId, tabIndex, url } });
@@ -122,10 +119,11 @@ export default defineBackground(() => {
                 }
 
                 // 使用工厂方法创建指令实例
-                return InstructionFactory.create(instruction, executor.GetElementManager());
+                return InstructionFactory.create(instruction);
             });
 
-            instructionManager.AddUnfilteredInstructions(processedInstructions);
+            instructionExecutor.GetInstructionManager().AddUnfilteredInstructions(processedInstructions);
+
             sendResponse({ success: true, count: processedInstructions.length });
         } else {
             sendResponse({ success: false, error: '缺少tabId或instructionsJsonString参数' });
@@ -136,8 +134,14 @@ export default defineBackground(() => {
         // 执行指令集
         if (message.params?.tabId) {
             const tabId = message.params.tabId as number;
-            await executor.Execute(tabId);
+
+            // 立即返回响应，然后在后台循环执行所有指令
             sendResponse({ success: true });
+
+            // 循环执行指令，直到没有更多指令或执行被停止
+            setTimeout(async () => {
+                await instructionExecutor.ExecuteAll([]);
+            }, 1000);
         } else {
             sendResponse({ success: false, error: '缺少tabId' });
         }
@@ -145,31 +149,31 @@ export default defineBackground(() => {
 
     async function pause_execution(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 暂停执行
-        executor.Pause();
+        instructionExecutor.Pause();
         sendResponse({ success: true });
     }
 
     async function stop_execution(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 停止执行
-        executor.Stop();
+        instructionExecutor.Stop();
         sendResponse({ success: true });
     }
 
     async function get_executor_status(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 获取执行器状态
-        const status: ExecutorStatus = executor.GetStatus();
+        const status: ExecutorStatus = instructionExecutor.GetStatus();
         sendResponse({ success: true, data: status });
     }
 
     async function get_results(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 获取执行结果
-        const results = resultManager.GetAllResults();
+        const results = instructionExecutor.GetResultManager().GetAllResults();
         sendResponse({ success: true, data: results });
     }
 
     async function clear_results(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 清空执行结果
-        resultManager.ClearAll();
+        instructionExecutor.GetResultManager().ClearAll();
         sendResponse({ success: true });
     }
 
@@ -177,11 +181,13 @@ export default defineBackground(() => {
         // 连接WebSocket
         if (message.params?.url) {
 
-            if (wsConnector) { wsConnector.Disconnect(); }
-            wsConnector = new WebSocketConnector(message.params.url as string, nodeConfig, instructionManager, resultManager);
-            await wsConnector.Connect();
+            if (wsConnector) {
+                await wsConnector.connect();
+            }
+
             sendResponse({ success: true });
         } else {
+
             sendResponse({ success: false, error: '缺少WebSocket URL' });
         }
     }
@@ -189,9 +195,9 @@ export default defineBackground(() => {
     async function disconnect_websocket(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 断开WebSocket
         if (wsConnector) {
-            wsConnector.Disconnect();
-            wsConnector = null;
+            wsConnector.disconnect();
         }
+
         sendResponse({ success: true });
     }
 
@@ -199,7 +205,7 @@ export default defineBackground(() => {
         // 测试WebSocket连接
         if (message.params?.url && wsConnector) {
             const url = message.params.url as string;
-            const connected = await wsConnector.TestConnection(url);
+            const connected = await wsConnector.testConnection(url);
             sendResponse({ success: true, data: { connected } });
         } else {
             sendResponse({ success: false, error: '缺少WebSocket URL' });
@@ -208,8 +214,10 @@ export default defineBackground(() => {
 
     async function send_results_to_server(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 发送执行结果到服务器
-        if (wsConnector && wsConnector.IsConnected()) {
-            wsConnector.SendResults();
+        if (wsConnector && wsConnector.isConnected()) {
+            const results = instructionExecutor.GetResultManager().GetAllResults();
+            const message: WSMessage = { type: 'instructions', data: results };
+            wsConnector.sendMessage(message);
             sendResponse({ success: true });
         } else {
             sendResponse({ success: false, error: 'WebSocket未连接' });
@@ -234,7 +242,7 @@ export default defineBackground(() => {
         'send_results_to_server': send_results_to_server,
     };
 
-    // 监听来自popup和content script的消息
+    // 监听来自 popup 和 content script 的消息
     browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
 
         try {
@@ -252,9 +260,88 @@ export default defineBackground(() => {
         return true; // 保持消息通道开放
     });
 
+    // 监听 CDP 事件（控制台日志和网络日志）
+    browser.debugger.onEvent.addListener((source, method, params) => {
+        const tabId = source.tabId;
+        if (tabId === undefined) return;
+
+        // 处理控制台日志事件
+        if (method === 'Runtime.consoleAPICalled') {
+            const consoleParams = params as any;
+            cdpExecutor.addConsoleLog(tabId, {
+                type: consoleParams.type,
+                args: consoleParams.args,
+                timestamp: consoleParams.timestamp,
+                executionContextId: consoleParams.executionContextId,
+                stackTrace: consoleParams.stackTrace
+            });
+        }
+
+        // 处理网络请求事件
+        if (method === 'Network.requestWillBeSent') {
+            const networkParams = params as any;
+            cdpExecutor.addNetworkLog(tabId, {
+                event: 'requestWillBeSent',
+                requestId: networkParams.requestId,
+                request: networkParams.request,
+                timestamp: networkParams.timestamp,
+                wallTime: networkParams.wallTime,
+                initiator: networkParams.initiator,
+                redirectResponse: networkParams.redirectResponse,
+                type: networkParams.type,
+                frameId: networkParams.frameId
+            });
+        }
+
+        // 处理网络响应事件
+        if (method === 'Network.responseReceived') {
+            const networkParams = params as any;
+            cdpExecutor.addNetworkLog(tabId, {
+                event: 'responseReceived',
+                requestId: networkParams.requestId,
+                response: networkParams.response,
+                timestamp: networkParams.timestamp,
+                type: networkParams.type,
+                frameId: networkParams.frameId
+            });
+        }
+
+        // 处理网络请求完成事件
+        if (method === 'Network.loadingFinished') {
+            const networkParams = params as any;
+            cdpExecutor.addNetworkLog(tabId, {
+                event: 'loadingFinished',
+                requestId: networkParams.requestId,
+                timestamp: networkParams.timestamp,
+                encodedDataLength: networkParams.encodedDataLength
+            });
+        }
+
+        // 处理网络请求失败事件
+        if (method === 'Network.loadingFailed') {
+            const networkParams = params as any;
+            cdpExecutor.addNetworkLog(tabId, {
+                event: 'loadingFailed',
+                requestId: networkParams.requestId,
+                timestamp: networkParams.timestamp,
+                type: networkParams.type,
+                errorText: networkParams.errorText,
+                canceled: networkParams.canceled,
+                blockedReason: networkParams.blockedReason
+            });
+        }
+    });
+
     // 扩展安装时的初始化
     browser.runtime.onInstalled.addListener(async () => {
+        // 获取节点配置
         await nodeConfig.GetNodeProfile();
+
+        // 注册消息类型处理器 - 执行指令（通过 WebSocket 消息）
+        wsConnector.registerMessageTypeHandler('instructions', instructionExecutor.handleMessage.bind(instructionExecutor));
+
+        // 注册 cdp 执行器的统一消息处理器（所有 CDP 相关消息都通过 handleMessage 处理）
+        wsConnector.registerMessageTypeHandler('cdp', cdpExecutor.handleMessage.bind(cdpExecutor));
     });
 
     // 监听标签页激活
@@ -264,8 +351,9 @@ export default defineBackground(() => {
             tabManager.RecordActivatedTab(activeInfo.tabId, tab.index, tab.url);
         }
         // 发送标签页激活消息到服务器
-        if (wsConnector && wsConnector.IsConnected()) {
-            wsConnector.SendTabsMessage({ tabId: activeInfo.tabId as number, tabIndex: tab.index, url: tab.url as string } as TabInfo);
+        if (wsConnector && wsConnector.isConnected()) {
+            const message: WSMessage = { type: "tabs", data: { tabId: activeInfo.tabId as number, tabIndex: tab.index, url: tab.url as string } as TabInfo };
+            wsConnector.sendMessage(message);
         }
     });
 
@@ -275,25 +363,23 @@ export default defineBackground(() => {
             tabManager.RecordActivatedTab(tabId, tab.index, tab.url);
         }
         // 发送标签页更新消息到服务器
-        if (wsConnector && wsConnector.IsConnected()) {
-            wsConnector.SendTabsMessage({ tabId: tabId as number, tabIndex: tab.index, url: tab.url as string } as TabInfo);
+        if (wsConnector && wsConnector.isConnected()) {
+            const message: WSMessage = { type: "tabs", data: { tabId: tabId as number, tabIndex: tab.index, url: tab.url as string } as TabInfo };
+            wsConnector.sendMessage(message);
         }
     });
 
     // 监听标签页关闭
     browser.tabs.onRemoved.addListener((tabId) => {
         tabManager.RemoveActivatedTab(tabId);
-        instructionManager.DeleteInstructionsByTabId(tabId);
+        instructionExecutor.GetInstructionManager().DeleteInstructionsByTabId(tabId);
+        // 清理该标签页的日志
+        cdpExecutor.clearConsoleLogs(tabId);
+        cdpExecutor.clearNetworkLogs(tabId);
         // 发送标签页关闭消息到服务器
-        if (wsConnector && wsConnector.IsConnected()) {
-            wsConnector.SendTabsMessage({ tabId: tabId as number, tabIndex: -1, url: '' } as TabInfo);
+        if (wsConnector && wsConnector.isConnected()) {
+            const message: WSMessage = { type: "tabs", data: { tabId: tabId as number, tabIndex: -1, url: '' } as TabInfo };
+            wsConnector.sendMessage(message);
         }
     });
-
-    // 定期发送执行结果到服务器
-    setInterval(() => {
-        if (wsConnector && wsConnector.IsConnected()) {
-            wsConnector.SendResults();
-        }
-    }, 10000); // 每10秒发送一次
 });

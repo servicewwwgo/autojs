@@ -119,8 +119,3 @@ export class InstructionManager {
     }
   }
 }
-
-/**
- * 导出全局指令管理器
- */
-export let instructionManager: InstructionManager = new InstructionManager();

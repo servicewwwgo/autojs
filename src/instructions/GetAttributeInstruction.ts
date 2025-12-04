@@ -1,6 +1,6 @@
 import type { GetAttributeInstruction, InstructionResult } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
-import { ElementManager } from '../managers';
+import { elementManager } from '../managers';
 
 /**
  * 获取元素属性指令
@@ -17,8 +17,8 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
     } as object;
   }
 
-  constructor(instruction: GetAttributeInstruction, elementManager: ElementManager) {
-    super(instruction, elementManager);
+  constructor(instruction: GetAttributeInstruction) {
+    super(instruction);
     this.elementName = instruction.elementName;
     this.attribute = instruction.attribute;
   }
@@ -28,7 +28,7 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
       let defaultResult: InstructionResult = { instructionID: this.instructionID, success: false, duration: 0 };
 
       // 从 elementManager 获取元素
-      const element = this._elementManager.GetElementByName(this.tabId, this.elementName);
+      const element = elementManager.GetElementByName(this.tabId, this.elementName);
 
       if (!element) {
         return { ...defaultResult, error: `Element "${this.elementName}" not found in element manager` };

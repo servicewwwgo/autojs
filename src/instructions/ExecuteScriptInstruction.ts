@@ -23,8 +23,8 @@ export class ExecuteScriptInstructionClass extends BaseInstructionClass {
   public uniqueContextId?: string;
   public serializationOptions?: any;
 
-  constructor(instruction: ExecuteScriptInstruction, elementManager: ElementManager) {
-    super(instruction, elementManager);
+  constructor(instruction: ExecuteScriptInstruction) {
+    super(instruction);
 
     this.expression = instruction.expression;
     this.objectGroup = instruction.objectGroup;

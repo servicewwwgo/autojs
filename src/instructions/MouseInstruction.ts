@@ -1,6 +1,6 @@
 import type { MouseInstruction, InstructionResult } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
-import { ElementManager } from '../managers';
+import { elementManager } from '../managers';
 
 /**
  * 鼠标操作指令
@@ -12,8 +12,8 @@ export class MouseInstructionClass extends BaseInstructionClass {
     public y?: number;
     public simulate?: 'calculated' | 'simulated' | 'none';
 
-    constructor(instruction: MouseInstruction, elementManager: ElementManager) {
-        super(instruction, elementManager);
+    constructor(instruction: MouseInstruction) {
+        super(instruction);
         this.action = instruction.action;
         this.elementName = instruction.elementName;
         this.x = instruction.x;
@@ -308,7 +308,7 @@ export class MouseInstructionClass extends BaseInstructionClass {
             // 如果指定了元素，获取元素位置
             if (this.elementName) {
                 // 从 elementManager 获取元素
-                const element = this._elementManager.GetElementByName(this.tabId, this.elementName);
+                const element = elementManager.GetElementByName(this.tabId, this.elementName);
 
                 if (!element) {
                     return { ...defaultResult, error: `Element "${this.elementName}" not found in element manager` };

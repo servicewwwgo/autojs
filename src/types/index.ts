@@ -199,7 +199,7 @@ export interface PopupScriptMessageType {
  * WebSocket消息类型
  */
 export interface WSMessage {
-  type: 'login' | 'heartbeat' | 'instructions' | 'result' | 'error' | 'tabs' | 'cdp';
+  type: 'login' | 'heartbeat' | 'tabs' | 'error' | 'instructions' | 'cdp';
   data?: any;
 }
 
@@ -207,9 +207,9 @@ export interface WSMessage {
  * 指令执行器状态
  */
 export interface ExecutorStatus {
+  stopRequested: boolean;
   isRunning: boolean;
   isPaused: boolean;
-  currentTabId: number | null;
   executedCount: number;
   successCount: number;
   errorCount: number;

@@ -1,14 +1,12 @@
 import type { BaseInstruction, InstructionResult, ContentScriptMessageType } from '../types';
 import { SendMessageToContentScript, ExecuteCDPCommand } from '../utils';
-import { ElementManager } from '../managers';
+import { elementManager } from '../managers';
 
 
 /**
  * 基础指令对象接口
  */
 export abstract class BaseInstructionClass implements BaseInstruction {
-    protected _elementManager: ElementManager;
-
     public tabId: number;
     public type: string;
     public instructionID: string;
@@ -18,9 +16,7 @@ export abstract class BaseInstructionClass implements BaseInstruction {
     public ignoreError?: boolean;
     public created_at: number;
 
-    constructor(instruction: BaseInstruction, elementManager: ElementManager) {
-        this._elementManager = elementManager;
-
+    constructor(instruction: BaseInstruction) {
         this.tabId = instruction.tabId;
         this.type = instruction.type;
         this.instructionID = instruction.instructionID;

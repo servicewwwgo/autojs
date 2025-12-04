@@ -1,6 +1,6 @@
 import type { KeyboardInstruction, InstructionResult } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
-import { ElementManager } from '../managers';
+import { elementManager } from '../managers';
 
 /**
  * 键盘操作指令
@@ -67,8 +67,8 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
         Meta: 'MetaLeft'
     };
 
-    constructor(instruction: KeyboardInstruction, elementManager: ElementManager) {
-        super(instruction, elementManager);
+    constructor(instruction: KeyboardInstruction) {
+        super(instruction);
         this.elementName = instruction.elementName;
         this.action = instruction.action;
         this.key = instruction.key;
@@ -120,7 +120,8 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
         }
 
         // 从 elementManager 获取元素
-        const element = this._elementManager.GetElementByName(this.tabId, this.elementName);
+        const element = elementManager.GetElementByName(this.tabId, this.elementName);
+
         if (!element) {
             return { success: false, error: `Element "${this.elementName}" not found in element manager` };
         }

@@ -92,9 +92,11 @@ function FindElementByTag(tag: any): HTMLElement | undefined {
  * @param sendResponse - 发送响应
  */
 async function ExecuteScript(message: ContentScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void): Promise<void> {
+  /*
   const script = message.params.script;
   const result = await eval(script);
   sendResponse({ success: result !== undefined, data: result ?? undefined });
+  */
 }
 
 /**

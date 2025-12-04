@@ -8,8 +8,8 @@ import { ElementManager } from '../managers';
 export class NavigateInstructionClass extends BaseInstructionClass {
     public url: string;
 
-    constructor(instruction: NavigateInstruction, elementManager: ElementManager) {
-        super(instruction, elementManager);
+    constructor(instruction: NavigateInstruction) {
+        super(instruction);
 
         this.url = instruction.url;
     }
@@ -119,5 +119,4 @@ export class NavigateInstructionClass extends BaseInstructionClass {
             url: this.url
         } as object;
     }
-
 }
