@@ -1,0 +1,9 @@
+{
+  "name": "com.autojs.logger",
+  "description": "Native Messaging host for logging Chrome extension output to files",
+  "path": "D:\\source\\autoweb\\autojs\\native\\com.autojs.logger.exe",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://clmjkkigeggneapjkakpiggclhnlooej/"
+  ]
+}

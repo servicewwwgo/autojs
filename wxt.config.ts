@@ -18,7 +18,8 @@ export default defineConfig({
       'storage',
       'scripting',
       'alarms',
-      'debugger'
+      'debugger',
+      'nativeMessaging'
     ],
     host_permissions: [
       '<all_urls>'

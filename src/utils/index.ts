@@ -146,7 +146,7 @@ export async function EnsureCDPConnected(tabId: number): Promise<void> {
             const errorMsg = browser.runtime.lastError.message || '';
             // 忽略"另一个调试器已连接"的错误（可能是其他扩展或DevTools）
             if (!errorMsg.includes('Another debugger') && !errorMsg.includes('already attached')) {
-                console.warn('CDP连接警告:', errorMsg);
+                console.warn('CDP connection warning:', errorMsg);
             }
         }
     }
@@ -165,6 +165,239 @@ export async function DisconnectCDP(tabId: number): Promise<void> {
         // 断开 CDP 连接
         await browser.debugger.detach(target);
     } catch (error) {
-        console.error('断开 CDP 连接错误:', error);
+        console.error('CDP disconnect error:', error);
+    }
+}
+
+/**
+ * 日志级别
+ */
+export enum LogLevel {
+    DEBUG = 'DEBUG',
+    INFO = 'INFO',
+    WARN = 'WARN',
+    ERROR = 'ERROR'
+}
+
+/**
+ * 日志配置选项
+ */
+export interface LogOptions {
+    level?: LogLevel;
+    includeTimestamp?: boolean;
+    includeSource?: boolean;
+    source?: string;
+    filePath?: string;
+}
+
+// 日志缓冲队列
+let logBuffer: Array<{ message: string; timestamp: string; level: LogLevel; source?: string }> = [];
+let logBufferTimer: ReturnType<typeof setTimeout> | null = null;
+const LOG_BUFFER_SIZE = 10; // 缓冲10条日志后批量写入
+const LOG_BUFFER_TIMEOUT = 5000; // 5秒后自动刷新缓冲
+let nativePort: Browser.runtime.Port | null = null;
+
+/**
+ * 初始化 Native Messaging 连接
+ * @param applicationName - Native Messaging 应用名称
+ * @returns 是否连接成功
+ */
+function initNativeConnection(applicationName: string = 'com.autojs.logger'): boolean {
+    try {
+        if (nativePort) {
+            // Check if connection is still valid by checking if port exists
+            // Note: postMessage might not throw immediately if connection is broken,
+            // so we rely on onDisconnect listener to set nativePort to null
+            // For now, assume existing port is valid if it exists
+            return true;
+        }
+
+        nativePort = browser.runtime.connectNative(applicationName);
+
+        nativePort.onMessage.addListener((message: any) => {
+            if (message.type === 'error') {
+                console.error('[LogFile] Native application error:', message.error);
+            } else if (message.type === 'success') {
+                // Log write successful
+            }
+        });
+
+        nativePort.onDisconnect.addListener(() => {
+            if (browser.runtime.lastError) {
+                console.warn('[LogFile] Native connection disconnected:', browser.runtime.lastError.message);
+            }
+            nativePort = null;
+        });
+
+        return true;
+    } catch (error) {
+        console.warn('[LogFile] Failed to connect to native application:', error);
+        nativePort = null;
+        return false;
+    }
+}
+
+/**
+ * 刷新日志缓冲，将缓冲的日志写入文件
+ */
+function flushLogBuffer(): void {
+    if (logBuffer.length === 0) {
+        return;
+    }
+
+    const logsToWrite = [...logBuffer];
+    logBuffer = [];
+
+    if (logBufferTimer) {
+        clearTimeout(logBufferTimer);
+        logBufferTimer = null;
+    }
+
+    if (!nativePort) {
+        if (!initNativeConnection()) {
+            // Fallback to console output if unable to connect to native application
+            logsToWrite.forEach(log => {
+                const logMessage = `[${log.timestamp}] [${log.level}]${log.source ? ` [${log.source}]` : ''} ${log.message}`;
+                console.log(logMessage);
+            });
+            return;
+        }
+        // After initNativeConnection, check again in case it failed silently
+        if (!nativePort) {
+            // Fallback to console output
+            logsToWrite.forEach(log => {
+                const logMessage = `[${log.timestamp}] [${log.level}]${log.source ? ` [${log.source}]` : ''} ${log.message}`;
+                console.log(logMessage);
+            });
+            return;
+        }
+    }
+
+    try {
+        nativePort.postMessage({
+            type: 'writeLogs',
+            logs: logsToWrite,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('[LogFile] Failed to send logs:', error);
+        // Fallback to console output
+        logsToWrite.forEach(log => {
+            const logMessage = `[${log.timestamp}] [${log.level}]${log.source ? ` [${log.source}]` : ''} ${log.message}`;
+            console.log(logMessage);
+        });
+    }
+}
+
+/**
+ * 格式化日志消息
+ * @param message - 原始消息（已经是字符串）
+ * @param options - 日志选项
+ * @returns 格式化后的日志对象
+ */
+function formatLogMessage(message: string, options: LogOptions = {}): {
+    message: string;
+    timestamp: string;
+    level: LogLevel;
+    source?: string;
+} {
+    const level = options.level || LogLevel.INFO;
+    const timestamp = new Date().toISOString();
+
+    return {
+        message: message,
+        timestamp,
+        level,
+        source: options.includeSource ? options.source : undefined
+    };
+}
+
+/**
+ * 输出日志到文件
+ * @param message - 日志消息（可以是字符串或对象）
+ * @param options - 日志选项
+ * @remarks
+ * 使用 Chrome Native Messaging API 将日志写入本地文件
+ * 
+ * 功能特性：
+ * - 支持日志级别（DEBUG, INFO, WARN, ERROR）
+ * - 自动添加时间戳
+ * - 日志缓冲机制，批量写入提高性能
+ * - 自动重连机制
+ * - 错误处理和回退到控制台输出
+ * 
+ * 使用示例：
+ * ```typescript
+ * // 基本用法
+ * OutputLogToFile('这是一条日志消息');
+ * 
+ * // 指定日志级别
+ * OutputLogToFile('错误信息', { level: LogLevel.ERROR });
+ * 
+ * // 包含来源信息
+ * OutputLogToFile('执行完成', { 
+ *     level: LogLevel.INFO, 
+ *     includeSource: true, 
+ *     source: 'InstructionExecutor' 
+ * });
+ * 
+ * // 记录对象
+ * OutputLogToFile({ tabId: 123, url: 'https://example.com' }, { level: LogLevel.DEBUG });
+ * ```
+ */
+export function OutputLogToFile(message: string | object, options: LogOptions = {}): void {
+    try {
+        // 格式化日志消息
+        const formattedLog = formatLogMessage(
+            typeof message === 'string' ? message : JSON.stringify(message),
+            options
+        );
+
+        // 添加到缓冲队列
+        logBuffer.push(formattedLog);
+
+        // 如果缓冲达到大小限制，立即刷新
+        if (logBuffer.length >= LOG_BUFFER_SIZE) {
+            // Clear existing timer before flushing
+            if (logBufferTimer) {
+                clearTimeout(logBufferTimer);
+                logBufferTimer = null;
+            }
+            flushLogBuffer();
+        } else {
+            // 设置定时器，超时后自动刷新
+            if (!logBufferTimer) {
+                logBufferTimer = setTimeout(() => {
+                    logBufferTimer = null; // Clear timer reference before flushing
+                    flushLogBuffer();
+                }, LOG_BUFFER_TIMEOUT);
+            }
+        }
+    } catch (error) {
+        console.error('[LogFile] Log processing failed:', error);
+        console.log(`[${new Date().toISOString()}] [ERROR] ${typeof message === 'string' ? message : JSON.stringify(message)}`);
+    }
+}
+
+/**
+ * 立即刷新日志缓冲
+ * 用于在应用关闭前确保所有日志都已写入
+ */
+export function FlushLogBuffer(): void {
+    flushLogBuffer();
+}
+
+/**
+ * 关闭日志连接
+ */
+export function CloseLogConnection(): void {
+    flushLogBuffer();
+    if (nativePort) {
+        try {
+            nativePort.disconnect();
+        } catch (error) {
+            console.warn('[LogFile] Error disconnecting:', error);
+        }
+        nativePort = null;
     }
 }

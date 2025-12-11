@@ -4,6 +4,7 @@ import { InstructionFactory, BaseInstructionClass } from '../instructions';
 import { nodeConfig, tabManager } from '../managers';
 import { InstructionExecutor, CdpExecutor, wsConnector } from '../executor';
 import { example } from '../example';
+import { OutputLogToFile, LogLevel } from '../utils';
 
 // Background script entry point
 /// <reference types="chrome" />
@@ -334,6 +335,9 @@ export default defineBackground(() => {
 
     // 扩展安装时的初始化
     browser.runtime.onInstalled.addListener(async () => {
+        // 输出日志
+        OutputLogToFile('扩展安装时的初始化', { level: LogLevel.INFO });
+
         // 获取节点配置
         await nodeConfig.GetNodeProfile();
 
