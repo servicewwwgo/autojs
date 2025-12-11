@@ -1,6 +1,5 @@
 import type { ExecuteScriptInstruction, InstructionResult } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
-import { ElementManager } from '../managers';
 
 /**
  * 页面JavaScript执行指令

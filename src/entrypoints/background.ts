@@ -1,5 +1,5 @@
 import { defineBackground } from 'wxt/utils/define-background';
-import { BackgroundScriptMessageType, ExecutorStatus, TabInfo, Instruction, WSMessage } from '../types';
+import { BackgroundScriptMessageType, ExecutorStatus, TabInfo, Instruction, WSMessage, CdpMessage, CdpResult } from '../types';
 import { InstructionFactory, BaseInstructionClass } from '../instructions';
 import { nodeConfig, tabManager } from '../managers';
 import { InstructionExecutor, CdpExecutor, wsConnector } from '../executor';
@@ -341,7 +341,18 @@ export default defineBackground(() => {
         wsConnector.registerMessageTypeHandler('instructions', instructionExecutor.handleMessage.bind(instructionExecutor));
 
         // 注册 cdp 执行器的统一消息处理器（所有 CDP 相关消息都通过 handleMessage 处理）
-        wsConnector.registerMessageTypeHandler('cdp', cdpExecutor.handleMessage.bind(cdpExecutor));
+        wsConnector.registerMessageTypeHandler('cdp', async (message: WSMessage): Promise<void> => {
+            // WSMessage.data 包含 CdpMessage
+            const cdpMessage = message.data as CdpMessage;
+            await cdpExecutor.handleMessage(cdpMessage);
+        });
+
+        // 设置 CDP 执行器的结果发送回调
+        cdpExecutor.setSendResult(async (result: CdpResult): Promise<void> => {
+            // 通过 WebSocket 发送 CDP 结果
+            const message: WSMessage = { type: 'cdp', data: result };
+            wsConnector.sendMessage(message);
+        });
     });
 
     // 监听标签页激活
@@ -350,11 +361,10 @@ export default defineBackground(() => {
         if (tab && tab.url) {
             tabManager.RecordActivatedTab(activeInfo.tabId, tab.index, tab.url);
         }
+
         // 发送标签页激活消息到服务器
-        if (wsConnector && wsConnector.isConnected()) {
-            const message: WSMessage = { type: "tabs", data: { tabId: activeInfo.tabId as number, tabIndex: tab.index, url: tab.url as string } as TabInfo };
-            wsConnector.sendMessage(message);
-        }
+        const message: WSMessage = { type: "tabs", data: { tabId: activeInfo.tabId as number, tabIndex: tab.index, url: tab.url as string } as TabInfo };
+        wsConnector.sendMessage(message);
     });
 
     // 监听标签页更新
@@ -363,10 +373,8 @@ export default defineBackground(() => {
             tabManager.RecordActivatedTab(tabId, tab.index, tab.url);
         }
         // 发送标签页更新消息到服务器
-        if (wsConnector && wsConnector.isConnected()) {
-            const message: WSMessage = { type: "tabs", data: { tabId: tabId as number, tabIndex: tab.index, url: tab.url as string } as TabInfo };
-            wsConnector.sendMessage(message);
-        }
+        const message: WSMessage = { type: "tabs", data: { tabId: tabId as number, tabIndex: tab.index, url: tab.url as string } as TabInfo };
+        wsConnector.sendMessage(message);
     });
 
     // 监听标签页关闭
@@ -377,9 +385,7 @@ export default defineBackground(() => {
         cdpExecutor.clearConsoleLogs(tabId);
         cdpExecutor.clearNetworkLogs(tabId);
         // 发送标签页关闭消息到服务器
-        if (wsConnector && wsConnector.isConnected()) {
-            const message: WSMessage = { type: "tabs", data: { tabId: tabId as number, tabIndex: -1, url: '' } as TabInfo };
-            wsConnector.sendMessage(message);
-        }
+        const message: WSMessage = { type: "tabs", data: { tabId: tabId as number, tabIndex: -1, url: '' } as TabInfo };
+        wsConnector.sendMessage(message);
     });
 });

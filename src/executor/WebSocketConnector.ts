@@ -1,11 +1,12 @@
+import { WEBSOCKET_CONN_URL } from '../consts';
 import type { WSMessage } from '../types';
 import { nodeConfig } from '../managers';
 
 // 检查消息大小，避免发送过大的消息
 const MAX_MESSAGE_SIZE = 10 * 1024 * 1024; // 10MB
 
-// WebSocket 默认连接 URL
-const WEBSOCKET_CONN_URL = 'ws://localhost:8080';
+const HEARTBEAT_INTERVAL = 30000; // 30秒心跳间隔
+const RECONNECT_INTERVAL = 5000; // 5秒重连间隔
 
 /**
  * WebSocket连接器
@@ -14,9 +15,9 @@ const WEBSOCKET_CONN_URL = 'ws://localhost:8080';
 export class WebSocketConnector {
     private ws: WebSocket | null = null;
     private url: string;
-    private reconnectInterval: number = 5000; // 5秒重连间隔
+    private reconnectInterval: number = RECONNECT_INTERVAL; // 5秒重连间隔
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    private heartbeatInterval: number = 30000; // 30秒心跳间隔
+    private heartbeatInterval: number = HEARTBEAT_INTERVAL; // 30秒心跳间隔
     private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     private connected: boolean = false; // WebSocket 连接状态
     private isLoggedIn: boolean = false; // 登录状态
@@ -60,8 +61,23 @@ export class WebSocketConnector {
             return;
         }
 
-        // 先断开旧连接
-        this.disconnect();
+        // 保存旧的 WebSocket 引用，用于清理
+        const oldWs = this.ws;
+
+        // 先断开旧连接（但不设置 isDisconnecting，因为我们要立即创建新连接）
+        this.clearReconnectTimer();
+        this.stopHeartbeat();
+        if (oldWs) {
+            // cleanupWebSocket 内部已有 try-catch，但为了安全起见，这里也添加保护
+            try {
+                this.cleanupWebSocket(oldWs);
+            } catch (error) {
+                console.warn('[WebSocket] 清理旧连接时出错:', error);
+            }
+        }
+        this.ws = null;
+        this.connected = false;
+        this.isLoggedIn = false;
 
         try {
             this.ws = new WebSocket(this.url);
@@ -93,84 +109,24 @@ export class WebSocketConnector {
             this.ws.onclose = (event) => {
                 console.log(`[WebSocket] 连接已关闭，代码: ${event.code}, 原因: ${event.reason || '无'}`);
 
-                this.connected = false;
-                this.isLoggedIn = false;
-                this.stopHeartbeat();
+                // 只有当关闭的是当前连接时才更新状态
+                if (event.target === this.ws) {
+                    this.connected = false;
+                    this.isLoggedIn = false;
+                    this.stopHeartbeat();
 
-                // 如果不是主动断开连接，则安排重连
-                if (!this.isDisconnecting) {
-                    this.scheduleReconnect();
+                    // 如果不是主动断开连接，则安排重连
+                    if (!this.isDisconnecting) {
+                        this.scheduleReconnect();
+                    }
                 }
             };
         } catch (error) {
             console.error('[WebSocket] 创建连接失败:', error);
             this.connected = false;
             this.isLoggedIn = false;
+            this.isDisconnecting = false; // 重置断开标记，允许后续重连
             throw error;
-        }
-    }
-
-    /**
-     * 处理接收到的消息
-     * @param event - WebSocket 消息事件
-     */
-    private handleMessage(event: MessageEvent): void {
-        try {
-            // 验证数据格式
-            if (!event.data || typeof event.data !== 'string') {
-                throw new Error('消息数据格式无效，期望字符串类型');
-            }
-
-            const message: WSMessage = JSON.parse(event.data);
-
-            // 处理登录响应
-            if (message.type === 'login') {
-                this.handleLoginResponse(message);
-                return;
-            }
-
-            console.log(`[WebSocket] 收到消息类型: ${message.type}`);
-
-            const handler = this.mapMessageTypeToFunction[message.type];
-
-            if (!handler) {
-                console.warn(`[WebSocket] 未知消息类型: ${message.type}`);
-                return;
-            }
-
-            // 使用 queueMicrotask 将消息处理推迟到下一个微任务，避免阻塞 WebSocket 消息接收
-            queueMicrotask(() => {
-                handler(message).catch((error) => {
-                    console.error(`[WebSocket] 处理消息时出错 (类型: ${message.type}):`, error);
-                });
-            });
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('[WebSocket] 处理消息时出错:', errorMessage);
-        }
-    }
-
-    /**
-     * 处理登录响应消息
-     * @param message - 登录响应消息
-     */
-    private handleLoginResponse(message: WSMessage): void {
-        if (message.data && typeof message.data === 'object' && 'success' in message.data) {
-            const loginData = message.data as { success: boolean; message?: string; error?: string; node_id?: string };
-
-            if (loginData.success) {
-                this.isLoggedIn = true;
-                console.log(`[WebSocket] 登录成功，节点ID: ${loginData.node_id || '未知'}`);
-            } else {
-                this.isLoggedIn = false;
-                console.error(`[WebSocket] 登录失败: ${loginData.error || loginData.message || '未知错误'}`);
-                // 登录失败时断开连接
-                this.disconnect();
-            }
-        } else {
-            // 如果没有 success 字段，假设登录成功（向后兼容）
-            this.isLoggedIn = true;
-            console.log('[WebSocket] 登录响应（兼容模式）');
         }
     }
 
@@ -196,18 +152,141 @@ export class WebSocketConnector {
      * @param ws - 要清理的 WebSocket 实例
      */
     private cleanupWebSocket(ws: WebSocket): void {
-        // 移除所有事件监听器，防止触发重连
-        ws.onopen = null;
-        ws.onmessage = null;
-        ws.onerror = null;
-        ws.onclose = null;
+        try {
+            // 移除所有事件监听器，防止触发重连
+            // 注意：这些操作理论上不会抛出异常，但为了安全起见，整个函数都用 try-catch 包裹
+            ws.onopen = null;
+            ws.onmessage = null;
+            ws.onerror = null;
+            ws.onclose = null;
 
-        // 只有在未关闭或未关闭中时才关闭
-        if (ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+            // 只有在未关闭或未关闭中时才关闭
+            if (ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+                try {
+                    ws.close();
+                } catch (error) {
+                    console.warn('[WebSocket] 关闭连接时出错:', error);
+                }
+            }
+        } catch (error) {
+            // 清理过程中的任何错误都不应该影响主流程
+            console.warn('[WebSocket] 清理 WebSocket 连接时出错:', error instanceof Error ? error.message : String(error));
+        }
+    }
+
+    /**
+     * 处理接收到的消息
+     * @param event - WebSocket 消息事件
+     */
+    private handleMessage(event: MessageEvent): void {
+        try {
+            // 验证数据格式
+            if (!event.data || typeof event.data !== 'string') {
+                throw new Error('消息数据格式无效，期望字符串类型');
+            }
+
+            const message: WSMessage = JSON.parse(event.data);
+
+            // 处理登录响应
+            if (message.type === 'login') {
+                this.handleLoginResponse(message);
+                return;
+            }
+
+            // 处理心跳响应
+            if (message.type === 'heartbeat') {
+                this.handleHeartbeatResponse(message);
+                return;
+            }
+
+            console.log(`[WebSocket] 收到消息类型: ${message.type}`);
+
+            const handler = this.mapMessageTypeToFunction[message.type];
+
+            if (!handler) {
+                console.warn(`[WebSocket] 未知消息类型: ${message.type}`);
+                return;
+            }
+
+            // 使用 queueMicrotask 将消息处理推迟到下一个微任务，避免阻塞 WebSocket 消息接收
+            queueMicrotask(() => {
+                handler(message).catch((error) => {
+                    console.error(`[WebSocket] 处理消息时出错 (类型: ${message.type}):`, error);
+                });
+            });
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('[WebSocket] 处理消息时出错:', errorMessage);
+        }
+    }
+
+    /**
+     * 处理心跳响应消息
+     * @param message - 心跳响应消息
+     */
+    private handleHeartbeatResponse(message: WSMessage): void {
+        try {
+            if (message.data && typeof message.data === 'object' && 'timestamp' in message.data) {
+                const timestamp = (message.data as { timestamp: number }).timestamp;
+                console.log(`[WebSocket] 收到心跳响应消息，时间戳: ${timestamp}`);
+            } else {
+                console.log('[WebSocket] 收到心跳响应消息（无时间戳）');
+            }
+        } catch (error) {
+            // 心跳响应处理失败不应该影响连接，只记录警告
+            console.warn('[WebSocket] 处理心跳响应时出错:', error instanceof Error ? error.message : String(error));
+        }
+    }
+
+    /**
+     * 处理登录响应消息
+     * @param message - 登录响应消息
+     */
+    private handleLoginResponse(message: WSMessage): void {
+        try {
+            if (message.data && typeof message.data === 'object' && 'success' in message.data) {
+                const loginData = message.data as { success: boolean; message?: string; error?: string; node_id?: string };
+
+                if (loginData.success) {
+                    this.isLoggedIn = true;
+                    console.log(`[WebSocket] 登录成功，节点ID: ${loginData.node_id || '未知'}`);
+                } else {
+                    this.isLoggedIn = false;
+                    console.error(`[WebSocket] 登录失败: ${loginData.error || loginData.message || '未知错误'}`);
+                    // 登录失败时断开连接
+                    this.disconnect();
+                }
+            } else {
+                // 如果没有 success 字段，假设登录成功（向后兼容）
+                this.isLoggedIn = true;
+                console.log('[WebSocket] 登录响应（兼容模式）');
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('[WebSocket] 处理登录响应时出错:', errorMessage);
+            // 处理登录响应失败时，标记为未登录
+            this.isLoggedIn = false;
+        }
+    }
+
+    /**
+     * 发送心跳消息
+     */
+    private sendHeartbeat(): void {
+        // 检查连接状态和 WebSocket 实际状态
+        if (this.connected && this.isLoggedIn && this.ws && this.ws.readyState === WebSocket.OPEN) {
             try {
-                ws.close();
+                const message: WSMessage = {
+                    type: 'heartbeat',
+                    data: { timestamp: Date.now() }
+                };
+                // sendMessage 内部已有 try-catch，但这里添加额外的保护以确保心跳失败不会影响定时器
+                if (!this.sendMessage(message)) {
+                    console.warn('[WebSocket] 发送心跳消息失败');
+                }
             } catch (error) {
-                console.warn('[WebSocket] 关闭连接时出错:', error);
+                // 心跳发送失败不应该影响定时器继续运行，只记录警告
+                console.warn('[WebSocket] 发送心跳消息时出错:', error instanceof Error ? error.message : String(error));
             }
         }
     }
@@ -245,17 +324,25 @@ export class WebSocketConnector {
      */
     public sendMessage(message: WSMessage): boolean {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            console.warn(`[WebSocket] 无法发送消息，WebSocket 未连接 (消息类型: ${message.type})`);
+            console.warn(`[WebSocket] 无法发送消息，WebSocket 未连接或未打开 (消息类型: ${message.type})`);
+            return false;
+        }
+
+        if (!this.isConnected()) {
+            console.warn(`[WebSocket] 无法发送消息，WebSocket 未连接或未登录 (消息类型: ${message.type})`);
             return false;
         }
 
         try {
             const jsonString = JSON.stringify(message);
 
-            // 检查消息大小
-            if (jsonString.length > MAX_MESSAGE_SIZE) {
+            // 检查消息大小（使用 Blob 获取准确的字节数）
+            const blob = new Blob([jsonString]);
+            const sizeInBytes = blob.size;
+
+            if (sizeInBytes > MAX_MESSAGE_SIZE) {
                 console.error(
-                    `[WebSocket] 消息过大 (${jsonString.length} bytes)，超过限制 (${MAX_MESSAGE_SIZE} bytes)，消息类型: ${message.type}`
+                    `[WebSocket] 消息过大 (${sizeInBytes} bytes)，超过限制 (${MAX_MESSAGE_SIZE} bytes)，消息类型: ${message.type}`
                 );
                 return false;
             }
@@ -266,19 +353,6 @@ export class WebSocketConnector {
             const errorMessage = error instanceof Error ? error.message : String(error);
             console.error(`[WebSocket] 发送消息失败 (类型: ${message.type}):`, errorMessage);
             return false;
-        }
-    }
-
-    /**
-     * 发送心跳消息
-     */
-    private sendHeartbeat(): void {
-        if (this.connected && this.isLoggedIn) {
-            const message: WSMessage = {
-                type: 'heartbeat',
-                data: { timestamp: Date.now() }
-            };
-            this.sendMessage(message);
         }
     }
 

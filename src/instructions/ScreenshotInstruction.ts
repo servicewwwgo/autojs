@@ -1,6 +1,5 @@
 import type { ScreenshotInstruction, InstructionResult } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
-import { ElementManager } from '../managers';
 
 /**
  * 页面截图指令

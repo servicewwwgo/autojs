@@ -1,7 +1,5 @@
 import type { BaseInstruction, InstructionResult, ContentScriptMessageType } from '../types';
 import { SendMessageToContentScript, ExecuteCDPCommand } from '../utils';
-import { elementManager } from '../managers';
-
 
 /**
  * 基础指令对象接口

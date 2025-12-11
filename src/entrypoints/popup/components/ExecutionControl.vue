@@ -99,9 +99,9 @@ const tabs = ref<Array<{ tabId: number; url: string }>>([]);
 const connectionStatus = ref('');
 const connectionStatusType = ref<'success' | 'error' | 'info'>('info');
 const executorStatus = ref<ExecutorStatus>({
+    stopRequested: false,
     isRunning: false,
     isPaused: false,
-    currentTabId: null as number | null,
     executedCount: 0,
     successCount: 0,
     errorCount: 0,

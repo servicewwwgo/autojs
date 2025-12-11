@@ -1,24 +1,5 @@
-import type { WSMessage } from '../types';
+import type { CdpMessage, CdpResult, CdpConnectMessage, CdpConnectResult, CdpDisconnectMessage, CdpDisconnectResult, CdpListTargetsMessage, CdpListTargetsResult, CdpExecuteJavaScriptMessage, CdpExecuteJavaScriptResult, CdpTakeElementScreenshotMessage, CdpTakeElementScreenshotResult, CdpSendCommandMessage, CdpSendCommandResult, CdpGrepSourceMessage, CdpGrepSourceResult, CdpGetNetworkLogsMessage, CdpGetNetworkLogsResult, CdpInitNetworkLogsMessage, CdpInitNetworkLogsResult, CdpGetConsoleLogsMessage, CdpGetConsoleLogsResult, CdpInitConsoleLogsMessage, CdpInitConsoleLogsResult } from '../types';
 import { EnsureCDPConnected, DisconnectCDP, ExecuteCDPCommand } from '../utils';
-import { wsConnector } from './WebSocketConnector';
-import { tabManager } from '../managers';
-
-/**
- * CDP 消息数据映射类型
- */
-export interface CdpMessage {
-    type: 'list_targets' | 'take_element_screenshot' | 'send_command' | 'grep_source' | 'get_network_logs' | 'get_console_logs' | 'execute_javascript' | 'init_network_logs' | 'init_console_logs';
-    id: string;
-    data: any;
-}
-
-export interface CdpResult {
-    type: string;
-    id: string;
-    success?: boolean;
-    error?: string;
-    data?: any;
-}
 
 /**
  * CDP (Chrome DevTools Protocol) 执行器
@@ -31,27 +12,31 @@ export class CdpExecutor {
 
     private mapTypeToFunction: { [key: string]: (data: any) => Promise<void> } = {};
 
+    private sendResult: ((result: CdpResult) => Promise<void>) | undefined;
+
     constructor() {
         // 初始化类型到函数的映射
         this.mapTypeToFunction = {
+            'cdp_connect': this.handleCdpConnect,
+            'cdp_disconnect': this.handleCdpDisconnect,
             'list_targets': this.handleListTargets,
+            'execute_javascript': this.handleExecuteJavaScript,
             'take_element_screenshot': this.handleTakeElementScreenshot,
             'send_command': this.handleSendCommand,
             'grep_source': this.handleGrepSource,
             'get_network_logs': this.handleGetNetworkLogs,
             'get_console_logs': this.handleGetConsoleLogs,
-            'execute_javascript': this.handleExecuteJavaScript,
             'init_network_logs': this.handleInitNetworkLogs,
             'init_console_logs': this.handleInitConsoleLogs,
         };
     }
 
     /**
-     * 发送 CDP 结果
-     * @param result - CDP 结果对象
+     * 设置发送 CDP 结果的函数
+     * @param sendResult - 发送结果的函数
      */
-    public async sendResult(result: CdpResult): Promise<void> {
-        wsConnector.sendMessage({ type: 'cdp', data: result } as WSMessage);
+    public setSendResult(sendResult: ((result: CdpResult) => Promise<void>) | undefined): void {
+        this.sendResult = sendResult;
     }
 
     /**
@@ -60,95 +45,164 @@ export class CdpExecutor {
      * @param message - WebSocket 消息
      * @returns void
      */
-    public async handleMessage(message: WSMessage): Promise<void> {
-        const cdpMessage = message.data as CdpMessage;
+    public async handleMessage(cdpMessage: CdpMessage): Promise<void> {
+        let defaultResult: CdpResult | undefined;
+
         const handler = this.mapTypeToFunction[cdpMessage.type];
+
         if (handler) {
             try {
                 await handler(cdpMessage);
+                return;
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
-                console.error('[CdpExecutor] 处理 CDP 消息时出错:', errorMessage);
-
-                this.sendResult({
-                    type: cdpMessage.type,
-                    id: cdpMessage.id,
-                    success: false,
-                    error: errorMessage,
-                });
+                defaultResult = { type: cdpMessage.type, id: cdpMessage.id, success: false, error: errorMessage } as CdpResult;
+                console.error('[CdpExecutor] handle message error:', errorMessage);
             }
-
+        } else {
+            const errorMessage = `handler not found: ${cdpMessage.type}`;
+            defaultResult = { type: cdpMessage.type, id: cdpMessage.id, success: false, error: errorMessage } as CdpResult;
+            console.error('[CdpExecutor] handler not found:', errorMessage);
         }
+
+        await this.sendResult?.(defaultResult as CdpResult);
+    }
+
+    // 连接 CDP
+    private async handleCdpConnect(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpConnectMessage = cdpMessage as CdpConnectMessage;
+        let defaultResult: CdpConnectResult | undefined;
+
+        if (msg.data === undefined) {
+            throw new Error('data is undefined in cdp_connect');
+        }
+
+        if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
+            throw new Error('tabId is required and must be a number in cdp_connect');
+        }
+
+        await EnsureCDPConnected(msg.data.tabId);
+
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId } } as CdpConnectResult;
+        await this.sendResult?.(defaultResult as CdpConnectResult);
+    }
+
+    // 断开 CDP
+    private async handleCdpDisconnect(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpDisconnectMessage = cdpMessage as CdpDisconnectMessage;
+        let defaultResult: CdpDisconnectResult | undefined;
+
+        if (msg.data === undefined) {
+            throw new Error('data is undefined in cdp_disconnect');
+        }
+
+        if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
+            throw new Error('tabId is required and must be a number in cdp_disconnect');
+        }
+
+        await DisconnectCDP(msg.data.tabId);
+
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId } } as CdpDisconnectResult;
+        await this.sendResult?.(defaultResult as CdpDisconnectResult);
     }
 
     // 列出所有标签页
-    public async handleListTargets(cdpMessage: CdpMessage): Promise<void> {
-        // 获取所有标签页
-        const tabs = tabManager.GetAllTabs();
+    private async handleListTargets(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpListTargetsMessage = cdpMessage as CdpListTargetsMessage;
+        let defaultResult: CdpListTargetsResult | undefined;
 
-        this.sendResult({
-            type: cdpMessage.type,
-            id: cdpMessage.id,
-            success: true,
-            data: tabs
-        });
+        // 使用 browser.tabs.query 获取所有标签页
+        const browserTabs = await browser.tabs.query({});
+
+        // 将浏览器标签页信息转换为 TabInfo 格式
+        const tabs: { tabId: number; tabIndex: number; url: string }[] = browserTabs.map((tab) => ({
+            tabId: tab.id || 0,
+            tabIndex: tab.index || 0,
+            url: tab.url || tab.pendingUrl || 'about:blank'
+        }));
+
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: tabs } as CdpListTargetsResult;
+        await this.sendResult?.(defaultResult as CdpListTargetsResult);
     }
 
     // 执行 JavaScript 代码
-    public async handleExecuteJavaScript(cdpMessage: CdpMessage): Promise<void> {
-        const { tabId, expression, ...options } = cdpMessage.data;
+    private async handleExecuteJavaScript(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpExecuteJavaScriptMessage = cdpMessage as CdpExecuteJavaScriptMessage;
+        let defaultResult: CdpExecuteJavaScriptResult | undefined;
 
-        await EnsureCDPConnected(tabId);
+        if (msg.data === undefined) {
+            throw new Error('data is undefined in execute_javascript');
+        }
+
+        if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
+            throw new Error('tabId is required and must be a number in execute_javascript');
+        }
+
+        if (!msg.data.expression || typeof msg.data.expression !== 'string') {
+            throw new Error('expression is required and must be a string in execute_javascript');
+        }
 
         // 启用 Runtime 域
-        await ExecuteCDPCommand(tabId, 'Runtime.enable');
+        await ExecuteCDPCommand(msg.data.tabId, 'Runtime.enable');
 
         // 构建 Runtime.evaluate 参数
         const params: any = {
-            expression: expression
+            expression: msg.data.expression
         };
 
         // 添加可选参数
-        if (options.returnByValue !== undefined) params.returnByValue = options.returnByValue;
-        if (options.awaitPromise !== undefined) params.awaitPromise = options.awaitPromise;
-        if (options.userGesture !== undefined) params.userGesture = options.userGesture;
-        if (options.silent !== undefined) params.silent = options.silent;
-        if (options.contextId !== undefined) params.contextId = options.contextId;
-        if (options.objectGroup !== undefined) params.objectGroup = options.objectGroup;
-        if (options.generatePreview !== undefined) params.generatePreview = options.generatePreview;
-        if (options.includeCommandLineAPI !== undefined) params.includeCommandLineAPI = options.includeCommandLineAPI;
+        if (msg.data.returnByValue !== undefined) params.returnByValue = msg.data.returnByValue;
+        if (msg.data.awaitPromise !== undefined) params.awaitPromise = msg.data.awaitPromise;
+        if (msg.data.userGesture !== undefined) params.userGesture = msg.data.userGesture;
+        if (msg.data.silent !== undefined) params.silent = msg.data.silent;
+        if (msg.data.contextId !== undefined) params.contextId = msg.data.contextId;
+        if (msg.data.objectGroup !== undefined) params.objectGroup = msg.data.objectGroup;
+        if (msg.data.generatePreview !== undefined) params.generatePreview = msg.data.generatePreview;
+        if (msg.data.includeCommandLineAPI !== undefined) params.includeCommandLineAPI = msg.data.includeCommandLineAPI;
+        if (msg.data.throwOnSideEffect !== undefined) params.throwOnSideEffect = msg.data.throwOnSideEffect;
+        if (msg.data.disableBreaks !== undefined) params.disableBreaks = msg.data.disableBreaks;
+        if (msg.data.replMode !== undefined) params.replMode = msg.data.replMode;
+        if (msg.data.allowUnsafeEvalBlockedByCSP !== undefined) params.allowUnsafeEvalBlockedByCSP = msg.data.allowUnsafeEvalBlockedByCSP;
+        if (msg.data.uniqueContextId !== undefined) params.uniqueContextId = msg.data.uniqueContextId;
+        if (msg.data.serializationOptions !== undefined) params.serializationOptions = msg.data.serializationOptions;
+        if (msg.data.timeout !== undefined) params.timeout = msg.data.timeout;
 
         // 执行 JavaScript 代码
-        const evalResult = await ExecuteCDPCommand(tabId, 'Runtime.evaluate', params);
+        const evalResult = await ExecuteCDPCommand(msg.data.tabId, 'Runtime.evaluate', params);
 
-        this.sendResult({
-            type: cdpMessage.type,
-            id: cdpMessage.id,
-            success: true,
-            data: evalResult
-        });
-
-        await DisconnectCDP(tabId);
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: { result: evalResult?.result, exceptionDetails: evalResult?.exceptionDetails } } as CdpExecuteJavaScriptResult;
+        await this.sendResult?.(defaultResult as CdpExecuteJavaScriptResult);
     }
 
     // 截取元素截图
-    public async handleTakeElementScreenshot(cdpMessage: CdpMessage): Promise<void> {
-        const { tabId, selector, selectorType = 'css' } = cdpMessage.data;
+    private async handleTakeElementScreenshot(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpTakeElementScreenshotMessage = cdpMessage as CdpTakeElementScreenshotMessage;
+        let defaultResult: CdpTakeElementScreenshotResult | undefined;
 
-        await EnsureCDPConnected(tabId);
+        if (msg.data === undefined) {
+            throw new Error('data is undefined in take_element_screenshot');
+        }
+
+        if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
+            throw new Error('tabId is required and must be a number in take_element_screenshot');
+        }
+
+        if (!msg.data.selector || typeof msg.data.selector !== 'string') {
+            throw new Error('selector is required and must be a string in take_element_screenshot');
+        }
 
         // 步骤1: 启用 DOM 域和 Page 域
-        await ExecuteCDPCommand(tabId, 'DOM.enable');
-        await ExecuteCDPCommand(tabId, 'Page.enable');
+        await ExecuteCDPCommand(msg.data.tabId, 'DOM.enable');
+        await ExecuteCDPCommand(msg.data.tabId, 'Page.enable');
 
         // 步骤2: 获取文档根节点
-        const documentResult = await ExecuteCDPCommand(tabId, 'DOM.getDocument', {
+        const documentResult = await ExecuteCDPCommand(msg.data.tabId, 'DOM.getDocument', {
             depth: -1,
             pierce: false
         });
 
         if (!documentResult?.root?.nodeId) {
-            throw new Error('无法获取文档根节点');
+            throw new Error('failed to get document root node in take_element_screenshot');
         }
 
         const rootNodeId = documentResult.root.nodeId;
@@ -156,14 +210,14 @@ export class CdpExecutor {
         // 步骤3: 通过选择器查找元素
         let nodeId: number | undefined;
 
-        if (selectorType === 'xpath') {
-            const searchResult = await ExecuteCDPCommand(tabId, 'DOM.performSearch', {
-                query: selector,
+        if (msg.data.selectorType === 'xpath') {
+            const searchResult = await ExecuteCDPCommand(msg.data.tabId, 'DOM.performSearch', {
+                query: msg.data.selector,
                 includeUserAgentShadowDOM: false
             });
 
             if (searchResult?.searchId) {
-                const searchResults = await ExecuteCDPCommand(tabId, 'DOM.getSearchResults', {
+                const searchResults = await ExecuteCDPCommand(msg.data.tabId, 'DOM.getSearchResults', {
                     searchId: searchResult.searchId,
                     fromIndex: 0,
                     toIndex: 1
@@ -174,21 +228,20 @@ export class CdpExecutor {
                 }
             }
         } else {
-            const cssSelector = selectorType === 'id' ? `#${selector}` : selector;
-            const queryResult = await ExecuteCDPCommand(tabId, 'DOM.querySelector', {
+            const cssSelector = msg.data.selectorType === 'id' ? `#${msg.data.selector}` : msg.data.selector;
+            const queryResult = await ExecuteCDPCommand(msg.data.tabId, 'DOM.querySelector', {
                 nodeId: rootNodeId,
                 selector: cssSelector
             });
-
             nodeId = queryResult?.nodeId;
         }
 
         if (!nodeId) {
-            throw new Error(`未找到元素: ${selector}`);
+            throw new Error(`element not found: ${msg.data.selector}`);
         }
 
         // 步骤4: 滚动元素到可视区
-        await ExecuteCDPCommand(tabId, 'DOM.scrollIntoViewIfNeeded', {
+        await ExecuteCDPCommand(msg.data.tabId, 'DOM.scrollIntoViewIfNeeded', {
             nodeId: nodeId
         });
 
@@ -196,16 +249,16 @@ export class CdpExecutor {
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // 步骤5: 获取元素盒模型（位置和尺寸）
-        const boxModel = await ExecuteCDPCommand(tabId, 'DOM.getBoxModel', {
+        const boxModel = await ExecuteCDPCommand(msg.data.tabId, 'DOM.getBoxModel', {
             nodeId: nodeId
         });
 
         if (!boxModel?.model) {
-            throw new Error('无法获取元素盒模型');
+            throw new Error('failed to get element box model in take_element_screenshot');
         }
 
         // 步骤6: 获取页面布局信息（获取滚动偏移量）
-        const layoutMetrics = await ExecuteCDPCommand(tabId, 'Page.getLayoutMetrics');
+        const layoutMetrics = await ExecuteCDPCommand(msg.data.tabId, 'Page.getLayoutMetrics');
 
         // 步骤7: 计算元素在文档中的绝对坐标
         const contentQuad = boxModel.model.content;
@@ -215,7 +268,7 @@ export class CdpExecutor {
         const height = Math.max(contentQuad[1], contentQuad[3], contentQuad[5], contentQuad[7]) - y;
 
         // 步骤8: 截取元素截图
-        const screenshotResult = await ExecuteCDPCommand(tabId, 'Page.captureScreenshot', {
+        const screenshotResult = await ExecuteCDPCommand(msg.data.tabId, 'Page.captureScreenshot', {
             format: 'png',
             clip: {
                 x: x,
@@ -230,46 +283,56 @@ export class CdpExecutor {
         const base64Image = screenshotResult?.data || '';
 
         // 步骤10: 返回截图结果
-        this.sendResult({
-            type: cdpMessage.type,
-            id: cdpMessage.id,
-            success: true,
-            data: {
-                image: base64Image,
-                format: 'png',
-                x: x,
-                y: y,
-                width: width,
-                height: height
-            }
-        });
-
-        // 步骤11: 断开 CDP 连接
-        await DisconnectCDP(tabId);
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: { image: base64Image, format: 'png', x: x, y: y, width: width, height: height } } as CdpTakeElementScreenshotResult;
+        await this.sendResult?.(defaultResult as CdpTakeElementScreenshotResult);
     }
 
     // 执行 CDP 命令
-    public async handleSendCommand(cdpMessage: CdpMessage): Promise<void> {
-        const { tabId, method, params } = cdpMessage.data;
+    private async handleSendCommand(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpSendCommandMessage = cdpMessage as CdpSendCommandMessage;
+        let defaultResult: CdpSendCommandResult | undefined;
 
-        await EnsureCDPConnected(tabId);
-        const result = await ExecuteCDPCommand(tabId, method, params);
-        await DisconnectCDP(tabId);
+        if (msg.data === undefined) {
+            throw new Error('data is undefined in send_command');
+        }
 
-        this.sendResult({
-            type: cdpMessage.type,
-            id: cdpMessage.id,
-            success: true,
-            data: result
-        });
+        if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
+            throw new Error('tabId is required and must be a number in send_command');
+        }
+
+        if (!msg.data.method || typeof msg.data.method !== 'string') {
+            throw new Error('method is required and must be a string in send_command');
+        }
+
+        // 执行 CDP 命令（params 可以为 undefined，因为某些 CDP 命令不需要参数）
+        const result = await ExecuteCDPCommand(msg.data.tabId, msg.data.method, msg.data.params);
+
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: result } as CdpSendCommandResult;
+        await this.sendResult?.(defaultResult as CdpSendCommandResult);
     }
 
     // 源码搜索
-    public async handleGrepSource(cdpMessage: CdpMessage): Promise<void> {
-        const { tabId, pattern, caseSensitive = false } = cdpMessage.data;
+    private async handleGrepSource(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpGrepSourceMessage = cdpMessage as CdpGrepSourceMessage;
+        let defaultResult: CdpGrepSourceResult | undefined;
 
-        await EnsureCDPConnected(tabId);
+        if (msg.data === undefined) {
+            throw new Error('data is undefined in grep_source');
+        }
 
+        if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
+            throw new Error('tabId is required and must be a number in grep_source');
+        }
+
+        if (!msg.data.pattern || typeof msg.data.pattern !== 'string') {
+            throw new Error('pattern is required and must be a string in grep_source');
+        }
+
+        // 保存已验证的数据引用，避免 TypeScript 类型检查问题
+        const data = msg.data;
+        const tabId = data.tabId;
+        const pattern = data.pattern;
+        const caseSensitive = data.caseSensitive;
         // 启用 Page 域以获取页面源码
         await ExecuteCDPCommand(tabId, 'Page.enable');
 
@@ -277,7 +340,7 @@ export class CdpExecutor {
         const resourceTree = await ExecuteCDPCommand(tabId, 'Page.getResourceTree');
 
         if (!resourceTree?.frameTree) {
-            throw new Error('无法获取页面资源树');
+            throw new Error('failed to get page resource tree in grep_source');
         }
 
         const matches: Array<{ url: string; line: number; content: string }> = [];
@@ -311,6 +374,9 @@ export class CdpExecutor {
 
                             const lines = content.split('\n');
                             lines.forEach((line: string, index: number) => {
+                                // 使用 match() 而不是 test()，避免正则表达式的 lastIndex 问题
+                                // 或者重置 lastIndex（对于全局正则表达式）
+                                regex.lastIndex = 0;
                                 if (regex.test(line)) {
                                     matches.push({
                                         url: resource.url,
@@ -322,7 +388,8 @@ export class CdpExecutor {
                         }
                     } catch (error) {
                         // 某些资源可能无法获取内容，忽略错误继续
-                        console.warn(`无法获取资源内容: ${resource.url}`, error);
+                        // 注意：msg.data 在这里已经验证过，不会是 undefined
+                        console.warn(`[CdpExecutor] some resources may not be able to get content, ignore errors and continue: ${resource.url}`, error);
                     }
                 }
             }
@@ -338,155 +405,147 @@ export class CdpExecutor {
         // 搜索主框架
         await searchInResourceTree(resourceTree.frameTree);
 
-        this.sendResult({
-            type: cdpMessage.type,
-            id: cdpMessage.id,
-            success: true,
-            data: {
-                matches: matches,
-                pattern: pattern,
-                count: matches.length
-            }
-        });
-
-        await DisconnectCDP(tabId);
+        // 返回结果
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: { matches: matches, pattern: pattern, count: matches.length } } as CdpGrepSourceResult;
+        await this.sendResult?.(defaultResult as CdpGrepSourceResult);
     }
 
     // 获取网络日志
-    public async handleGetNetworkLogs(cdpMessage: CdpMessage): Promise<void> {
-        const { tabId, clear = false, filter, limit, offset = 0, requestId, groupByRequest = false } = cdpMessage.data;
+    private async handleGetNetworkLogs(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpGetNetworkLogsMessage = cdpMessage as CdpGetNetworkLogsMessage;
+        let defaultResult: CdpGetNetworkLogsResult | undefined;
 
-        const logKey = `network_${tabId}`;
-        let logs = this.networkLogs.get(logKey) || [];
-
-        // 如果请求清空日志，先返回当前日志，然后清空
-        if (clear) {
-            this.networkLogs.delete(logKey);
-            // 清空后返回空数组
-            logs = [];
-        } else {
-            // 如果指定了 requestId，只返回该请求的日志
-            if (requestId) {
-                logs = logs.filter((log: any) => log.requestId === requestId);
-            } else {
-                // 应用过滤条件
-                if (filter) {
-                    logs = this.filterNetworkLogs(logs, filter);
-                }
-            }
-
-            // 如果按请求分组，将同一 requestId 的日志合并
-            if (groupByRequest && !requestId) {
-                logs = this.groupNetworkLogsByRequest(logs);
-            }
-
-            // 应用分页
-            if (limit !== undefined && !groupByRequest) {
-                logs = logs.slice(offset, offset + limit);
-            }
+        if (msg.data === undefined) {
+            throw new Error('data is undefined in get_network_logs');
         }
 
-        this.sendResult({
-            type: cdpMessage.type,
-            id: cdpMessage.id,
-            success: true,
-            data: {
-                tabId: tabId,
-                logs: logs,
-                count: logs.length,
-                total: clear ? 0 : (this.networkLogs.get(logKey)?.length || 0),
-                grouped: groupByRequest && !requestId
-            }
-        });
+        if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
+            throw new Error('tabId is required and must be a number in get_network_logs');
+        }
+
+        const logKey = `network_${msg.data.tabId}`;
+        let logs = this.networkLogs.get(logKey) || [];
+        const totalBeforeClear = logs.length;
+
+        // 如果请求清空日志，先返回当前日志，然后清空
+        if (msg.data?.clear) {
+            this.networkLogs.delete(logKey);
+        }
+
+        // 如果指定了 requestId，只返回该请求的日志
+        if (msg.data?.requestId) {
+            logs = logs.filter((log: any) => log.requestId === msg.data?.requestId);
+        } else if (msg.data?.filter) {
+            // 应用过滤条件
+            logs = this.filterNetworkLogs(logs, msg.data?.filter);
+        }
+
+        // 如果按请求分组，将同一 requestId 的日志合并
+        if (msg.data?.groupByRequest && !msg.data?.requestId) {
+            logs = this.groupNetworkLogsByRequest(logs);
+        }
+
+        // 应用分页
+        if (msg.data?.limit !== undefined && !msg.data?.groupByRequest) {
+            logs = logs.slice(msg.data?.offset || 0, (msg.data?.offset || 0) + (msg.data?.limit || 0));
+        }
+
+        // 计算总数：如果已清空，则为0；否则使用当前存储的日志数量
+        const total = msg.data.clear ? 0 : (this.networkLogs.get(logKey)?.length || totalBeforeClear);
+
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId, logs: logs, count: logs.length, total: total, grouped: msg.data.groupByRequest && !msg.data.requestId } } as CdpGetNetworkLogsResult;
+        await this.sendResult?.(defaultResult as CdpGetNetworkLogsResult);
     }
 
     // 获取控制台日志
-    public async handleGetConsoleLogs(cdpMessage: CdpMessage): Promise<void> {
-        const { tabId, clear = false, filter, limit, offset = 0 } = cdpMessage.data;
+    private async handleGetConsoleLogs(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpGetConsoleLogsMessage = cdpMessage as CdpGetConsoleLogsMessage;
+        let defaultResult: CdpGetConsoleLogsResult | undefined;
 
-        const logKey = `console_${tabId}`;
-        let logs = this.consoleLogs.get(logKey) || [];
-
-        // 如果请求清空日志，先返回当前日志，然后清空
-        if (clear) {
-            this.consoleLogs.delete(logKey);
-            // 清空后返回空数组
-            logs = [];
-        } else {
-            // 应用过滤条件
-            if (filter) {
-                logs = this.filterConsoleLogs(logs, filter);
-            }
-
-            // 应用分页
-            if (limit !== undefined) {
-                logs = logs.slice(offset, offset + limit);
-            }
+        if (msg.data === undefined) {
+            throw new Error('data is undefined in get_console_logs');
         }
 
-        this.sendResult({
-            type: cdpMessage.type,
-            id: cdpMessage.id,
-            success: true,
-            data: {
-                tabId: tabId,
-                logs: logs,
-                count: logs.length,
-                total: clear ? 0 : (this.consoleLogs.get(logKey)?.length || 0)
-            }
-        });
+        if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
+            throw new Error('tabId is required and must be a number in get_console_logs');
+        }
+
+        const logKey = `console_${msg.data.tabId}`;
+        let logs = this.consoleLogs.get(logKey) || [];
+        const totalBeforeClear = logs.length;
+
+        // 如果请求清空日志，先返回当前日志，然后清空
+        if (msg.data?.clear) {
+            this.consoleLogs.delete(logKey);
+        }
+
+        // 应用过滤条件
+        if (msg.data?.filter) {
+            logs = this.filterConsoleLogs(logs, msg.data?.filter);
+        }
+
+        // 应用分页
+        if (msg.data?.limit !== undefined) {
+            logs = logs.slice(msg.data?.offset || 0, (msg.data?.offset || 0) + (msg.data?.limit || 0));
+        }
+
+        // 计算总数：如果已清空，则为0；否则使用当前存储的日志数量
+        const total = msg.data.clear ? 0 : (this.consoleLogs.get(logKey)?.length || totalBeforeClear);
+
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId, logs: logs, count: logs.length, total: total } } as CdpGetConsoleLogsResult;
+        await this.sendResult?.(defaultResult as CdpGetConsoleLogsResult);
     }
 
     // 初始化网络日志收集
-    public async handleInitNetworkLogs(cdpMessage: CdpMessage): Promise<void> {
-        const { tabId, clear = false } = cdpMessage.data;
+    private async handleInitNetworkLogs(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpInitNetworkLogsMessage = cdpMessage as CdpInitNetworkLogsMessage;
+        let defaultResult: CdpInitNetworkLogsResult | undefined;
 
-        await EnsureCDPConnected(tabId);
-
-        // 启用 Network 域以开始收集网络日志
-        await ExecuteCDPCommand(tabId, 'Network.enable');
-
-        // 如果请求清空日志，则清空该标签页的网络日志
-        if (clear) {
-            this.clearNetworkLogs(tabId);
+        if (msg.data === undefined) {
+            throw new Error('data is undefined in init_network_logs');
         }
 
-        this.sendResult({
-            type: cdpMessage.type,
-            id: cdpMessage.id,
-            success: true,
-            data: {
-                tabId: tabId,
-                message: '网络日志收集已启用'
-            }
-        });
+        if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
+            throw new Error('tabId is required and must be a number in init_network_logs');
+        }
+
+        // 启用 Network 域以开始收集网络日志
+        await ExecuteCDPCommand(msg.data.tabId, 'Network.enable');
+
+        // 如果请求清空日志，则清空该标签页的网络日志
+        if (msg.data?.clear) {
+            this.clearNetworkLogs(msg.data.tabId);
+        }
+
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId, message: 'Network logs collection enabled' } } as CdpInitNetworkLogsResult;
+        await this.sendResult?.(defaultResult as CdpInitNetworkLogsResult);
 
         // 注意：不断开连接，以便持续收集日志
     }
 
     // 初始化控制台日志收集
-    public async handleInitConsoleLogs(cdpMessage: CdpMessage): Promise<void> {
-        const { tabId, clear = false } = cdpMessage.data;
+    private async handleInitConsoleLogs(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpInitConsoleLogsMessage = cdpMessage as CdpInitConsoleLogsMessage;
+        let defaultResult: CdpInitConsoleLogsResult | undefined;
 
-        await EnsureCDPConnected(tabId);
-
-        // 启用 Runtime 域以开始收集控制台日志（控制台日志通过 Runtime.consoleAPICalled 事件收集）
-        await ExecuteCDPCommand(tabId, 'Runtime.enable');
-
-        // 如果请求清空日志，则清空该标签页的控制台日志
-        if (clear) {
-            this.clearConsoleLogs(tabId);
+        if (msg.data === undefined) {
+            throw new Error('data is undefined in init_console_logs');
         }
 
-        this.sendResult({
-            type: cdpMessage.type,
-            id: cdpMessage.id,
-            success: true,
-            data: {
-                tabId: tabId,
-                message: '控制台日志收集已启用'
-            }
-        });
+        if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
+            throw new Error('tabId is required and must be a number in init_console_logs');
+        }
+
+        // 启用 Runtime 域以开始收集控制台日志（控制台日志通过 Runtime.consoleAPICalled 事件收集）
+        await ExecuteCDPCommand(msg.data.tabId, 'Runtime.enable');
+
+        // 如果请求清空日志，则清空该标签页的控制台日志
+        if (msg.data?.clear) {
+            this.clearConsoleLogs(msg.data.tabId);
+        }
+
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId, message: 'Console logs collection enabled' } } as CdpInitConsoleLogsResult;
+        await this.sendResult?.(defaultResult as CdpInitConsoleLogsResult);
 
         // 注意：不断开连接，以便持续收集日志
     }

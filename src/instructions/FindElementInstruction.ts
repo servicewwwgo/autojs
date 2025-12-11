@@ -1,4 +1,5 @@
-import { ElementData, ElementTag, FindElementInstruction, InstructionResult } from '../types';
+import { ElementTag } from '../consts';
+import { ElementData, FindElementInstruction, InstructionResult } from '../types';
 import { GenerateRandomString } from '../utils';
 import { ElementClass, elementManager } from '../managers';
 import { BaseInstructionClass } from './BaseInstruction';

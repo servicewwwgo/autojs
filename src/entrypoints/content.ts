@@ -1,5 +1,6 @@
 import { defineContentScript } from 'wxt/utils/define-content-script';
-import { BackgroundScriptMessageType, ContentScriptMessageType, ElementTag } from '../types';
+import { ElementTag } from '../consts';
+import { BackgroundScriptMessageType, ContentScriptMessageType } from '../types';
 import { SendMessageToBackgroundScript, EscapeCSSSelector } from '../utils';
 
 /**

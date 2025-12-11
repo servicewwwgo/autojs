@@ -1,6 +1,5 @@
 import type { NavigateInstruction, InstructionResult } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
-import { ElementManager } from '../managers';
 
 /**
  * 页面导航指令
