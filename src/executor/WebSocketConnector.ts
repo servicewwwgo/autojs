@@ -145,18 +145,16 @@ export class WebSocketConnector {
     private cleanupWebSocket(): void {
         try {
             if (this.ws) {
-                this.ws.onopen = null;
-                this.ws.onmessage = null;
-                this.ws.onerror = null;
-                this.ws.onclose = null;
-
-                this.isLoggedIn = false;
-                this.connected = false;
-
                 // 只有在未关闭或未关闭中时才关闭
                 if (this.ws.readyState !== WebSocket.CLOSED && this.ws.readyState !== WebSocket.CLOSING) {
                     this.ws.close();
                 }
+
+                this.ws.onopen = null;
+                this.ws.onmessage = null;
+                this.ws.onerror = null;
+                this.ws.onclose = null;
+                this.ws = null;
             }
         } catch (error) {
             OutputLogToFile(`[WebSocket] Error cleaning up WebSocket connection: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
