@@ -91,7 +91,7 @@ export abstract class BaseInstructionClass implements BaseInstruction {
                 lastError = error as Error;
                 // 如果不是最后一次尝试，等待后重试
                 if (i < maxAttempts) {
-                    OutputLogToFile(`指令 ${this.instructionID} 执行失败，正在重试 (${i}/${maxAttempts}): ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
+                    OutputLogToFile(`[BaseInstruction] Instruction ${this.instructionID} execution failed, retrying (${i}/${maxAttempts}): ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
                     await this.Delay(1); // 重试前等待 1 秒
                 }
             }

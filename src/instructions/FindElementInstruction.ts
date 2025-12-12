@@ -37,7 +37,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
             });
 
             if (!documentResult?.root?.nodeId) {
-                OutputLogToFile(`Failed to get document root node for "${this.elementData.name}"`, { level: LogLevel.ERROR });
+                OutputLogToFile(`[FindElementInstruction] Failed to get document root node for "${this.elementData.name}"`, { level: LogLevel.ERROR });
                 return [];
             }
 
@@ -55,7 +55,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
                         });
                         candidateNodeIds = queryResult?.nodeIds || [];
                     } catch (error) {
-                        OutputLogToFile(`CDP querySelectorAll failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+                        OutputLogToFile(`[FindElementInstruction] CDP querySelectorAll failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
                         throw error;
                     }
                     break;
@@ -68,7 +68,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
                         });
                         candidateNodeIds = queryResult?.nodeIds || [];
                     } catch (error) {
-                        OutputLogToFile(`CDP querySelectorAll (id) failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+                        OutputLogToFile(`[FindElementInstruction] CDP querySelectorAll (id) failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
                         throw error;
                     }
                     break;
@@ -81,7 +81,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
                         });
 
                         if (!searchResult?.searchId) {
-                            OutputLogToFile(`XPath search did not return a searchId for "${this.elementData.name}"`, { level: LogLevel.WARN });
+                            OutputLogToFile(`[FindElementInstruction] XPath search did not return a searchId for "${this.elementData.name}"`, { level: LogLevel.WARN });
                             candidateNodeIds = [];
                             break;
                         }
@@ -100,7 +100,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
 
                             // 检查是否有更多结果被截断
                             if (candidateNodeIds.length >= maxResults) {
-                                OutputLogToFile(`XPath search returned ${candidateNodeIds.length} results for "${this.elementData.name}", which may be truncated (max: ${maxResults})`, { level: LogLevel.WARN });
+                                OutputLogToFile(`[FindElementInstruction] XPath search returned ${candidateNodeIds.length} results for "${this.elementData.name}", which may be truncated (max: ${maxResults})`, { level: LogLevel.WARN });
                             }
                         } finally {
                             // 确保清理搜索资源，即使获取结果时出错
@@ -109,11 +109,11 @@ export class FindElementInstructionClass extends BaseInstructionClass {
                                     searchId: searchId
                                 });
                             } catch (discardError) {
-                                OutputLogToFile(`Failed to discard search results for "${this.elementData.name}": ${discardError instanceof Error ? discardError.message : String(discardError)}`, { level: LogLevel.WARN });
+                                OutputLogToFile(`[FindElementInstruction] Failed to discard search results for "${this.elementData.name}": ${discardError instanceof Error ? discardError.message : String(discardError)}`, { level: LogLevel.WARN });
                             }
                         }
                     } catch (error) {
-                        OutputLogToFile(`CDP performSearch (xpath) failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+                        OutputLogToFile(`[FindElementInstruction] CDP performSearch (xpath) failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
                         throw error;
                     }
                     break;
@@ -124,7 +124,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
 
             return candidateNodeIds;
         } catch (error) {
-            OutputLogToFile(`Error finding all matching elements for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[FindElementInstruction] Error finding all matching elements for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
             return [];
         }
     }
@@ -158,7 +158,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
 
             return false;
         } catch (error) {
-            OutputLogToFile(`Error checking node has child: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[FindElementInstruction] Error checking node has child: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
             return false;
         }
     }
@@ -175,7 +175,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
             const childrenElement = elementManager.GetElementByName(this.tabId, childrenName);
 
             if (!childrenElement || !childrenElement.elementData.nodeId) {
-                OutputLogToFile(`Children element "${childrenName}" not found in manager`, { level: LogLevel.WARN });
+                OutputLogToFile(`[FindElementInstruction] Children element "${childrenName}" not found in manager`, { level: LogLevel.WARN });
                 return undefined;
             }
 
@@ -192,7 +192,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
 
             return undefined;
         } catch (error) {
-            OutputLogToFile(`Error selecting element by children "${childrenName}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[FindElementInstruction] Error selecting element by children "${childrenName}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
             return undefined;
         }
     }
@@ -209,7 +209,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
             const parentElement = elementManager.GetElementByName(this.tabId, parentName);
 
             if (!parentElement || !parentElement.elementData.nodeId) {
-                OutputLogToFile(`Parent element "${parentName}" not found in manager`, { level: LogLevel.WARN });
+                OutputLogToFile(`[FindElementInstruction] Parent element "${parentName}" not found in manager`, { level: LogLevel.WARN });
                 return undefined;
             }
 
@@ -245,7 +245,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
 
             return undefined;
         } catch (error) {
-            OutputLogToFile(`Error selecting element by parent "${parentName}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[FindElementInstruction] Error selecting element by parent "${parentName}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
             return undefined;
         }
     }
@@ -263,7 +263,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
             const siblingElement = elementManager.GetElementByName(this.tabId, siblingName);
 
             if (!siblingElement || !siblingElement.elementData.nodeId) {
-                OutputLogToFile(`Sibling element "${siblingName}" not found in manager`, { level: LogLevel.WARN });
+                OutputLogToFile(`[FindElementInstruction] Sibling element "${siblingName}" not found in manager`, { level: LogLevel.WARN });
                 return undefined;
             }
 
@@ -326,14 +326,14 @@ export class FindElementInstructionClass extends BaseInstructionClass {
                         }
                         }
                     } catch (error) {
-                        OutputLogToFile(`Error checking sibling relation for node ${candidateNodeId}: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
+                        OutputLogToFile(`[FindElementInstruction] Error checking sibling relation for node ${candidateNodeId}: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
                         continue; // 继续检查下一个节点
                     }
             }
 
             return undefined;
         } catch (error) {
-            OutputLogToFile(`Error selecting element by sibling "${siblingName}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[FindElementInstruction] Error selecting element by sibling "${siblingName}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
             return undefined;
         }
     }
@@ -392,7 +392,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
             // 返回第一个符合所有条件的节点ID
             return filteredNodeIds.length > 0 ? filteredNodeIds[0] : undefined;
         } catch (error) {
-            OutputLogToFile(`Error checking node relations: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[FindElementInstruction] Error checking node relations: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
             return undefined;
         }
     }

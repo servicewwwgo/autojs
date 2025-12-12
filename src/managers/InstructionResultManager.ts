@@ -13,7 +13,7 @@ export class ResultManager {
    */
   public SaveResult(result: InstructionResult): void {
     this.results.set(result.instructionID, result);
-    OutputLogToFile(`结果管理器: 保存指令结果成功，指令ID: ${result.instructionID}, 成功: ${result.success}`, { level: LogLevel.INFO });
+    OutputLogToFile(`[ResultManager] Saved instruction result successfully, instructionID: ${result.instructionID}, success: ${result.success}`, { level: LogLevel.INFO });
   }
 
   /**
@@ -36,7 +36,7 @@ export class ResultManager {
   public ClearAll(): void {
     const count = this.results.size;
     this.results.clear();
-    OutputLogToFile(`结果管理器: 清除所有结果成功，清除数量: ${count}`, { level: LogLevel.INFO });
+    OutputLogToFile(`[ResultManager] Cleared all results successfully, count: ${count}`, { level: LogLevel.INFO });
   }
 
   /**
@@ -45,7 +45,7 @@ export class ResultManager {
   public ClearResult(instructionID: string): void {
     const deleted = this.results.delete(instructionID);
     if (deleted) {
-      OutputLogToFile(`结果管理器: 清除指令结果成功，指令ID: ${instructionID}`, { level: LogLevel.INFO });
+      OutputLogToFile(`[ResultManager] Cleared instruction result successfully, instructionID: ${instructionID}`, { level: LogLevel.INFO });
     }
   }
 

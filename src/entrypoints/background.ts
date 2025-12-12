@@ -48,21 +48,21 @@ export default defineBackground(() => {
     async function get_tabs(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 获取所有标签页
         const tabs = await tabManager.GetAllTabs();
-        OutputLogToFile(`获取标签页列表成功，数量: ${tabs.length}`, { level: LogLevel.INFO });
+        OutputLogToFile(`[Background] Retrieved tabs list successfully, count: ${tabs.length}`, { level: LogLevel.INFO });
         sendResponse({ success: true, data: tabs });
     }
 
     async function get_node_profile(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 获取节点配置
         const profile = await nodeConfig.GetNodeProfile();
-        OutputLogToFile(`获取节点配置成功`, { level: LogLevel.INFO });
+        OutputLogToFile(`[Background] Retrieved node profile successfully`, { level: LogLevel.INFO });
         sendResponse({ success: true, data: profile });
     }
 
     async function update_node_profile(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 更新节点配置
         await nodeConfig.UpdateNodeProfile(message.params as { node_name?: string; node_token?: string });
-        OutputLogToFile(`更新节点配置成功`, { level: LogLevel.INFO });
+        OutputLogToFile(`[Background] Updated node profile successfully`, { level: LogLevel.INFO });
         sendResponse({ success: true });
     }
 
@@ -76,11 +76,11 @@ export default defineBackground(() => {
             // 添加測試指令
             instructionExecutor.GetInstructionManager().DeleteInstructionsByTabId(tabId);
             await add_example_instructions(tabId);
-            OutputLogToFile(`内容脚本已就绪，标签页ID: ${tabId}, URL: ${url}`, { level: LogLevel.INFO });
+            OutputLogToFile(`[Background] Content script ready, tabId: ${tabId}, URL: ${url}`, { level: LogLevel.INFO });
 
             sendResponse({ success: true, data: { tabId, tabIndex, url } });
         } else {
-            OutputLogToFile(`内容脚本就绪失败: 无法获取标签页ID`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[Background] Content script ready failed: unable to get tabId`, { level: LogLevel.ERROR });
             sendResponse({ success: false, error: '无法获取标签页ID' });
         }
     }
@@ -129,11 +129,11 @@ export default defineBackground(() => {
             });
 
             instructionExecutor.GetInstructionManager().AddUnfilteredInstructions(processedInstructions);
-            OutputLogToFile(`添加指令集成功，标签页ID: ${tabId}, 指令数量: ${processedInstructions.length}`, { level: LogLevel.INFO });
+            OutputLogToFile(`[Background] Added instructions successfully, tabId: ${tabId}, count: ${processedInstructions.length}`, { level: LogLevel.INFO });
 
             sendResponse({ success: true, count: processedInstructions.length });
         } else {
-            OutputLogToFile(`添加指令集失败: 缺少tabId或instructionsJsonString参数`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[Background] Failed to add instructions: missing tabId or instructionsJsonString parameter`, { level: LogLevel.ERROR });
             sendResponse({ success: false, error: '缺少tabId或instructionsJsonString参数' });
         }
     }
@@ -142,7 +142,7 @@ export default defineBackground(() => {
         // 执行指令集
         if (message.params?.tabId) {
             const tabId = message.params.tabId as number;
-            OutputLogToFile(`开始执行指令集，标签页ID: ${tabId}`, { level: LogLevel.INFO });
+            OutputLogToFile(`[Background] Started executing instructions, tabId: ${tabId}`, { level: LogLevel.INFO });
 
             // 立即返回响应，然后在后台循环执行所有指令
             sendResponse({ success: true });
@@ -152,7 +152,7 @@ export default defineBackground(() => {
                 await instructionExecutor.ExecuteAll([]);
             }, 1000);
         } else {
-            OutputLogToFile(`执行指令集失败: 缺少tabId`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[Background] Failed to execute instructions: missing tabId`, { level: LogLevel.ERROR });
             sendResponse({ success: false, error: '缺少tabId' });
         }
     }
@@ -160,14 +160,14 @@ export default defineBackground(() => {
     async function pause_execution(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 暂停执行
         instructionExecutor.Pause();
-        OutputLogToFile(`暂停执行指令`, { level: LogLevel.INFO });
+        OutputLogToFile(`[Background] Execution paused`, { level: LogLevel.INFO });
         sendResponse({ success: true });
     }
 
     async function stop_execution(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 停止执行
         instructionExecutor.Stop();
-        OutputLogToFile(`停止执行指令`, { level: LogLevel.INFO });
+        OutputLogToFile(`[Background] Execution stopped`, { level: LogLevel.INFO });
         sendResponse({ success: true });
     }
 
@@ -180,14 +180,14 @@ export default defineBackground(() => {
     async function get_results(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 获取执行结果
         const results = instructionExecutor.GetResultManager().GetAllResults();
-        OutputLogToFile(`获取执行结果成功，结果数量: ${results.length}`, { level: LogLevel.INFO });
+        OutputLogToFile(`[Background] Retrieved execution results successfully, count: ${results.length}`, { level: LogLevel.INFO });
         sendResponse({ success: true, data: results });
     }
 
     async function clear_results(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 清空执行结果
         instructionExecutor.GetResultManager().ClearAll();
-        OutputLogToFile(`清空执行结果成功`, { level: LogLevel.INFO });
+        OutputLogToFile(`[Background] Cleared execution results successfully`, { level: LogLevel.INFO });
         sendResponse({ success: true });
     }
 
@@ -197,14 +197,14 @@ export default defineBackground(() => {
             const url = message.params.url as string;
             if (wsConnector) {
                 await wsConnector.connect();
-                OutputLogToFile(`WebSocket 连接成功，URL: ${url}`, { level: LogLevel.INFO });
+                OutputLogToFile(`[Background] WebSocket connected successfully, URL: ${url}`, { level: LogLevel.INFO });
             } else {
-                OutputLogToFile(`WebSocket 连接失败: wsConnector 未初始化`, { level: LogLevel.ERROR });
+                OutputLogToFile(`[Background] WebSocket connection failed: wsConnector not initialized`, { level: LogLevel.ERROR });
             }
 
             sendResponse({ success: true });
         } else {
-            OutputLogToFile(`WebSocket 连接失败: 缺少URL`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[Background] WebSocket connection failed: missing URL`, { level: LogLevel.ERROR });
             sendResponse({ success: false, error: '缺少WebSocket URL' });
         }
     }
@@ -213,7 +213,7 @@ export default defineBackground(() => {
         // 断开WebSocket
         if (wsConnector) {
             wsConnector.disconnect();
-            OutputLogToFile(`WebSocket 已断开连接`, { level: LogLevel.INFO });
+            OutputLogToFile(`[Background] WebSocket disconnected`, { level: LogLevel.INFO });
         }
 
         sendResponse({ success: true });
@@ -236,10 +236,10 @@ export default defineBackground(() => {
             const results = instructionExecutor.GetResultManager().GetAllResults();
             const message: WSMessage = { type: 'instructions', data: results };
             wsConnector.sendMessage(message);
-            OutputLogToFile(`发送执行结果到服务器成功，结果数量: ${results.length}`, { level: LogLevel.INFO });
+            OutputLogToFile(`[Background] Sent execution results to server successfully, count: ${results.length}`, { level: LogLevel.INFO });
             sendResponse({ success: true });
         } else {
-            OutputLogToFile(`发送执行结果到服务器失败: WebSocket未连接`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[Background] Failed to send execution results to server: WebSocket not connected`, { level: LogLevel.ERROR });
             sendResponse({ success: false, error: 'WebSocket未连接' });
         }
     }
@@ -270,15 +270,15 @@ export default defineBackground(() => {
 
             if (handler) {
                 handler(message, sender, sendResponse).catch((error) => {
-                    OutputLogToFile(`处理消息时发生错误: ${error instanceof Error ? error.message : String(error)}, 消息类型: ${message.type}`, { level: LogLevel.ERROR });
+                    OutputLogToFile(`[Background] Error processing message (type: ${message.type}): ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
                     sendResponse({ success: false, error: `处理消息时发生错误: ${error} ${JSON.stringify(message)}` });
                 });
             } else {
-                OutputLogToFile(`未知的消息类型: ${message.type}`, { level: LogLevel.WARN });
+                OutputLogToFile(`[Background] Unknown message type: ${message.type}`, { level: LogLevel.WARN });
                 sendResponse({ success: false, error: `未知的消息类型: ${message.type} ${JSON.stringify(message)}` });
             }
         } catch (error) {
-            OutputLogToFile(`处理消息时发生未捕获的错误: ${error instanceof Error ? error.message : String(error)}, 消息类型: ${message.type}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[Background] Uncaught error processing message (type: ${message.type}): ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
             sendResponse({ success: false, error: `处理消息时发生未捕获的错误: ${error} ${JSON.stringify(message)}` });
         }
 
@@ -360,7 +360,7 @@ export default defineBackground(() => {
     // 扩展安装时的初始化
     browser.runtime.onInstalled.addListener(async () => {
         // 输出日志
-        OutputLogToFile('扩展安装时的初始化', { level: LogLevel.INFO });
+        OutputLogToFile('[Background] Extension installed, initializing', { level: LogLevel.INFO });
 
         // 获取节点配置
         await nodeConfig.GetNodeProfile();
@@ -388,7 +388,7 @@ export default defineBackground(() => {
         const tab = await browser.tabs.get(activeInfo.tabId);
         if (tab && tab.url) {
             tabManager.RecordActivatedTab(activeInfo.tabId, tab.index, tab.url);
-            OutputLogToFile(`标签页已激活，标签页ID: ${activeInfo.tabId}, URL: ${tab.url}`, { level: LogLevel.INFO });
+            OutputLogToFile(`[Background] Tab activated, tabId: ${activeInfo.tabId}, URL: ${tab.url}`, { level: LogLevel.INFO });
         }
 
         // 发送标签页激活消息到服务器
@@ -400,7 +400,7 @@ export default defineBackground(() => {
     browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         if (changeInfo.status === 'complete' && tab && tab.url) {
             tabManager.RecordActivatedTab(tabId, tab.index, tab.url);
-            OutputLogToFile(`标签页已更新，标签页ID: ${tabId}, URL: ${tab.url}`, { level: LogLevel.INFO });
+            OutputLogToFile(`[Background] Tab updated, tabId: ${tabId}, URL: ${tab.url}`, { level: LogLevel.INFO });
         }
         // 发送标签页更新消息到服务器
         const message: WSMessage = { type: "tabs", data: { tabId: tabId as number, tabIndex: tab.index, url: tab.url as string } as TabInfo };
@@ -414,7 +414,7 @@ export default defineBackground(() => {
         // 清理该标签页的日志
         cdpExecutor.clearConsoleLogs(tabId);
         cdpExecutor.clearNetworkLogs(tabId);
-        OutputLogToFile(`标签页已关闭，标签页ID: ${tabId}`, { level: LogLevel.INFO });
+        OutputLogToFile(`[Background] Tab closed, tabId: ${tabId}`, { level: LogLevel.INFO });
         // 发送标签页关闭消息到服务器
         const message: WSMessage = { type: "tabs", data: { tabId: tabId as number, tabIndex: -1, url: '' } as TabInfo };
         wsConnector.sendMessage(message);

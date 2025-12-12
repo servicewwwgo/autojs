@@ -76,7 +76,7 @@ const loadLogs = async () => {
             logs.value = response.data as InstructionResult[];
         }
     } catch (error) {
-        OutputLogToFile(`加载日志失败: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+        OutputLogToFile(`[ExecutionLog] Failed to load logs: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
     }
 };
 
@@ -91,7 +91,7 @@ const clearLogs = async () => {
                 logs.value = [] as InstructionResult[];
             }
         } catch (error) {
-            OutputLogToFile(`清空日志失败: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[ExecutionLog] Failed to clear logs: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
         }
     }
 };
@@ -116,7 +116,7 @@ onMounted(() => {
     // 定期刷新日志
     logInterval = setInterval(() => {
         loadLogs().catch((error) => {
-            OutputLogToFile(`刷新日志失败: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[ExecutionLog] Failed to refresh logs: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
         });
     }, 2000) as any;
 });

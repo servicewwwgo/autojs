@@ -83,7 +83,7 @@ export class ElementClass implements IElement {
 
         // 检查是否找到元素（通过 nodeId）
         if (!this.elementData.nodeId) {
-            OutputLogToFile(`Element "${this.elementData.name}" not found with nodeId: ${this.elementData.nodeId}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[ElementManager] Element "${this.elementData.name}" not found with nodeId: ${this.elementData.nodeId}`, { level: LogLevel.ERROR });
             return false;
         }
 
@@ -152,7 +152,7 @@ export class ElementManager {
     public clearAll(): void {
         const totalCount = Array.from(this.elements.values()).reduce((sum, map) => sum + map.size, 0);
         this.elements.clear();
-        OutputLogToFile(`元素管理器: 清空所有元素成功，清除数量: ${totalCount}`, { level: LogLevel.INFO });
+        OutputLogToFile(`[ElementManager] Cleared all elements successfully, count: ${totalCount}`, { level: LogLevel.INFO });
     }
 
     /**
@@ -170,7 +170,7 @@ export class ElementManager {
             this.elements.set(tabId, new Map());
         }
         this.elements.get(tabId)?.set(name, element);
-        OutputLogToFile(`元素管理器: 保存元素成功，标签页ID: ${tabId}, 元素名称: ${name}`, { level: LogLevel.INFO });
+        OutputLogToFile(`[ElementManager] Saved element successfully, tabId: ${tabId}, elementName: ${name}`, { level: LogLevel.INFO });
     }
 
     /**
@@ -180,7 +180,7 @@ export class ElementManager {
         if (this.elements.has(tabId)) {
             const deleted = this.elements.get(tabId)?.delete(name);
             if (deleted) {
-                OutputLogToFile(`元素管理器: 删除元素成功，标签页ID: ${tabId}, 元素名称: ${name}`, { level: LogLevel.INFO });
+                OutputLogToFile(`[ElementManager] Removed element successfully, tabId: ${tabId}, elementName: ${name}`, { level: LogLevel.INFO });
             }
         }
     }
@@ -205,7 +205,7 @@ export class ElementManager {
     public ClearTabElements(tabId: number): void {
         const count = this.elements.get(tabId)?.size || 0;
         this.elements.delete(tabId);
-        OutputLogToFile(`元素管理器: 清空标签页元素成功，标签页ID: ${tabId}, 清除数量: ${count}`, { level: LogLevel.INFO });
+        OutputLogToFile(`[ElementManager] Cleared tab elements successfully, tabId: ${tabId}, count: ${count}`, { level: LogLevel.INFO });
     }
 }
 

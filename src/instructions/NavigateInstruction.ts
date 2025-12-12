@@ -110,7 +110,7 @@ export class NavigateInstructionClass extends BaseInstructionClass {
         }
 
         // 超时后记录警告但继续执行
-        OutputLogToFile(`Content script 在 ${maxWaitTime / 1000} 秒内未准备好，继续执行（可能影响后续需要 content script 的指令）`, { level: LogLevel.WARN });
+        OutputLogToFile(`[NavigateInstruction] Content script not ready within ${maxWaitTime / 1000} seconds, continuing execution (may affect subsequent instructions requiring content script)`, { level: LogLevel.WARN });
     }
 
     ToObject(): object {

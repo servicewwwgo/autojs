@@ -47,7 +47,7 @@ export class MouseInstructionClass extends BaseInstructionClass {
                 y: targetY
             });
         } catch (error) {
-            OutputLogToFile(`Error moving mouse to target position: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[MouseInstruction] Error moving mouse to target position: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
             throw error;
         }
     }
@@ -71,7 +71,7 @@ export class MouseInstructionClass extends BaseInstructionClass {
                 viewportWidth = viewportResult?.cssLayoutViewport?.clientWidth || 1920;
                 viewportHeight = viewportResult?.cssLayoutViewport?.clientHeight || 1080;
             } catch (error) {
-                OutputLogToFile(`Failed to get viewport metrics, using default values: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
+                OutputLogToFile(`[MouseInstruction] Failed to get viewport metrics, using default values: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
             }
 
             const startX = viewportWidth / 2;
@@ -137,7 +137,7 @@ export class MouseInstructionClass extends BaseInstructionClass {
                 }
             }
         } catch (error) {
-            OutputLogToFile(`Error simulating mouse trajectory: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[MouseInstruction] Error simulating mouse trajectory: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
             // 如果模擬失敗，直接移動到目標位置
             await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
                 type: 'mouseMoved',
@@ -166,7 +166,7 @@ export class MouseInstructionClass extends BaseInstructionClass {
                 viewportWidth = viewportResult?.cssLayoutViewport?.clientWidth || 1920;
                 viewportHeight = viewportResult?.cssLayoutViewport?.clientHeight || 1080;
             } catch (error) {
-                OutputLogToFile(`Failed to get viewport metrics, using default values: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
+                OutputLogToFile(`[MouseInstruction] Failed to get viewport metrics, using default values: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
             }
 
             const startX = viewportWidth / 2;
@@ -260,7 +260,7 @@ export class MouseInstructionClass extends BaseInstructionClass {
                 }
             }
         } catch (error) {
-            OutputLogToFile(`Error simulating mouse trajectory: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[MouseInstruction] Error simulating mouse trajectory: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
             // 如果模擬失敗，直接移動到目標位置
             await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
                 type: 'mouseMoved',

@@ -55,7 +55,7 @@ export class SetAttributeInstructionClass extends BaseInstructionClass {
                 value: this.value
             });
 
-            OutputLogToFile(`[SetAttributeInstruction] 设置元素属性成功: ${this.elementName}.${this.attribute} = ${this.value}`, { level: LogLevel.INFO });
+            OutputLogToFile(`[SetAttributeInstruction] Set element attribute successfully: ${this.elementName}.${this.attribute} = ${this.value}`, { level: LogLevel.INFO });
 
             return { ...defaultResult, success: true, data: { elementName: this.elementName, attribute: this.attribute, value: this.value } };
         });

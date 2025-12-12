@@ -24,7 +24,7 @@ export class TabManager {
     };
 
     this.tabs.set(tabId, newTabInfo);
-    OutputLogToFile(`标签页已记录: ${JSON.stringify(newTabInfo)}`, { level: LogLevel.INFO });
+    OutputLogToFile(`[TabManager] Tab recorded: ${JSON.stringify(newTabInfo)}`, { level: LogLevel.INFO });
   }
 
   /**

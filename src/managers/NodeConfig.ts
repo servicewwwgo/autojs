@@ -98,7 +98,7 @@ export class NodeConfig {
       this.nodeProfile.node_token = updates.node_token ?? this.nodeProfile.node_token;
     }
 
-    OutputLogToFile(`节点配置已更新: ${JSON.stringify(updates)}`, { level: LogLevel.INFO });
+    OutputLogToFile(`[NodeConfig] Node profile updated: ${JSON.stringify(updates)}`, { level: LogLevel.INFO });
   }
 
 };
