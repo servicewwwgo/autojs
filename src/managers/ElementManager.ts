@@ -1,4 +1,5 @@
 import type { ElementData } from '../types';
+import { OutputLogToFile, LogLevel } from '../utils';
 
 /**
  * 元素对象接口
@@ -82,7 +83,7 @@ export class ElementClass implements IElement {
 
         // 检查是否找到元素（通过 nodeId）
         if (!this.elementData.nodeId) {
-            console.error(`Element "${this.elementData.name}" not found with nodeId: ${this.elementData.nodeId}`);
+            OutputLogToFile(`Element "${this.elementData.name}" not found with nodeId: ${this.elementData.nodeId}`, { level: LogLevel.ERROR });
             return false;
         }
 
@@ -149,7 +150,9 @@ export class ElementManager {
      * 清空所有元素
      */
     public clearAll(): void {
+        const totalCount = Array.from(this.elements.values()).reduce((sum, map) => sum + map.size, 0);
         this.elements.clear();
+        OutputLogToFile(`元素管理器: 清空所有元素成功，清除数量: ${totalCount}`, { level: LogLevel.INFO });
     }
 
     /**
@@ -167,6 +170,7 @@ export class ElementManager {
             this.elements.set(tabId, new Map());
         }
         this.elements.get(tabId)?.set(name, element);
+        OutputLogToFile(`元素管理器: 保存元素成功，标签页ID: ${tabId}, 元素名称: ${name}`, { level: LogLevel.INFO });
     }
 
     /**
@@ -174,7 +178,10 @@ export class ElementManager {
      */
     public RemoveElementByName(tabId: number, name: string): void {
         if (this.elements.has(tabId)) {
-            this.elements.get(tabId)?.delete(name);
+            const deleted = this.elements.get(tabId)?.delete(name);
+            if (deleted) {
+                OutputLogToFile(`元素管理器: 删除元素成功，标签页ID: ${tabId}, 元素名称: ${name}`, { level: LogLevel.INFO });
+            }
         }
     }
 
@@ -196,7 +203,9 @@ export class ElementManager {
      * 清空指定标签页的所有元素
      */
     public ClearTabElements(tabId: number): void {
+        const count = this.elements.get(tabId)?.size || 0;
         this.elements.delete(tabId);
+        OutputLogToFile(`元素管理器: 清空标签页元素成功，标签页ID: ${tabId}, 清除数量: ${count}`, { level: LogLevel.INFO });
     }
 }
 

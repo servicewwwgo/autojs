@@ -1,7 +1,7 @@
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import { ElementTag } from '../consts';
 import { BackgroundScriptMessageType, ContentScriptMessageType } from '../types';
-import { SendMessageToBackgroundScript, EscapeCSSSelector } from '../utils';
+import { SendMessageToBackgroundScript, EscapeCSSSelector, OutputLogToFile, LogLevel } from '../utils';
 
 /**
  * 通知 background script 内容脚本已加载完成
@@ -10,9 +10,9 @@ async function notifyContentScriptReady() {
   const response = await SendMessageToBackgroundScript({ type: 'contentScriptReady', params: { url: window.location.href } } as BackgroundScriptMessageType);
 
   if (response.success) {
-    console.log('Notified background script successfully');
+    OutputLogToFile('Notified background script successfully', { level: LogLevel.INFO });
   } else {
-    console.error('Failed to notify background script:', response.error);
+    OutputLogToFile(`Failed to notify background script: ${response.error}`, { level: LogLevel.ERROR });
   }
 }
 
@@ -32,9 +32,9 @@ function hideWebdriver(): void {
       enumerable: true
     });
 
-    console.log('navigator.webdriver property hidden');
+    OutputLogToFile('navigator.webdriver property hidden', { level: LogLevel.INFO });
   } catch (error) {
-    console.warn('Failed to hide navigator.webdriver property:', error);
+    OutputLogToFile(`Failed to hide navigator.webdriver property: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
   }
 }
 
@@ -67,7 +67,7 @@ function FindElement(selector: string, selectorType: 'css' | 'xpath' | 'id'): HT
         break;
       }
     default:
-      console.error(`Unsupported selector type: ${selectorType}`);
+      OutputLogToFile(`Unsupported selector type: ${selectorType}`, { level: LogLevel.ERROR });
   }
 
   return element;
@@ -181,7 +181,7 @@ async function GetAttribute(message: ContentScriptMessageType, sender: Browser.r
           }
         }
       } catch (error) {
-        console.warn('Failed to get background-image:', error);
+        OutputLogToFile(`Failed to get background-image: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
       }
     }
 
@@ -203,7 +203,7 @@ async function GetAttribute(message: ContentScriptMessageType, sender: Browser.r
         attributeValue = (style as any)[camelCase] || null;
       }
     } catch (error) {
-      console.warn(`Failed to get computed style property "${attribute}":`, error);
+      OutputLogToFile(`Failed to get computed style property "${attribute}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
       attributeValue = null;
     }
   }
@@ -274,7 +274,7 @@ function checkParentVisibility(element: HTMLElement): boolean {
       }
     } catch (error) {
       // 如果无法获取计算样式（例如在 document_start 阶段），跳过此检查
-      console.warn('Cannot get computed style for parent element:', error);
+      OutputLogToFile(`Cannot get computed style for parent element: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
     }
 
     parent = parent.parentElement;
@@ -301,7 +301,7 @@ function IsVisible(element: HTMLElement): boolean {
     style = window.getComputedStyle(element);
   } catch (error) {
     // 如果无法获取计算样式（例如在 document_start 阶段），返回 false
-    console.warn('Cannot get computed style for element:', error);
+    OutputLogToFile(`Cannot get computed style for element: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
     return false;
   }
 
@@ -342,7 +342,7 @@ function IsVisible(element: HTMLElement): boolean {
   try {
     rect = element.getBoundingClientRect();
   } catch (error) {
-    console.warn('Cannot get bounding rect for element:', error);
+    OutputLogToFile(`Cannot get bounding rect for element: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
     return false;
   }
 
@@ -445,7 +445,7 @@ export default defineContentScript({
   matches: ['<all_urls>'],
   runAt: 'document_start',
   main() {
-    console.log('Content script loaded (document_start)');
+    OutputLogToFile('Content script loaded (document_start)', { level: LogLevel.INFO });
 
     // 立即隐藏 navigator.webdriver 属性（在页面脚本运行之前）
     hideWebdriver();
@@ -472,11 +472,15 @@ export default defineContentScript({
     // 等待 DOM 加载完成后再通知 background script
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => {
-        notifyContentScriptReady().catch(console.error);
+        notifyContentScriptReady().catch((error) => {
+          OutputLogToFile(`Failed to notify content script ready: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+        });
       });
     } else {
       // DOM 已经加载完成
-      notifyContentScriptReady().catch(console.error);
+      notifyContentScriptReady().catch((error) => {
+        OutputLogToFile(`Failed to notify content script ready: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+      });
     }
   }
 });

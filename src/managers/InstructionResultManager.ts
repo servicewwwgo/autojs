@@ -1,4 +1,5 @@
 import type { InstructionResult } from '../types';
+import { OutputLogToFile, LogLevel } from '../utils';
 
 /**
  * 指令结果管理器
@@ -12,6 +13,7 @@ export class ResultManager {
    */
   public SaveResult(result: InstructionResult): void {
     this.results.set(result.instructionID, result);
+    OutputLogToFile(`结果管理器: 保存指令结果成功，指令ID: ${result.instructionID}, 成功: ${result.success}`, { level: LogLevel.INFO });
   }
 
   /**
@@ -32,14 +34,19 @@ export class ResultManager {
    * 清除所有结果
    */
   public ClearAll(): void {
+    const count = this.results.size;
     this.results.clear();
+    OutputLogToFile(`结果管理器: 清除所有结果成功，清除数量: ${count}`, { level: LogLevel.INFO });
   }
 
   /**
    * 清除指定指令的结果
    */
   public ClearResult(instructionID: string): void {
-    this.results.delete(instructionID);
+    const deleted = this.results.delete(instructionID);
+    if (deleted) {
+      OutputLogToFile(`结果管理器: 清除指令结果成功，指令ID: ${instructionID}`, { level: LogLevel.INFO });
+    }
   }
 
   /**

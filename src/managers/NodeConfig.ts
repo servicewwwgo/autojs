@@ -1,5 +1,5 @@
 import type { NodeProfile } from '../types';
-import { GenerateUUID } from '../utils';
+import { GenerateUUID, OutputLogToFile, LogLevel } from '../utils';
 
 /**
  * 节点配置对象
@@ -98,7 +98,7 @@ export class NodeConfig {
       this.nodeProfile.node_token = updates.node_token ?? this.nodeProfile.node_token;
     }
 
-    console.log('节点配置已更新:', updates);
+    OutputLogToFile(`节点配置已更新: ${JSON.stringify(updates)}`, { level: LogLevel.INFO });
   }
 
 };

@@ -1,4 +1,5 @@
 import type { TabInfo } from '../types';
+import { OutputLogToFile, LogLevel } from '../utils';
 
 /**
  * 标签页管理器
@@ -23,7 +24,7 @@ export class TabManager {
     };
 
     this.tabs.set(tabId, newTabInfo);
-    console.log('标签页已记录:', newTabInfo);
+    OutputLogToFile(`标签页已记录: ${JSON.stringify(newTabInfo)}`, { level: LogLevel.INFO });
   }
 
   /**

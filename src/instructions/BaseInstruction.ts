@@ -1,5 +1,5 @@
 import type { BaseInstruction, InstructionResult, ContentScriptMessageType } from '../types';
-import { SendMessageToContentScript, ExecuteCDPCommand } from '../utils';
+import { SendMessageToContentScript, ExecuteCDPCommand, OutputLogToFile, LogLevel } from '../utils';
 
 /**
  * 基础指令对象接口
@@ -91,7 +91,7 @@ export abstract class BaseInstructionClass implements BaseInstruction {
                 lastError = error as Error;
                 // 如果不是最后一次尝试，等待后重试
                 if (i < maxAttempts) {
-                    console.warn(`指令 ${this.instructionID} 执行失败，正在重试 (${i}/${maxAttempts})`, error);
+                    OutputLogToFile(`指令 ${this.instructionID} 执行失败，正在重试 (${i}/${maxAttempts}): ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
                     await this.Delay(1); // 重试前等待 1 秒
                 }
             }

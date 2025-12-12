@@ -1,4 +1,5 @@
 import type { BaseInstructionClass } from '../instructions';
+import { OutputLogToFile, LogLevel } from '../utils';
 
 /**
  * 指令对象管理器
@@ -37,6 +38,7 @@ export class InstructionManager {
     for (const [tabId, instructions] of instructionsByTab) {
       this.AddInstructions(tabId, instructions);
     }
+    OutputLogToFile(`指令管理器: 添加未过滤指令成功，总数: ${instructions.length}, 标签页数: ${instructionsByTab.size}`, { level: LogLevel.INFO });
   }
 
   /**
@@ -56,6 +58,7 @@ export class InstructionManager {
     instructions.sort((a, b) => a.created_at - b.created_at);
     // 将排序后的指令添加到该标签页的指令列表
     this.instructionsMap.get(tabId)!.push(...instructions);
+    OutputLogToFile(`指令管理器: 添加指令到标签页成功，标签页ID: ${tabId}, 指令数量: ${instructions.length}`, { level: LogLevel.INFO });
   }
 
   /**
@@ -105,7 +108,9 @@ export class InstructionManager {
    * 清除指定标签页的所有指令
    */
   public DeleteInstructionsByTabId(tabId: number): void {
+    const count = this.instructionsMap.get(tabId)?.length || 0;
     this.instructionsMap.delete(tabId);
+    OutputLogToFile(`指令管理器: 清除标签页指令成功，标签页ID: ${tabId}, 清除数量: ${count}`, { level: LogLevel.INFO });
   }
 
   /**

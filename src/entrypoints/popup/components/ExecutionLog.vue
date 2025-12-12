@@ -47,7 +47,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { BackgroundScriptMessageType, InstructionResult } from '../../../types';
-import { SendMessageToBackgroundScript } from '../../../utils';
+import { SendMessageToBackgroundScript, OutputLogToFile, LogLevel } from '../../../utils';
 
 let logInterval: number | null = null;
 
@@ -76,7 +76,7 @@ const loadLogs = async () => {
             logs.value = response.data as InstructionResult[];
         }
     } catch (error) {
-        console.error('加载日志失败:', error);
+        OutputLogToFile(`加载日志失败: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
     }
 };
 
@@ -91,7 +91,7 @@ const clearLogs = async () => {
                 logs.value = [] as InstructionResult[];
             }
         } catch (error) {
-            console.error('清空日志失败:', error);
+            OutputLogToFile(`清空日志失败: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
         }
     }
 };
@@ -115,7 +115,9 @@ const sendToServer = async () => {
 onMounted(() => {
     // 定期刷新日志
     logInterval = setInterval(() => {
-        loadLogs().catch((error) => console.error('刷新日志失败:', error));
+        loadLogs().catch((error) => {
+            OutputLogToFile(`刷新日志失败: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+        });
     }, 2000) as any;
 });
 

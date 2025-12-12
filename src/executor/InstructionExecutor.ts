@@ -1,4 +1,4 @@
-import { EnsureCDPConnected, DisconnectCDP } from '../utils';
+import { EnsureCDPConnected, DisconnectCDP, OutputLogToFile, LogLevel } from '../utils';
 import { BaseInstruction, ExecutorStatus, InstructionResult, WSMessage } from '../types';
 import { BaseInstructionClass, InstructionFactory } from '../instructions';
 import { InstructionManager, ResultManager } from '../managers';
@@ -48,6 +48,7 @@ export class InstructionExecutor {
   public Pause(): void {
     if (this.isRunning) {
       this.isPaused = true;
+      OutputLogToFile(`指令执行器已暂停`, { level: LogLevel.INFO });
     }
   }
 
@@ -57,6 +58,7 @@ export class InstructionExecutor {
   public Resume(): void {
     if (this.isPaused) {
       this.isPaused = false;
+      OutputLogToFile(`指令执行器已恢复`, { level: LogLevel.INFO });
     }
   }
 
@@ -89,6 +91,7 @@ export class InstructionExecutor {
     this.stopRequested = true;
     this.isRunning = false;
     this.isPaused = false;
+    OutputLogToFile(`指令执行器已停止，执行统计: 总计=${this.executedCount}, 成功=${this.successCount}, 失败=${this.errorCount}`, { level: LogLevel.INFO });
   }
 
   /**
@@ -120,6 +123,7 @@ export class InstructionExecutor {
     this.successCount = 0;
     this.errorCount = 0;
     this.startTime = Date.now();
+    OutputLogToFile(`指令执行器已启动，待执行指令数: ${instructions.length}`, { level: LogLevel.INFO });
 
     // 执行指令循环（FIFO 队列）
     while (!this.stopRequested) {
@@ -158,8 +162,10 @@ export class InstructionExecutor {
 
             if (result.success) {
               this.successCount++; // 成功数 +1
+              OutputLogToFile(`指令执行成功: ${instruction.instructionID} (${instruction.type}), 耗时: ${result.duration}ms`, { level: LogLevel.INFO });
             } else {
               this.errorCount++; // 失败数 +1
+              OutputLogToFile(`指令执行失败: ${instruction.instructionID} (${instruction.type}), 错误: ${result.error || '未知错误'}, 耗时: ${result.duration}ms`, { level: LogLevel.ERROR });
             }
 
             this.resultManager.SaveResult(result);
@@ -186,7 +192,10 @@ export class InstructionExecutor {
     if (message.data && Array.isArray(message.data)) {
       const instructions: BaseInstruction[] = message.data as BaseInstruction[];
       const instructionClasses: BaseInstructionClass[] = instructions.map(instruction => InstructionFactory.create(instruction));
+      OutputLogToFile(`收到 WebSocket 指令消息，指令数量: ${instructionClasses.length}`, { level: LogLevel.INFO });
       await this.ExecuteAll(instructionClasses);
+    } else {
+      OutputLogToFile(`收到无效的 WebSocket 指令消息: ${JSON.stringify(message)}`, { level: LogLevel.WARN });
     }
   }
 

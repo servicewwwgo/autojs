@@ -1,5 +1,6 @@
 import type { NavigateInstruction, InstructionResult } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
+import { OutputLogToFile, LogLevel } from '../utils';
 
 /**
  * 页面导航指令
@@ -109,7 +110,7 @@ export class NavigateInstructionClass extends BaseInstructionClass {
         }
 
         // 超时后记录警告但继续执行
-        console.warn(`Content script 在 ${maxWaitTime / 1000} 秒内未准备好，继续执行（可能影响后续需要 content script 的指令）`);
+        OutputLogToFile(`Content script 在 ${maxWaitTime / 1000} 秒内未准备好，继续执行（可能影响后续需要 content script 的指令）`, { level: LogLevel.WARN });
     }
 
     ToObject(): object {

@@ -146,7 +146,7 @@ export async function EnsureCDPConnected(tabId: number): Promise<void> {
             const errorMsg = browser.runtime.lastError.message || '';
             // 忽略"另一个调试器已连接"的错误（可能是其他扩展或DevTools）
             if (!errorMsg.includes('Another debugger') && !errorMsg.includes('already attached')) {
-                console.warn('CDP connection warning:', errorMsg);
+                OutputLogToFile(`CDP connection warning: ${errorMsg}`, { level: LogLevel.WARN });
             }
         }
     }
@@ -165,7 +165,7 @@ export async function DisconnectCDP(tabId: number): Promise<void> {
         // 断开 CDP 连接
         await browser.debugger.detach(target);
     } catch (error) {
-        console.error('CDP disconnect error:', error);
+        OutputLogToFile(`CDP disconnect error: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
     }
 }
 
