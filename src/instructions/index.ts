@@ -1,7 +1,7 @@
 /**
  * 指令类统一导出
  */
-import type { Instruction, FindElementInstruction, KeyboardInstruction, MouseInstruction, InputInstruction, GetAttributeInstruction, NavigateInstruction, ScreenshotInstruction, ExecuteScriptInstruction } from '../types';
+import type { Instruction, FindElementInstruction, KeyboardInstruction, MouseInstruction, InputInstruction, GetAttributeInstruction, SetAttributeInstruction, NavigateInstruction, ScreenshotInstruction, ExecuteScriptInstruction } from '../types';
 
 import { BaseInstructionClass } from './BaseInstruction';
 import { FindElementInstructionClass } from './FindElementInstruction';
@@ -9,6 +9,7 @@ import { KeyboardInstructionClass } from './KeyboardInstruction';
 import { MouseInstructionClass } from './MouseInstruction';
 import { InputInstructionClass } from './InputInstruction';
 import { GetAttributeInstructionClass } from './GetAttributeInstruction';
+import { SetAttributeInstructionClass } from './SetAttributeInstruction';
 import { NavigateInstructionClass } from './NavigateInstruction';
 import { ScreenshotInstructionClass } from './ScreenshotInstruction';
 import { ExecuteScriptInstructionClass } from './ExecuteScriptInstruction';
@@ -22,6 +23,7 @@ export { KeyboardInstructionClass } from './KeyboardInstruction';
 export { MouseInstructionClass } from './MouseInstruction';
 export { InputInstructionClass } from './InputInstruction';
 export { GetAttributeInstructionClass } from './GetAttributeInstruction';
+export { SetAttributeInstructionClass } from './SetAttributeInstruction';
 export { NavigateInstructionClass } from './NavigateInstruction';
 export { ScreenshotInstructionClass } from './ScreenshotInstruction';
 export { ExecuteScriptInstructionClass } from './ExecuteScriptInstruction';
@@ -51,6 +53,8 @@ export class InstructionFactory {
         return new InputInstructionClass(instruction as InputInstruction);
       case 'get_attribute':
         return new GetAttributeInstructionClass(instruction as GetAttributeInstruction);
+      case 'set_attribute':
+        return new SetAttributeInstructionClass(instruction as SetAttributeInstruction);
       case 'navigate':
         return new NavigateInstructionClass(instruction as NavigateInstruction);
       case 'screenshot':

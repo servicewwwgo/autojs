@@ -13,6 +13,7 @@ export { KeyboardInstruction } from './instruction';
 export { MouseInstruction } from './instruction';
 export { InputInstruction } from './instruction';
 export { GetAttributeInstruction } from './instruction';
+export { SetAttributeInstruction } from './instruction';
 export { NavigateInstruction } from './instruction';
 export { ScreenshotInstruction } from './instruction';
 export { ExecuteScriptInstruction } from './instruction';
