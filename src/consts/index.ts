@@ -7,4 +7,4 @@ export const ElementTag: string = 'cdp-locate-id';
 /**
  * WebSocket 默认连接 URL
  */
-export const WEBSOCKET_CONN_URL: string = 'ws://localhost:8080';
+export const WEBSOCKET_CONN_URL: string = 'ws://localhost:8080/ws';
