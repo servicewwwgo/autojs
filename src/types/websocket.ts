@@ -9,6 +9,14 @@ export interface WSMessage {
 }
 
 /**
+ * WebSocket错误消息
+ */
+export interface WSErrorMessage extends WSMessage {
+  type: 'error';
+  data: { error: string; message?: string; code?: number };
+}
+
+/**
  * WebSocket登录消息
  */
 export interface WSLoginMessage extends WSMessage {
@@ -39,3 +47,4 @@ export interface WSHeartbeatResponse extends WSMessage {
   type: 'heartbeat';
   data: { success: boolean };
 }
+

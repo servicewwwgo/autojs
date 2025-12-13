@@ -8,6 +8,7 @@ import { elementManager } from '../managers';
 export class GetAttributeInstructionClass extends BaseInstructionClass {
   public elementName: string;
   public attribute?: string;
+  public usage?: "variable" | "data" | "none";
 
   ToObject(): object {
     return {
@@ -21,6 +22,7 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
     super(instruction);
     this.elementName = instruction.elementName;
     this.attribute = instruction.attribute;
+    this.usage = instruction.usage;
   }
 
   public async Execute(): Promise<InstructionResult> {
@@ -55,7 +57,7 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
         return { ...defaultResult, error: response?.error || `Failed to get attribute "${this.attribute || 'text'}" for element "${this.elementName}"` };
       }
 
-      return { ...defaultResult, success: true, data: response.data ?? undefined };
+      return { ...defaultResult, success: true, data: { usage: this.usage, value: response.data ?? undefined } };
     });
 
     return result;

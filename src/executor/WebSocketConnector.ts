@@ -1,5 +1,5 @@
 import { WEBSOCKET_CONN_URL } from '../consts';
-import type { WSMessage, WSLoginMessage, WSLoginResponse, WSHeartbeatMessage, WSHeartbeatResponse } from '../types';
+import type { WSMessage, WSLoginMessage, WSLoginResponse, WSHeartbeatMessage, WSHeartbeatResponse, WSErrorMessage } from '../types';
 import { OutputLogToFile, LogLevel } from '../utils';
 import { nodeConfig } from '../managers';
 
@@ -186,6 +186,12 @@ export class WebSocketConnector {
                 return;
             }
 
+            // 处理错误消息
+            if (message.type === 'error') {
+                this.handleErrorMessage(message as WSErrorMessage);
+                return;
+            }
+
             OutputLogToFile(`[WebSocket] Received message type: ${message.type}`, { level: LogLevel.INFO });
 
             const handler = this.mapMessageTypeToFunction[message.type];
@@ -233,6 +239,14 @@ export class WebSocketConnector {
 
             OutputLogToFile(`[WebSocket] Login failed: ${message.data.error || message.data.message || 'unknown error'}`, { level: LogLevel.ERROR });
         }
+    }
+
+    /**
+     * 处理Error消息
+     * @param message - Error消息
+     */
+    private handleErrorMessage(message: WSErrorMessage): void {
+        OutputLogToFile(`[WebSocket] Received error message: ${message.data.error || message.data.message || 'unknown error'}`, { level: LogLevel.ERROR });
     }
 
     /**

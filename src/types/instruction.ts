@@ -119,6 +119,7 @@ export interface GetAttributeInstruction extends BaseInstruction {
   type: 'get_attribute';
   elementName: string;
   attribute?: string;
+  usage?: "variable" | "data" | "none";
 }
 
 /**

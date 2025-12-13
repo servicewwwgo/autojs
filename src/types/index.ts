@@ -4,6 +4,7 @@ export { TabInfo } from './tab';
 export { WSMessage } from './websocket';
 export { WSLoginMessage, WSLoginResponse } from './websocket';
 export { WSHeartbeatMessage, WSHeartbeatResponse } from './websocket';
+export { WSErrorMessage } from './websocket';
 
 export { ExecutorStatus } from './executor';
 
