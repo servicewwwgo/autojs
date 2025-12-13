@@ -12,7 +12,7 @@ export class CdpExecutor {
 
     private mapTypeToFunction: { [key: string]: (data: any) => Promise<void> } = {};
 
-    private sendResult: ((result: CdpResult) => Promise<void>) | undefined;
+    private sendResult: ((result: CdpResult) => void) | undefined;
 
     constructor() {
         // 初始化类型到函数的映射
@@ -35,7 +35,7 @@ export class CdpExecutor {
      * 设置发送 CDP 结果的函数
      * @param sendResult - 发送结果的函数
      */
-    public setSendResult(sendResult: ((result: CdpResult) => Promise<void>) | undefined): void {
+    public setSendResult(sendResult: (result: CdpResult) => void): void {
         this.sendResult = sendResult;
     }
 
@@ -65,7 +65,7 @@ export class CdpExecutor {
             OutputLogToFile(`[CdpExecutor] handler not found: ${errorMessage}`, { level: LogLevel.ERROR });
         }
 
-        await this.sendResult?.(defaultResult as CdpResult);
+        this.sendResult?.(defaultResult as CdpResult);
     }
 
     // 连接 CDP
@@ -85,7 +85,7 @@ export class CdpExecutor {
 
         defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId } } as CdpConnectResult;
         OutputLogToFile(`[CdpExecutor] CDP connected successfully, tabId: ${msg.data.tabId}`, { level: LogLevel.INFO });
-        await this.sendResult?.(defaultResult as CdpConnectResult);
+        this.sendResult?.(defaultResult as CdpConnectResult);
     }
 
     // 断开 CDP
@@ -105,7 +105,7 @@ export class CdpExecutor {
 
         defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId } } as CdpDisconnectResult;
         OutputLogToFile(`[CdpExecutor] CDP disconnected successfully, tabId: ${msg.data.tabId}`, { level: LogLevel.INFO });
-        await this.sendResult?.(defaultResult as CdpDisconnectResult);
+        this.sendResult?.(defaultResult as CdpDisconnectResult);
     }
 
     // 列出所有标签页
@@ -125,7 +125,7 @@ export class CdpExecutor {
 
         defaultResult = { type: msg.type, id: msg.id, success: true, data: tabs } as CdpListTargetsResult;
         OutputLogToFile(`[CdpExecutor] Listed targets successfully, count: ${tabs.length}`, { level: LogLevel.INFO });
-        await this.sendResult?.(defaultResult as CdpListTargetsResult);
+        this.sendResult?.(defaultResult as CdpListTargetsResult);
     }
 
     // 执行 JavaScript 代码
@@ -175,7 +175,7 @@ export class CdpExecutor {
 
         defaultResult = { type: msg.type, id: msg.id, success: true, data: { result: evalResult?.result, exceptionDetails: evalResult?.exceptionDetails } } as CdpExecuteJavaScriptResult;
         OutputLogToFile(`[CdpExecutor] Executed JavaScript successfully, tabId: ${msg.data.tabId}`, { level: LogLevel.INFO });
-        await this.sendResult?.(defaultResult as CdpExecuteJavaScriptResult);
+        this.sendResult?.(defaultResult as CdpExecuteJavaScriptResult);
     }
 
     // 截取元素截图
@@ -289,7 +289,7 @@ export class CdpExecutor {
         // 步骤10: 返回截图结果
         defaultResult = { type: msg.type, id: msg.id, success: true, data: { image: base64Image, format: 'png', x: x, y: y, width: width, height: height } } as CdpTakeElementScreenshotResult;
         OutputLogToFile(`[CdpExecutor] Element screenshot taken successfully, tabId: ${msg.data.tabId}, selector: ${msg.data.selector}`, { level: LogLevel.INFO });
-        await this.sendResult?.(defaultResult as CdpTakeElementScreenshotResult);
+        this.sendResult?.(defaultResult as CdpTakeElementScreenshotResult);
     }
 
     // 执行 CDP 命令
@@ -314,7 +314,7 @@ export class CdpExecutor {
 
         defaultResult = { type: msg.type, id: msg.id, success: true, data: result } as CdpSendCommandResult;
         OutputLogToFile(`[CdpExecutor] CDP command executed successfully, tabId: ${msg.data.tabId}, method: ${msg.data.method}`, { level: LogLevel.INFO });
-        await this.sendResult?.(defaultResult as CdpSendCommandResult);
+        this.sendResult?.(defaultResult as CdpSendCommandResult);
     }
 
     // 源码搜索
@@ -414,7 +414,7 @@ export class CdpExecutor {
         // 返回结果
         defaultResult = { type: msg.type, id: msg.id, success: true, data: { matches: matches, pattern: pattern, count: matches.length } } as CdpGrepSourceResult;
         OutputLogToFile(`[CdpExecutor] Source code search completed successfully, tabId: ${tabId}, pattern: ${pattern}, matches: ${matches.length}`, { level: LogLevel.INFO });
-        await this.sendResult?.(defaultResult as CdpGrepSourceResult);
+        this.sendResult?.(defaultResult as CdpGrepSourceResult);
     }
 
     // 获取网络日志
@@ -462,7 +462,7 @@ export class CdpExecutor {
 
         defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId, logs: logs, count: logs.length, total: total, grouped: msg.data.groupByRequest && !msg.data.requestId } } as CdpGetNetworkLogsResult;
         OutputLogToFile(`[CdpExecutor] Retrieved network logs successfully, tabId: ${msg.data.tabId}, returned: ${logs.length}, total: ${total}`, { level: LogLevel.INFO });
-        await this.sendResult?.(defaultResult as CdpGetNetworkLogsResult);
+        this.sendResult?.(defaultResult as CdpGetNetworkLogsResult);
     }
 
     // 获取控制台日志
@@ -502,7 +502,7 @@ export class CdpExecutor {
 
         defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId, logs: logs, count: logs.length, total: total } } as CdpGetConsoleLogsResult;
         OutputLogToFile(`[CdpExecutor] Retrieved console logs successfully, tabId: ${msg.data.tabId}, returned: ${logs.length}, total: ${total}`, { level: LogLevel.INFO });
-        await this.sendResult?.(defaultResult as CdpGetConsoleLogsResult);
+        this.sendResult?.(defaultResult as CdpGetConsoleLogsResult);
     }
 
     // 初始化网络日志收集
@@ -528,7 +528,7 @@ export class CdpExecutor {
 
         defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId, message: 'Network logs collection enabled' } } as CdpInitNetworkLogsResult;
         OutputLogToFile(`[CdpExecutor] Network log collection initialized successfully, tabId: ${msg.data.tabId}`, { level: LogLevel.INFO });
-        await this.sendResult?.(defaultResult as CdpInitNetworkLogsResult);
+        this.sendResult?.(defaultResult as CdpInitNetworkLogsResult);
 
         // 注意：不断开连接，以便持续收集日志
     }
@@ -556,7 +556,7 @@ export class CdpExecutor {
 
         defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId, message: 'Console logs collection enabled' } } as CdpInitConsoleLogsResult;
         OutputLogToFile(`[CdpExecutor] Console log collection initialized successfully, tabId: ${msg.data.tabId}`, { level: LogLevel.INFO });
-        await this.sendResult?.(defaultResult as CdpInitConsoleLogsResult);
+        this.sendResult?.(defaultResult as CdpInitConsoleLogsResult);
 
         // 注意：不断开连接，以便持续收集日志
     }
