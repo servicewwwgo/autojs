@@ -1,7 +1,7 @@
 import { EnsureCDPConnected, DisconnectCDP, OutputLogToFile, LogLevel } from '../utils';
 import { BaseInstruction, ExecutorStatus, InstructionResult, WSMessage } from '../types';
 import { BaseInstructionClass, InstructionFactory } from '../instructions';
-import { InstructionManager, ResultManager } from '../managers';
+import { InstructionManager, ResultManager, tabManager } from '../managers';
 
 /**
  * 指令执行器
@@ -101,6 +101,7 @@ export class InstructionExecutor {
     this.stopRequested = true;
     this.isRunning = false;
     this.isPaused = false;
+    this.resultManager.ClearAll();
     OutputLogToFile(`[InstructionExecutor] Execution stopped, statistics: total=${this.executedCount}, success=${this.successCount}, failed=${this.errorCount}`, { level: LogLevel.INFO });
   }
 
@@ -150,6 +151,11 @@ export class InstructionExecutor {
 
       for (const tabId of tabIds) {
         try {
+          // 如果标签页未激活，则跳过
+          if (false === tabManager.IsActivated(tabId)) {
+            continue;
+          }
+
           // 确保 CDP 已连接到标签页（执行 CDP 命令的前提条件）
           await EnsureCDPConnected(tabId);
 
@@ -163,6 +169,8 @@ export class InstructionExecutor {
 
             // 执行指令，获取执行结果
             const result: InstructionResult = await instruction.Execute();
+
+            this.sendResult?.(result);
 
             // 更新执行统计信息
             this.executedCount++; // 总执行数 +1
