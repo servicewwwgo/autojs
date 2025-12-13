@@ -9,9 +9,9 @@ export default defineConfig({
   browser: 'chrome',
   // 配置manifest版本
   manifest: {
-    version: '1.0.0',
-    name: 'Web自动化爬虫',
-    description: '基于WXT+Vue的Chrome浏览器扩展爬虫系统',
+    version: '1.0.2',
+    name: '自动化网页',
+    description: '基于WXT+Vue的Chrome浏览器自动化系统',
     permissions: [
       'activeTab',
       'tabs',
