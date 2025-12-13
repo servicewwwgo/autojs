@@ -2,7 +2,7 @@ import type { BaseInstruction, InstructionResult, ContentScriptMessageType } fro
 import { SendMessageToContentScript, ExecuteCDPCommand, OutputLogToFile, LogLevel } from '../utils';
 
 /**
- * 基础指令对象接口
+ * 基础指令对象接口 - 针对标签页的命令
  */
 export abstract class BaseInstructionClass implements BaseInstruction {
     public tabId: number;
