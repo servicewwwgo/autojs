@@ -21,9 +21,19 @@ export class InstructionExecutor {
 
   private startTime: number = Date.now();
 
+  private sendResult: ((result: InstructionResult) => void) | undefined;
+
   constructor() {
     this.instructionManager = new InstructionManager();
     this.resultManager = new ResultManager();
+  }
+
+  /**
+   * 设置发送指令结果的函数
+   * @param sendResult - 发送指令结果的函数
+   */
+  public setSendResult(sendResult: (result: InstructionResult) => void): void {
+    this.sendResult = sendResult;
   }
 
   /**
@@ -119,10 +129,7 @@ export class InstructionExecutor {
     this.isRunning = true;
     this.isPaused = false;
     this.stopRequested = false;
-    this.executedCount = 0;
-    this.successCount = 0;
-    this.errorCount = 0;
-    this.startTime = Date.now();
+
     OutputLogToFile(`[InstructionExecutor] Execution started, pending instructions: ${instructions.length}`, { level: LogLevel.INFO });
 
     // 执行指令循环（FIFO 队列）
@@ -175,6 +182,11 @@ export class InstructionExecutor {
         }
       }
     }
+
+    this.isRunning = false;
+    this.isPaused = false;
+    this.stopRequested = true;
+    OutputLogToFile(`[InstructionExecutor] Execution finished, statistics: total=${this.executedCount}, success=${this.successCount}, failed=${this.errorCount}`, { level: LogLevel.INFO });
   }
 
   /**

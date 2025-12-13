@@ -1,5 +1,5 @@
 import { defineBackground } from 'wxt/utils/define-background';
-import { BackgroundScriptMessageType, ExecutorStatus, TabInfo, Instruction, WSMessage, CdpMessage, CdpResult } from '../types';
+import { BackgroundScriptMessageType, ExecutorStatus, TabInfo, Instruction, WSMessage, CdpMessage, CdpResult, InstructionResult } from '../types';
 import { InstructionFactory, BaseInstructionClass } from '../instructions';
 import { nodeConfig, tabManager } from '../managers';
 import { InstructionExecutor, CdpExecutor, wsConnector } from '../executor';
@@ -357,30 +357,40 @@ export default defineBackground(() => {
         }
     });
 
-    // 扩展安装时的初始化
-    browser.runtime.onInstalled.addListener(async () => {
-        // 输出日志
-        OutputLogToFile('[Background] Extension installed, initializing', { level: LogLevel.INFO });
+    // Chrome 程序启动时
+    browser.runtime.onStartup.addListener(async () => {
+        OutputLogToFile('[Background] Chrome program started, initializing', { level: LogLevel.INFO });
 
         // 获取节点配置
         await nodeConfig.GetNodeProfile();
 
         // 注册消息类型处理器 - 执行指令（通过 WebSocket 消息）
-        wsConnector.registerMessageTypeHandler('instructions', instructionExecutor.handleMessage.bind(instructionExecutor));
+        wsConnector.registerMessageTypeHandler('instructions', async (message: WSMessage): Promise<void> => {
+            await instructionExecutor.handleMessage(message);
+        });
+
+        // 设置指令执行器的结果发送回调
+        instructionExecutor.setSendResult((result: InstructionResult): void => {
+            // 通过 WebSocket 发送指令结果
+            wsConnector.sendMessage({ type: 'instructions', data: result } as WSMessage);
+        });
 
         // 注册 cdp 执行器的统一消息处理器（所有 CDP 相关消息都通过 handleMessage 处理）
         wsConnector.registerMessageTypeHandler('cdp', async (message: WSMessage): Promise<void> => {
-            // WSMessage.data 包含 CdpMessage
-            const cdpMessage = message.data as CdpMessage;
-            await cdpExecutor.handleMessage(cdpMessage);
+            await cdpExecutor.handleMessage(message.data as CdpMessage);
         });
 
         // 设置 CDP 执行器的结果发送回调
-        cdpExecutor.setSendResult(async (result: CdpResult): Promise<void> => {
+        cdpExecutor.setSendResult((result: CdpResult): void => {
             // 通过 WebSocket 发送 CDP 结果
-            const message: WSMessage = { type: 'cdp', data: result };
-            wsConnector.sendMessage(message);
+            wsConnector.sendMessage({ type: 'cdp', data: result } as WSMessage);
         });
+    });
+
+    // 扩展安装时的初始化
+    browser.runtime.onInstalled.addListener(async () => {
+        // 输出日志
+        OutputLogToFile('[Background] Extension installed, initializing', { level: LogLevel.INFO });
     });
 
     // 监听标签页激活
