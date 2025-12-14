@@ -387,6 +387,12 @@ export default defineBackground(() => {
         });
     });
 
+    // Chrome 程序暂停时
+    browser.runtime.onSuspend.addListener(async () => {
+        OutputLogToFile('[Background] Chrome program suspended, stopping execution', { level: LogLevel.INFO });
+        // instructionExecutor.Pause();
+    });
+
     // 扩展安装时的初始化
     browser.runtime.onInstalled.addListener(async () => {
         // 输出日志

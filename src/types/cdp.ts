@@ -13,7 +13,7 @@ export interface CdpMessage {
 export interface CdpResult {
     type: string;
     id: string;
-    success?: boolean;
+    success: boolean;
     error?: string;
     data?: any;
 }
