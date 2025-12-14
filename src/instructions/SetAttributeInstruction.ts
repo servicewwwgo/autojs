@@ -29,7 +29,7 @@ export class SetAttributeInstructionClass extends BaseInstructionClass {
 
     public async Execute(): Promise<InstructionResult> {
         const result = await this.Retry(async () => {
-            let defaultResult: InstructionResult = { instructionID: this.instructionID, success: false, duration: 0 };
+            let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
             // 从 elementManager 获取元素
             const element = elementManager.GetElementByName(this.tabId, this.elementName);

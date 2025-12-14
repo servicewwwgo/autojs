@@ -1,5 +1,5 @@
 import { defineBackground } from 'wxt/utils/define-background';
-import { BackgroundScriptMessageType, ExecutorStatus, TabInfo, Instruction, WSMessage, CdpMessage, CdpResult, InstructionResult } from '../types';
+import { BackgroundScriptMessageType, ExecutorStatus, TabInfo, Instruction, WSMessage, CdpMessage, CdpResult, InstructionResults } from '../types';
 import { InstructionFactory, BaseInstructionClass } from '../instructions';
 import { nodeConfig, tabManager } from '../managers';
 import { InstructionExecutor, CdpExecutor, wsConnector } from '../executor';
@@ -370,7 +370,7 @@ export default defineBackground(() => {
         });
 
         // 设置指令执行器的结果发送回调
-        instructionExecutor.setSendResult((result: InstructionResult): void => {
+        instructionExecutor.setSendResult((result: InstructionResults): void => {
             // 通过 WebSocket 发送指令结果
             wsConnector.sendMessage({ type: 'instructions', data: result } as WSMessage);
         });

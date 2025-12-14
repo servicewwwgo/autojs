@@ -6,55 +6,59 @@ import { OutputLogToFile, LogLevel } from '../utils';
  * 用于保存每一个指令执行后的结果
  */
 export class ResultManager {
-  private results: Map<string, InstructionResult> = new Map();
+  private results: Map<number, InstructionResult[]> = new Map();
 
   /**
    * 保存指令结果
    */
   public SaveResult(result: InstructionResult): void {
-    this.results.set(result.instructionID, result);
-    OutputLogToFile(`[ResultManager] Saved instruction result successfully, instructionID: ${result.instructionID}, success: ${result.success}`, { level: LogLevel.INFO });
+    let tabResults = this.results.get(result.tabId) ?? [];
+    tabResults.push(result);
+    this.results.set(result.tabId, tabResults);
+    OutputLogToFile(`[ResultManager] Saved tab result successfully, tabId: ${result.tabId}, success: ${result.success}`, { level: LogLevel.INFO });
   }
 
   /**
-   * 获取指令结果
+   * 获取标签页结果
    */
-  public GetResult(instructionID: string): InstructionResult | undefined {
-    return this.results.get(instructionID);
+  public GetResult(tabId: number): InstructionResult[] | undefined {
+    return this.results.get(tabId);
   }
 
   /**
-   * 获取所有结果
+   * 获取标签页结果
+   */
+  public GetResultAndDelete(tabId: number): InstructionResult[] | undefined {
+    const results = this.results.get(tabId);
+
+    if (results && results.length > 0) {
+      this.results.delete(tabId);
+    }
+
+    return results;
+  }
+
+  /**
+   * 清除指定标签页的结果
+   */
+  public ClearResult(tabId: number): void {
+    this.results.delete(tabId);
+    OutputLogToFile(`[ResultManager] Cleared tab result successfully, tabId: ${tabId}`, { level: LogLevel.INFO });
+  }
+
+  /**
+   * 获取所有标签页结果
    */
   public GetAllResults(): InstructionResult[] {
-    return Array.from(this.results.values());
+    return Array.from(this.results.values()).flat();
   }
 
   /**
-   * 清除所有结果
+   * 清除所有标签页结果
    */
   public ClearAll(): void {
     const count = this.results.size;
     this.results.clear();
-    OutputLogToFile(`[ResultManager] Cleared all results successfully, count: ${count}`, { level: LogLevel.INFO });
-  }
-
-  /**
-   * 清除指定指令的结果
-   */
-  public ClearResult(instructionID: string): void {
-    const deleted = this.results.delete(instructionID);
-    if (deleted) {
-      OutputLogToFile(`[ResultManager] Cleared instruction result successfully, instructionID: ${instructionID}`, { level: LogLevel.INFO });
-    }
-  }
-
-  /**
-   * 批量获取结果
-   */
-  public GetResults(instructionIDs: string[]): InstructionResult[] {
-    return instructionIDs
-      .map(id => this.results.get(id))
-      .filter((result): result is InstructionResult => result !== undefined);
+    OutputLogToFile(`[ResultManager] Cleared all tab results successfully, count: ${count}`, { level: LogLevel.INFO });
   }
 }

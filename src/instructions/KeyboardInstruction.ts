@@ -235,7 +235,7 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
      */
     public async Execute(): Promise<InstructionResult> {
         const result = await this.Retry(async () => {
-            let defaultResult: InstructionResult = { instructionID: this.instructionID, success: false, duration: 0 };
+            let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
             // 准备元素（聚焦、滚动等）
             const prepareResult = await this.prepareElement();

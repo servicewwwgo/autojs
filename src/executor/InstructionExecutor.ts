@@ -1,5 +1,5 @@
 import { EnsureCDPConnected, DisconnectCDP, OutputLogToFile, LogLevel } from '../utils';
-import { BaseInstruction, ExecutorStatus, InstructionResult, WSMessage } from '../types';
+import { BaseInstruction, ExecutorStatus, InstructionResult, InstructionResults, WSMessage } from '../types';
 import { BaseInstructionClass, InstructionFactory } from '../instructions';
 import { InstructionManager, ResultManager, tabManager } from '../managers';
 
@@ -21,7 +21,7 @@ export class InstructionExecutor {
 
   private startTime: number = Date.now();
 
-  private sendResult: ((result: InstructionResult) => void) | undefined;
+  private sendResult: ((result: InstructionResults) => void) | undefined;
 
   constructor() {
     this.instructionManager = new InstructionManager();
@@ -32,7 +32,7 @@ export class InstructionExecutor {
    * 设置发送指令结果的函数
    * @param sendResult - 发送指令结果的函数
    */
-  public setSendResult(sendResult: (result: InstructionResult) => void): void {
+  public setSendResult(sendResult: (result: InstructionResults) => void): void {
     this.sendResult = sendResult;
   }
 
@@ -170,8 +170,6 @@ export class InstructionExecutor {
             // 执行指令，获取执行结果
             const result: InstructionResult = await instruction.Execute();
 
-            this.sendResult?.(result);
-
             // 更新执行统计信息
             this.executedCount++; // 总执行数 +1
 
@@ -185,6 +183,9 @@ export class InstructionExecutor {
 
             this.resultManager.SaveResult(result);
           }
+
+          const results = this.resultManager.GetResultAndDelete(tabId) ?? [];
+          this.sendResult?.({ tabId: tabId, results: results });
         } finally {
           await DisconnectCDP(tabId);
         }

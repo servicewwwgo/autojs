@@ -21,11 +21,20 @@ export interface ElementData {
  * 指令结果类型
  */
 export interface InstructionResult {
+  tabId: number;
   instructionID: string;
   success: boolean;
   error?: string;
   duration: number;
   data?: any;
+}
+
+/**
+ * 指令结果列表类型
+ */
+export interface InstructionResults {
+  tabId: number;
+  results: InstructionResult[];
 }
 
 /**

@@ -20,7 +20,7 @@ export { SetAttributeInstruction } from './instruction';
 export { NavigateInstruction } from './instruction';
 export { ScreenshotInstruction } from './instruction';
 export { ExecuteScriptInstruction } from './instruction';
-export { InstructionResult } from './instruction';
+export { InstructionResult, InstructionResults } from './instruction';
 
 export { ContentScriptMessageType } from './content';
 export { BackgroundScriptMessageType } from './background';

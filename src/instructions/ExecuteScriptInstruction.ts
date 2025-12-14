@@ -65,7 +65,7 @@ export class ExecuteScriptInstructionClass extends BaseInstructionClass {
 
   public async Execute(): Promise<InstructionResult> {
     const result = await this.Retry(async () => {
-      let defaultResult: InstructionResult = { instructionID: this.instructionID, success: false, duration: 0 };
+      let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
       // 构建 Runtime.evaluate 参数对象，尽可能原样还原 CDP 接口
       const params: any = {

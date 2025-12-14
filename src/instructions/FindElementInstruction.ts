@@ -324,11 +324,11 @@ export class FindElementInstructionClass extends BaseInstructionClass {
                         if (Math.abs(candidateIndex - siblingIndex) === 1) {
                             return candidateNodeId;
                         }
-                        }
-                    } catch (error) {
-                        OutputLogToFile(`[FindElementInstruction] Error checking sibling relation for node ${candidateNodeId}: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
-                        continue; // 继续检查下一个节点
                     }
+                } catch (error) {
+                    OutputLogToFile(`[FindElementInstruction] Error checking sibling relation for node ${candidateNodeId}: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
+                    continue; // 继续检查下一个节点
+                }
             }
 
             return undefined;
@@ -536,7 +536,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
     public async Execute(): Promise<InstructionResult> {
         const result = await this.Retry(async () => {
 
-            let defaultResult: InstructionResult = { instructionID: this.instructionID, success: false, duration: 0 };
+            let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
             // 启用 DOM 域
             await this.ExecuteCDPCommand('DOM.enable');

@@ -24,7 +24,7 @@ export class NavigateInstructionClass extends BaseInstructionClass {
      */
     public async Execute(): Promise<InstructionResult> {
         const result = await this.Retry(async () => {
-            let defaultResult: InstructionResult = { instructionID: this.instructionID, success: false, duration: 0 };
+            let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
             // 如果设置了延迟，先等待
             await this.Delay(this.delay);
