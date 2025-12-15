@@ -73,9 +73,7 @@ export default defineBackground(() => {
             const tabIndex = sender.tab.index;
             const url = message.params?.url as string || sender.tab.url as string || '';
             tabManager.RecordActivatedTab(tabId, tabIndex, url);
-            // 添加測試指令
-            instructionExecutor.GetInstructionManager().DeleteInstructionsByTabId(tabId);
-            await add_example_instructions(tabId);
+
             OutputLogToFile(`[Background] Content script ready, tabId: ${tabId}, URL: ${url}`, { level: LogLevel.INFO });
 
             sendResponse({ success: true, data: { tabId, tabIndex, url } });
@@ -407,12 +405,12 @@ export default defineBackground(() => {
         });
 
         // 连接 WebSocket
-        // await wsConnector.connect();
+        await wsConnector.connect();
 
-        // 激活所有标签页
+        // 重载所有标签页
         const tabs = await browser.tabs.query({});
         for (const tab of tabs) {
-            await browser.tabs.update(tab.id as number, { active: true });
+            await browser.tabs.reload(tab.id as number);
         }
     });
 
