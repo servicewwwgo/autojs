@@ -30,6 +30,7 @@ export class InstructionManager {
         if (!instructionsByTab.has(instruction.tabId)) {
           instructionsByTab.set(instruction.tabId, []);
         }
+        OutputLogToFile(`[InstructionManager] Adding instruction to tab, tabId: ${instruction.tabId}, instruction: ${JSON.stringify(instruction)}`, { level: LogLevel.INFO });
         instructionsByTab.get(instruction.tabId)!.push(instruction);
       }
     }
