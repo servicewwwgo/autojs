@@ -368,6 +368,14 @@ export default defineBackground(() => {
         // instructionExecutor.Pause();
     });
 
+    // 点击扩展图标时打开侧边栏
+    browser.action.onClicked.addListener(async (tab) => {
+        if (tab.id) {
+            await browser.sidePanel.open({ tabId: tab.id });
+            OutputLogToFile(`[Background] Side panel opened for tab ${tab.id}`, { level: LogLevel.INFO });
+        }
+    });
+
     // 扩展安装时的初始化
     browser.runtime.onInstalled.addListener(async () => {
         // 输出日志
@@ -400,6 +408,12 @@ export default defineBackground(() => {
 
         // 连接 WebSocket
         // await wsConnector.connect();
+
+        // 激活所有标签页
+        const tabs = await browser.tabs.query({});
+        for (const tab of tabs) {
+            await browser.tabs.update(tab.id as number, { active: true });
+        }
     });
 
     // 监听标签页激活

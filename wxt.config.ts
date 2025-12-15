@@ -19,11 +19,18 @@ export default defineConfig({
       'scripting',
       'alarms',
       'debugger',
-      'nativeMessaging'
+      'nativeMessaging',
+      'sidePanel'
     ],
     host_permissions: [
       '<all_urls>'
-    ]
+    ],
+    side_panel: {
+      default_path: 'sidepanel.html'
+    },
+    action: {
+      default_title: '打开SemiAutoJs侧边栏'
+    }
   },
   dev: {
     server: {

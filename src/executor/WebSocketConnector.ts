@@ -1,5 +1,5 @@
 import { WEBSOCKET_CONN_URL } from '../consts';
-import type { WSMessage, WSLoginMessage, WSLoginResponse, WSHeartbeatMessage, WSHeartbeatResponse, WSErrorMessage } from '../types';
+import type { WSMessage, WSLoginMessage, WSLoginResponse, WSHeartbeatMessage, WSHeartbeatResponse, WSErrorMessage, TabInfo } from '../types';
 import { OutputLogToFile, LogLevel } from '../utils';
 import { nodeConfig } from '../managers';
 
@@ -84,6 +84,11 @@ export class WebSocketConnector {
                 this.sendLoginMessage().catch(() => {
                     OutputLogToFile('[WebSocket] Failed to send login message', { level: LogLevel.ERROR });
                     this.cleanupWebSocket();
+                });
+
+                // 发送所有标签页信息
+                this.sendAllTabsInfo().catch(() => {
+                    OutputLogToFile('[WebSocket] Failed to send all tabs info', { level: LogLevel.ERROR });
                 });
 
                 this.startHeartbeat();
@@ -268,6 +273,26 @@ export class WebSocketConnector {
         const jsonString = JSON.stringify(message);
 
         this.ws?.send(jsonString);
+
+        return true;
+    }
+
+    /**
+     * 发送所有标签页信息
+     */
+    private async sendAllTabsInfo(): Promise<boolean> {
+        const tabs = await browser.tabs.query({});
+
+        for (const tab of tabs) {
+            const message: WSMessage = {
+                type: 'tabs', data: {
+                    tabId: tab.id as number,
+                    tabIndex: tab.index as number,
+                    url: tab.url as string
+                } as TabInfo
+            } as WSMessage;
+            this.sendMessage(message);
+        }
 
         return true;
     }

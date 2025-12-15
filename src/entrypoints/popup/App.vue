@@ -40,10 +40,13 @@ const tabs = [
 
 <style scoped>
 .app {
-  width: 600px;
-  min-height: 500px;
+  width: 100%;
+  min-width: 400px;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  position: relative;
 }
 
 .header {
@@ -51,6 +54,7 @@ const tabs = [
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .header h1 {
@@ -69,6 +73,7 @@ const tabs = [
   display: flex;
   border-bottom: 1px solid #e0e0e0;
   background: #f5f5f5;
+  flex-shrink: 0;
 }
 
 .tab-button {
@@ -96,5 +101,8 @@ const tabs = [
   flex: 1;
   padding: 20px;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  /* 确保flex布局正确计算高度 */
 }
 </style>
