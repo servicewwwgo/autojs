@@ -134,7 +134,12 @@ export class InstructionExecutor {
     OutputLogToFile(`[InstructionExecutor] Execution started, pending instructions: ${instructions.length}`, { level: LogLevel.INFO });
 
     // 执行指令循环（FIFO 队列）
-    while (!this.stopRequested) {
+    for (let i = 0; i < 10; i++) {
+      // 如果请求停止，则退出循环
+      if (this.stopRequested) {
+        break;
+      }
+
       // 如果执行器被暂停，等待恢复
       if (this.isPaused) {
         await this.Delay(100);
@@ -143,10 +148,8 @@ export class InstructionExecutor {
 
       const tabIds = this.instructionManager.GetAllTabIds();
 
-      // 如果没有标签页，则等待 100 毫秒后再次检查
       if (tabIds.length === 0) {
-        await this.Delay(100);
-        continue;
+        break;
       }
 
       for (const tabId of tabIds) {
