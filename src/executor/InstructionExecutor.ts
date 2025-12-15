@@ -1,7 +1,7 @@
 import { EnsureCDPConnected, DisconnectCDP, OutputLogToFile, LogLevel } from '../utils';
 import { BaseInstruction, ExecutorStatus, InstructionResult, InstructionResults, WSMessage } from '../types';
 import { BaseInstructionClass, InstructionFactory } from '../instructions';
-import { InstructionManager, ResultManager, tabManager } from '../managers';
+import { InstructionManager, ResultManager } from '../managers';
 
 /**
  * 指令执行器
@@ -151,8 +151,11 @@ export class InstructionExecutor {
 
       for (const tabId of tabIds) {
         try {
-          // 如果标签页未激活，则跳过
-          if (false === tabManager.IsActivated(tabId)) {
+          // 如果标签页不存在，则跳过
+          const tab = await browser.tabs.get(tabId);
+
+          if (!tab || tab.id !== tabId) {
+            OutputLogToFile(`[InstructionExecutor] Tab not found or ID mismatch, tabId: ${tabId}`, { level: LogLevel.WARN });
             continue;
           }
 

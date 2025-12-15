@@ -87,9 +87,9 @@ export class WebSocketConnector {
                 });
 
                 // 发送所有标签页信息
-                // this.sendAllTabsInfo().catch(() => {
-                //     OutputLogToFile('[WebSocket] Failed to send all tabs info', { level: LogLevel.ERROR });
-                // });
+                this.sendAllTabsInfo().catch(() => {
+                    OutputLogToFile('[WebSocket] Failed to send all tabs info', { level: LogLevel.ERROR });
+                });
 
                 this.startHeartbeat();
                 this.clearReconnectTimer();

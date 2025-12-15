@@ -4,19 +4,6 @@ import { BackgroundScriptMessageType, ContentScriptMessageType } from '../types'
 import { SendMessageToBackgroundScript, EscapeCSSSelector, OutputLogToFile, LogLevel } from '../utils';
 
 /**
- * 通知 background script 内容脚本已加载完成
- */
-async function notifyContentScriptReady() {
-  const response = await SendMessageToBackgroundScript({ type: 'contentScriptReady', params: { url: window.location.href } } as BackgroundScriptMessageType);
-
-  if (response.success) {
-    OutputLogToFile('[Content] Notified background script successfully', { level: LogLevel.INFO });
-  } else {
-    OutputLogToFile(`[Content] Failed to notify background script: ${response.error}`, { level: LogLevel.ERROR });
-  }
-}
-
-/**
  * 隐藏 navigator.webdriver 属性
  * 用于防止网站检测到自动化工具
  * 
@@ -468,19 +455,5 @@ export default defineContentScript({
         sendResponse({ success: false, error: `Unknown message type: ${message.type}` });
       }
     });
-
-    // 等待 DOM 加载完成后再通知 background script
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        notifyContentScriptReady().catch((error) => {
-          OutputLogToFile(`[Content] Failed to notify content script ready: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
-        });
-      });
-    } else {
-      // DOM 已经加载完成
-      notifyContentScriptReady().catch((error) => {
-        OutputLogToFile(`[Content] Failed to notify content script ready: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
-      });
-    }
   }
 });

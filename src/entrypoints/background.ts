@@ -1,7 +1,7 @@
 import { defineBackground } from 'wxt/utils/define-background';
 import { BackgroundScriptMessageType, ExecutorStatus, TabInfo, Instruction, WSMessage, CdpMessage, CdpResult, InstructionResults } from '../types';
 import { InstructionFactory, BaseInstructionClass } from '../instructions';
-import { nodeConfig, tabManager } from '../managers';
+import { nodeConfig } from '../managers';
 import { InstructionExecutor, CdpExecutor, wsConnector } from '../executor';
 import { example } from '../example';
 import { OutputLogToFile, LogLevel } from '../utils';
@@ -47,9 +47,15 @@ export default defineBackground(() => {
 
     async function get_tabs(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 获取所有标签页
-        const tabs = await tabManager.GetAllTabs();
+        const tabs = await browser.tabs.query({});
         OutputLogToFile(`[Background] Retrieved tabs list successfully, count: ${tabs.length}`, { level: LogLevel.INFO });
-        sendResponse({ success: true, data: tabs });
+        sendResponse({
+            success: true, data: tabs.map((tab) => ({
+                tabId: tab.id as number,
+                tabIndex: tab.index as number,
+                url: tab.url as string,
+            })) as TabInfo[]
+        });
     }
 
     async function get_node_profile(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
@@ -64,23 +70,6 @@ export default defineBackground(() => {
         await nodeConfig.UpdateNodeProfile(message.params as { node_name?: string; node_token?: string });
         OutputLogToFile(`[Background] Updated node profile successfully`, { level: LogLevel.INFO });
         sendResponse({ success: true });
-    }
-
-    async function contentScriptReady(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
-        // 内容脚本上线，在标签页管理器中添加标签页对象
-        if (sender.tab?.id) {
-            const tabId = sender.tab.id;
-            const tabIndex = sender.tab.index;
-            const url = message.params?.url as string || sender.tab.url as string || '';
-            tabManager.RecordActivatedTab(tabId, tabIndex, url);
-
-            OutputLogToFile(`[Background] Content script ready, tabId: ${tabId}, URL: ${url}`, { level: LogLevel.INFO });
-
-            sendResponse({ success: true, data: { tabId, tabIndex, url } });
-        } else {
-            OutputLogToFile(`[Background] Content script ready failed: unable to get tabId`, { level: LogLevel.ERROR });
-            sendResponse({ success: false, error: '无法获取标签页ID' });
-        }
     }
 
     async function add_instructions(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
@@ -246,7 +235,6 @@ export default defineBackground(() => {
         'get_tabs': get_tabs,
         'get_node_profile': get_node_profile,
         'update_node_profile': update_node_profile,
-        'contentScriptReady': contentScriptReady,
         'add_instructions': add_instructions,
         'execute_instructions': execute_instructions,
         'pause_execution': pause_execution,
@@ -417,11 +405,6 @@ export default defineBackground(() => {
     // 监听标签页激活
     browser.tabs.onActivated.addListener(async (activeInfo) => {
         const tab = await browser.tabs.get(activeInfo.tabId);
-        if (tab && tab.url) {
-            tabManager.RecordActivatedTab(activeInfo.tabId, tab.index, tab.url);
-            OutputLogToFile(`[Background] Tab activated, tabId: ${activeInfo.tabId}, URL: ${tab.url}`, { level: LogLevel.INFO });
-        }
-
         // 发送标签页激活消息到服务器
         const message: WSMessage = { type: "tabs", data: { tabId: activeInfo.tabId as number, tabIndex: tab.index, url: tab.url as string } as TabInfo };
         wsConnector.sendMessage(message);
@@ -430,7 +413,6 @@ export default defineBackground(() => {
     // 监听标签页更新
     browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         if (changeInfo.status === 'complete' && tab && tab.url) {
-            tabManager.RecordActivatedTab(tabId, tab.index, tab.url);
             OutputLogToFile(`[Background] Tab updated, tabId: ${tabId}, URL: ${tab.url}`, { level: LogLevel.INFO });
         }
         // 发送标签页更新消息到服务器
@@ -440,7 +422,6 @@ export default defineBackground(() => {
 
     // 监听标签页关闭
     browser.tabs.onRemoved.addListener((tabId) => {
-        tabManager.RemoveActivatedTab(tabId);
         instructionExecutor.GetInstructionManager().DeleteInstructionsByTabId(tabId);
         // 清理该标签页的日志
         cdpExecutor.clearConsoleLogs(tabId);

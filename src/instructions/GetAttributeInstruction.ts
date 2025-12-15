@@ -1,6 +1,7 @@
 import type { GetAttributeInstruction, InstructionResult } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
 import { elementManager } from '../managers';
+import { OutputLogToFile, LogLevel } from '../utils';
 
 /**
  * 获取元素属性指令
@@ -43,21 +44,14 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
         return { ...defaultResult, error: `Element "${this.elementName}" has no tag. Make sure the element was found using FindElementInstruction first.` };
       }
 
-      // 发送消息到 content script 获取属性
-      const response: any = await this.SendMessageToContentScript({
-        type: 'get_attribute',
-        params: {
-          tag: tag,
-          attribute: this.attribute || 'text'
-        }
+      // 使用 CDP 协议获取元素属性
+      const attributes = await this.ExecuteCDPCommand('DOM.getAttributes', {
+        nodeId: element.GetNodeId(),
       });
 
-      // 检查响应是否成功
-      if (!response || !response.success) {
-        return { ...defaultResult, error: response?.error || `Failed to get attribute "${this.attribute || 'text'}" for element "${this.elementName}"` };
-      }
+      OutputLogToFile(`[GetAttributeInstruction] Attributes: ${JSON.stringify(attributes)}`, { level: LogLevel.INFO });
 
-      return { ...defaultResult, success: true, data: { usage: this.usage, value: response.data ?? undefined } };
+      return { ...defaultResult, success: true, data: { usage: this.usage, value: "test" } };
     });
 
     return result;
