@@ -134,20 +134,11 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
             return { success: false, error: `Element "${this.elementName}" has no nodeId. Make sure the element was found using FindElementInstruction first.` };
         }
 
-        // 如果元素有 tag，滚动到元素位置
-        if (tag) {
-            const scrollResponse: any = await this.SendMessageToContentScript({
-                type: 'scroll_into_view',
-                params: { tag: tag }
-            });
-
-            if (!scrollResponse || !scrollResponse.success) {
-                return { success: false, error: `Failed to scroll to element "${this.elementName}": ${scrollResponse?.error}` };
-            }
-        }
-
-        // 启用 DOM 域并聚焦元素
+        // 启用 DOM 域
         await this.ExecuteCDPCommand('DOM.enable');
+        // 滚动到元素位置
+        await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: nodeId });
+        // 聚焦元素
         await this.ExecuteCDPCommand('DOM.focus', { nodeId: nodeId });
 
         return { success: true };
