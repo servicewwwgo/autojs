@@ -264,7 +264,12 @@ export class WebSocketConnector {
     private async sendLoginMessage(): Promise<boolean> {
         const profile = await nodeConfig.GetNodeProfile();
         const message: WSLoginMessage = { type: 'login', data: profile } as WSLoginMessage;
-        return this.sendMessage(message);
+
+        const jsonString = JSON.stringify(message);
+
+        this.ws?.send(jsonString);
+
+        return true;
     }
 
     /**

@@ -89,8 +89,9 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { BackgroundScriptMessageType, ExecutorStatus, TabInfo } from '../../../types';
 import { SendMessageToBackgroundScript } from '../../../utils';
+import { WEBSOCKET_CONN_URL } from '../../../consts';
 
-const wsUrl = ref('ws://localhost:8080');
+const wsUrl = ref(WEBSOCKET_CONN_URL);
 const message = ref('');
 const messageType = ref<'success' | 'error'>('success');
 const isConnected = ref(false);

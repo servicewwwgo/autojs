@@ -360,6 +360,18 @@ export default defineBackground(() => {
     // Chrome 程序启动时
     browser.runtime.onStartup.addListener(async () => {
         OutputLogToFile('[Background] Chrome program started, initializing', { level: LogLevel.INFO });
+    });
+
+    // Chrome 程序暂停时
+    browser.runtime.onSuspend.addListener(async () => {
+        OutputLogToFile('[Background] Chrome program suspended, stopping execution', { level: LogLevel.INFO });
+        // instructionExecutor.Pause();
+    });
+
+    // 扩展安装时的初始化
+    browser.runtime.onInstalled.addListener(async () => {
+        // 输出日志
+        OutputLogToFile('[Background] Extension installed, initializing', { level: LogLevel.INFO });
 
         // 获取节点配置
         await nodeConfig.GetNodeProfile();
@@ -385,18 +397,9 @@ export default defineBackground(() => {
             // 通过 WebSocket 发送 CDP 结果
             wsConnector.sendMessage({ type: 'cdp', data: result } as WSMessage);
         });
-    });
 
-    // Chrome 程序暂停时
-    browser.runtime.onSuspend.addListener(async () => {
-        OutputLogToFile('[Background] Chrome program suspended, stopping execution', { level: LogLevel.INFO });
-        // instructionExecutor.Pause();
-    });
-
-    // 扩展安装时的初始化
-    browser.runtime.onInstalled.addListener(async () => {
-        // 输出日志
-        OutputLogToFile('[Background] Extension installed, initializing', { level: LogLevel.INFO });
+        // 连接 WebSocket
+        // await wsConnector.connect();
     });
 
     // 监听标签页激活

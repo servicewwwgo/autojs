@@ -11,7 +11,7 @@ export class InstructionExecutor {
   private instructionManager: InstructionManager;
   private resultManager: ResultManager;
 
-  private isRunning: boolean = true;
+  private isRunning: boolean = false;
   private isPaused: boolean = false;
   private stopRequested: boolean = false;
 
