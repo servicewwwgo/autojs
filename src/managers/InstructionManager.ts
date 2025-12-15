@@ -97,8 +97,13 @@ export class InstructionManager {
       // 从数组头部取出第一个指令（FIFO）
       const instruction = instructions.shift();
       if (instruction) {
-        // 更新指令列表（shift 已修改原数组，这里确保 Map 中的引用正确）
-        this.instructionsMap.set(tabId, instructions);
+        // 如果数组为空，删除对应的 key
+        if (instructions.length === 0) {
+          this.instructionsMap.delete(tabId);
+        } else {
+          // 更新指令列表（shift 已修改原数组，这里确保 Map 中的引用正确）
+          this.instructionsMap.set(tabId, instructions);
+        }
         return instruction;
       }
     }
@@ -121,7 +126,12 @@ export class InstructionManager {
     const instructions = this.instructionsMap.get(tabId);
     if (instructions) {
       const filtered = instructions.filter(inst => inst.created_at > created_at);
-      this.instructionsMap.set(tabId, filtered);
+      // 如果过滤后数组为空，删除对应的 key
+      if (filtered.length === 0) {
+        this.instructionsMap.delete(tabId);
+      } else {
+        this.instructionsMap.set(tabId, filtered);
+      }
     }
   }
 }
