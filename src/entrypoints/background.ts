@@ -18,6 +18,9 @@ export default defineBackground(() => {
     // 初始化WebSocket连接器
     const wsConnector: WebSocketConnector = new WebSocketConnector(WEBSOCKET_CONN_URL);
 
+    // 立即设置回调，确保消息处理器在任何 WebSocket 连接建立之前就已经注册
+    // 注意：set_callbacks 函数在后面定义，但这里先声明，稍后调用
+
     async function add_example_instructions(tabId: number) {
         const now = Date.now();
 
@@ -388,8 +391,7 @@ export default defineBackground(() => {
         }
     });
 
-    // 确保定时任务存在的辅助函数
-    async function ensureAlarmsExist(): Promise<void> {
+    async function initialize(): Promise<void> {
         try {
             // 检查定时任务是否已存在
             const existingAlarm = await browser.alarms.get('connect_websocket');
@@ -398,6 +400,9 @@ export default defineBackground(() => {
                 browser.alarms.create('connect_websocket', { periodInMinutes: 1, delayInMinutes: 0 });
                 OutputLogToFile('[Background] Created connect_websocket alarm', { level: LogLevel.INFO });
             }
+
+            // 设置回调
+            set_callbacks().catch(error => OutputLogToFile(`[Background] Failed to set callbacks: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR }));
         } catch (error) {
             OutputLogToFile(`[Background] Failed to ensure alarms exist: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
         }
@@ -406,8 +411,7 @@ export default defineBackground(() => {
     // 监听 Chrome 程序启动
     browser.runtime.onStartup.addListener(async () => {
         OutputLogToFile('[Background] Chrome program started, initializing', { level: LogLevel.INFO });
-        // 确保定时任务存在
-        await ensureAlarmsExist();
+        await initialize();
     });
 
     // Chrome 程序暂停时
@@ -427,8 +431,7 @@ export default defineBackground(() => {
     browser.runtime.onInstalled.addListener(async (details) => {
         // 输出日志
         OutputLogToFile(`[Background] Extension installed/updated, reason: ${details.reason}, initializing`, { level: LogLevel.INFO });
-        // 确保定时任务存在（处理首次安装、更新等情况）
-        await ensureAlarmsExist();
+        await initialize();
     });
 
     // 监听标签页激活
@@ -500,5 +503,10 @@ export default defineBackground(() => {
             default:
                 break;
         }
+    });
+
+    // 在 background script 启动时立即设置回调，确保消息处理器在任何 WebSocket 连接建立之前就已经注册
+    set_callbacks().catch(error => {
+        OutputLogToFile(`[Background] Failed to set callbacks on startup: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
     });
 });
