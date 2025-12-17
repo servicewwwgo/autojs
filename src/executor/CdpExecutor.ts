@@ -15,19 +15,19 @@ export class CdpExecutor {
     private sendResult: ((result: CdpResult) => void) | undefined;
 
     constructor() {
-        // 初始化类型到函数的映射
+        // 初始化类型到函数的映射，使用箭头函数确保 this 绑定正确
         this.mapTypeToFunction = {
-            'cdp_connect': this.handleCdpConnect,
-            'cdp_disconnect': this.handleCdpDisconnect,
-            'list_targets': this.handleListTargets,
-            'execute_javascript': this.handleExecuteJavaScript,
-            'take_element_screenshot': this.handleTakeElementScreenshot,
-            'send_command': this.handleSendCommand,
-            'grep_source': this.handleGrepSource,
-            'get_network_logs': this.handleGetNetworkLogs,
-            'get_console_logs': this.handleGetConsoleLogs,
-            'init_network_logs': this.handleInitNetworkLogs,
-            'init_console_logs': this.handleInitConsoleLogs,
+            'cdp_connect': (data: any) => this.handleCdpConnect(data),
+            'cdp_disconnect': (data: any) => this.handleCdpDisconnect(data),
+            'list_targets': (data: any) => this.handleListTargets(data),
+            'execute_javascript': (data: any) => this.handleExecuteJavaScript(data),
+            'take_element_screenshot': (data: any) => this.handleTakeElementScreenshot(data),
+            'send_command': (data: any) => this.handleSendCommand(data),
+            'grep_source': (data: any) => this.handleGrepSource(data),
+            'get_network_logs': (data: any) => this.handleGetNetworkLogs(data),
+            'get_console_logs': (data: any) => this.handleGetConsoleLogs(data),
+            'init_network_logs': (data: any) => this.handleInitNetworkLogs(data),
+            'init_console_logs': (data: any) => this.handleInitConsoleLogs(data),
         };
     }
 
