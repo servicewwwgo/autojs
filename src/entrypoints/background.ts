@@ -2,9 +2,10 @@ import { defineBackground } from 'wxt/utils/define-background';
 import { BackgroundScriptMessageType, ExecutorStatus, TabInfo, Instruction, WSMessage, CdpMessage, CdpResult, InstructionResults } from '../types';
 import { InstructionFactory, BaseInstructionClass } from '../instructions';
 import { nodeConfig } from '../managers';
-import { InstructionExecutor, CdpExecutor, wsConnector } from '../executor';
+import { InstructionExecutor, CdpExecutor, WebSocketConnector } from '../executor';
 import { example } from '../example';
 import { OutputLogToFile, LogLevel } from '../utils';
+import { WEBSOCKET_CONN_URL } from '../consts';
 
 // Background script entry point
 /// <reference types="chrome" />
@@ -14,6 +15,8 @@ export default defineBackground(() => {
     // 初始化管理器
     const instructionExecutor = new InstructionExecutor();
     const cdpExecutor = new CdpExecutor();
+    // 初始化WebSocket连接器
+    const wsConnector: WebSocketConnector = new WebSocketConnector(WEBSOCKET_CONN_URL);
 
     async function add_example_instructions(tabId: number) {
         const now = Date.now();
@@ -231,6 +234,40 @@ export default defineBackground(() => {
         }
     }
 
+    async function send_tabs(): Promise<void> {
+        // 发送所有标签页信息
+        const tabs = await browser.tabs.query({});
+
+        for (const tab of tabs) {
+            const message: WSMessage = { type: 'tabs', data: { tabId: tab.id as number, tabIndex: tab.index as number, url: tab.url as string } as TabInfo };
+            wsConnector.sendMessage(message);
+        }
+    }
+
+    async function set_callbacks(): Promise<void> {
+        // 注册消息类型处理器 - 执行指令（通过 WebSocket 消息）
+        wsConnector.registerMessageTypeHandler('instructions', async (message: WSMessage): Promise<void> => {
+            await instructionExecutor.handleMessage(message);
+        });
+
+        // 设置指令执行器的结果发送回调
+        instructionExecutor.setSendResult((result: InstructionResults): void => {
+            // 通过 WebSocket 发送指令结果
+            wsConnector.sendMessage({ type: 'instructions', data: result } as WSMessage);
+        });
+
+        // 注册 cdp 执行器的统一消息处理器（所有 CDP 相关消息都通过 handleMessage 处理）
+        wsConnector.registerMessageTypeHandler('cdp', async (message: WSMessage): Promise<void> => {
+            await cdpExecutor.handleMessage(message.data as CdpMessage);
+        });
+
+        // 设置 CDP 执行器的结果发送回调
+        cdpExecutor.setSendResult((result: CdpResult): void => {
+            // 通过 WebSocket 发送 CDP 结果
+            wsConnector.sendMessage({ type: 'cdp', data: result } as WSMessage);
+        });
+    }
+
     let mapTypeToFunction: { [key: string]: (message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) => Promise<void> } = {
         'get_tabs': get_tabs,
         'get_node_profile': get_node_profile,
@@ -246,6 +283,14 @@ export default defineBackground(() => {
         'disconnect_websocket': disconnect_websocket,
         'test_websocket': test_websocket,
         'send_results_to_server': send_results_to_server,
+        'send_tabs': async (message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+            await send_tabs();
+            sendResponse({ success: true });
+        },
+        'setCallbacks': async (message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) => {
+            set_callbacks();
+            sendResponse({ success: true });
+        },
     };
 
     // 监听来自 popup 和 content script 的消息
@@ -343,15 +388,31 @@ export default defineBackground(() => {
         }
     });
 
-    // Chrome 程序启动时
+    // 确保定时任务存在的辅助函数
+    async function ensureAlarmsExist(): Promise<void> {
+        try {
+            // 检查定时任务是否已存在
+            const existingAlarm = await browser.alarms.get('connect_websocket');
+            if (!existingAlarm) {
+                // 如果不存在，创建定时任务
+                browser.alarms.create('connect_websocket', { periodInMinutes: 1, delayInMinutes: 0 });
+                OutputLogToFile('[Background] Created connect_websocket alarm', { level: LogLevel.INFO });
+            }
+        } catch (error) {
+            OutputLogToFile(`[Background] Failed to ensure alarms exist: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+        }
+    }
+
+    // 监听 Chrome 程序启动
     browser.runtime.onStartup.addListener(async () => {
         OutputLogToFile('[Background] Chrome program started, initializing', { level: LogLevel.INFO });
+        // 确保定时任务存在
+        await ensureAlarmsExist();
     });
 
     // Chrome 程序暂停时
     browser.runtime.onSuspend.addListener(async () => {
         OutputLogToFile('[Background] Chrome program suspended, stopping execution', { level: LogLevel.INFO });
-        // instructionExecutor.Pause();
     });
 
     // 点击扩展图标时打开侧边栏
@@ -363,43 +424,11 @@ export default defineBackground(() => {
     });
 
     // 扩展安装时的初始化
-    browser.runtime.onInstalled.addListener(async () => {
+    browser.runtime.onInstalled.addListener(async (details) => {
         // 输出日志
-        OutputLogToFile('[Background] Extension installed, initializing', { level: LogLevel.INFO });
-
-        // 获取节点配置
-        await nodeConfig.GetNodeProfile();
-
-        // 注册消息类型处理器 - 执行指令（通过 WebSocket 消息）
-        wsConnector.registerMessageTypeHandler('instructions', async (message: WSMessage): Promise<void> => {
-            await instructionExecutor.handleMessage(message);
-        });
-
-        // 设置指令执行器的结果发送回调
-        instructionExecutor.setSendResult((result: InstructionResults): void => {
-            // 通过 WebSocket 发送指令结果
-            wsConnector.sendMessage({ type: 'instructions', data: result } as WSMessage);
-        });
-
-        // 注册 cdp 执行器的统一消息处理器（所有 CDP 相关消息都通过 handleMessage 处理）
-        wsConnector.registerMessageTypeHandler('cdp', async (message: WSMessage): Promise<void> => {
-            await cdpExecutor.handleMessage(message.data as CdpMessage);
-        });
-
-        // 设置 CDP 执行器的结果发送回调
-        cdpExecutor.setSendResult((result: CdpResult): void => {
-            // 通过 WebSocket 发送 CDP 结果
-            wsConnector.sendMessage({ type: 'cdp', data: result } as WSMessage);
-        });
-
-        // 连接 WebSocket
-        await wsConnector.connect();
-
-        // 重载所有标签页
-        const tabs = await browser.tabs.query({});
-        for (const tab of tabs) {
-            await browser.tabs.reload(tab.id as number);
-        }
+        OutputLogToFile(`[Background] Extension installed/updated, reason: ${details.reason}, initializing`, { level: LogLevel.INFO });
+        // 确保定时任务存在（处理首次安装、更新等情况）
+        await ensureAlarmsExist();
     });
 
     // 监听标签页激活
@@ -430,5 +459,46 @@ export default defineBackground(() => {
         // 发送标签页关闭消息到服务器
         const message: WSMessage = { type: "tabs", data: { tabId: tabId as number, tabIndex: -1, url: '' } as TabInfo };
         wsConnector.sendMessage(message);
+    });
+
+    // alarms定时任务
+    browser.alarms.onAlarm.addListener(async (alarm) => {
+        OutputLogToFile(`[Background] Alarm triggered: ${alarm.name}`, { level: LogLevel.INFO });
+
+        switch (alarm.name) {
+            case 'connect_websocket':
+                {
+                    // 如果已经连接，直接返回，不执行 send_tabs
+                    if (wsConnector.isConnected()) {
+                        OutputLogToFile('[Background] WebSocket already connected, skipping connection and send_tabs', { level: LogLevel.INFO });
+                        break;
+                    }
+
+                    // 启动连接（异步操作，不等待完成）
+                    wsConnector.connect().catch(error => {
+                        OutputLogToFile(`[Background] Failed to connect WebSocket: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+                    });
+
+                    // 连接启动后，使用轮询检查连接状态，等待登录完成，然后发送标签页
+                    // 使用轮询检查连接状态，最多等待10秒
+                    let attempts = 0;
+                    const maxAttempts = 10;
+                    const checkInterval = setInterval(() => {
+                        attempts++;
+                        if (wsConnector.isConnected()) {
+                            clearInterval(checkInterval);
+                            // 只有在真正新建立的连接时才执行 send_tabs
+                            OutputLogToFile('[Background] WebSocket connected and logged in, sending tabs', { level: LogLevel.INFO });
+                            send_tabs().catch(error => OutputLogToFile(`[Background] Failed to send tabs after connection: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR }));
+                        } else if (attempts >= maxAttempts) {
+                            clearInterval(checkInterval);
+                            OutputLogToFile('[Background] WebSocket connection check timeout, connection may have failed', { level: LogLevel.WARN });
+                        }
+                    }, 1000); // 每1000ms检查一次
+                    break;
+                }
+            default:
+                break;
+        }
     });
 });

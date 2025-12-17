@@ -1,6 +1,5 @@
-import { WEBSOCKET_CONN_URL } from '../consts';
-import type { WSMessage, WSLoginMessage, WSLoginResponse, WSHeartbeatMessage, WSHeartbeatResponse, WSErrorMessage, TabInfo } from '../types';
-import { OutputLogToFile, LogLevel } from '../utils';
+import type { WSMessage, WSLoginMessage, WSLoginResponse, WSHeartbeatMessage, WSHeartbeatResponse, WSErrorMessage, TabInfo, BackgroundScriptMessageType } from '../types';
+import { OutputLogToFile, LogLevel, SendMessageToBackgroundScript } from '../utils';
 import { nodeConfig } from '../managers';
 
 // 检查消息大小，避免发送过大的消息
@@ -84,11 +83,6 @@ export class WebSocketConnector {
                 this.sendLoginMessage().catch(() => {
                     OutputLogToFile('[WebSocket] Failed to send login message', { level: LogLevel.ERROR });
                     this.cleanupWebSocket();
-                });
-
-                // 发送所有标签页信息
-                this.sendAllTabsInfo().catch(() => {
-                    OutputLogToFile('[WebSocket] Failed to send all tabs info', { level: LogLevel.ERROR });
                 });
 
                 this.startHeartbeat();
@@ -498,6 +492,3 @@ export class WebSocketConnector {
         });
     }
 }
-
-// 初始化WebSocket连接器
-export let wsConnector: WebSocketConnector = new WebSocketConnector(WEBSOCKET_CONN_URL);
