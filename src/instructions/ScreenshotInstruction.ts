@@ -17,13 +17,6 @@ export class ScreenshotInstructionClass extends BaseInstructionClass {
     this.params = instruction.params;
   }
 
-  ToObject(): object {
-    return {
-      ...super.ToObject(),
-      params: this.params
-    } as object;
-  }
-
   public async Execute(): Promise<InstructionResult> {
 
     const result = await this.Retry(async () => {

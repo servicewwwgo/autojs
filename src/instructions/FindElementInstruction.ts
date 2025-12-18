@@ -17,13 +17,6 @@ export class FindElementInstructionClass extends BaseInstructionClass {
         this.params = instruction.params;
     }
 
-    ToObject(): object {
-        return {
-            ...super.ToObject(),
-            params: this.params
-        } as object;
-    }
-
     /**
      * 查找所有匹配的元素, 并返回元素nodeId列表
      * @param selectorType - 选择器类型

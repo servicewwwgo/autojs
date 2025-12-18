@@ -18,13 +18,6 @@ export class SetAttributeInstructionClass extends BaseInstructionClass {
         this.params = instruction.params;
     }
 
-    ToObject(): object {
-        return {
-            ...super.ToObject(),
-            params: this.params
-        } as object;
-    }
-
     public async Execute(): Promise<InstructionResult> {
         const result = await this.Retry(async () => {
             let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };

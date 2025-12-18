@@ -12,7 +12,8 @@ export abstract class BaseInstructionClass implements BaseInstruction {
     public retry?: number;
     public timeout?: number;
     public ignoreError?: boolean;
-    public created_at: number;
+    public created_at?: number;
+    public params?: any;
 
     constructor(instruction: BaseInstruction) {
         this.tabId = instruction.tabId;
@@ -23,6 +24,7 @@ export abstract class BaseInstructionClass implements BaseInstruction {
         this.timeout = instruction.timeout;
         this.ignoreError = instruction.ignoreError;
         this.created_at = instruction.created_at;
+        this.params = instruction.params;
     }
 
     /**
@@ -37,7 +39,8 @@ export abstract class BaseInstructionClass implements BaseInstruction {
             delay: this.delay,
             retry: this.retry,
             timeout: this.timeout,
-            created_at: this.created_at
+            created_at: this.created_at,
+            params: this.params
         } as object;
     }
 

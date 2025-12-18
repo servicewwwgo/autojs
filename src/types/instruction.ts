@@ -48,7 +48,8 @@ export interface BaseInstruction {
   retry?: number;  // 重试次数
   timeout?: number;  // 超时时间
   ignoreError?: boolean;  // 是否忽略错误
-  created_at: number;  // 创建时间
+  created_at?: number;  // 创建时间
+  params?: any; // 指令参数
 }
 
 /**

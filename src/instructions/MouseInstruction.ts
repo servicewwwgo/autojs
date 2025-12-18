@@ -20,13 +20,6 @@ export class MouseInstructionClass extends BaseInstructionClass {
         this.params = instruction.params;
     }
 
-    ToObject(): object {
-        return {
-            ...super.ToObject(),
-            params: this.params
-        } as object;
-    }
-
     /**
      * 鼠標軌跡仿真 - 不模擬鼠標軌跡
      * 直接移動到目標位置，不進行任何模擬

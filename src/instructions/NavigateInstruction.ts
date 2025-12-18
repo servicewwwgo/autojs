@@ -16,13 +16,6 @@ export class NavigateInstructionClass extends BaseInstructionClass {
         this.params = instruction.params;
     }
 
-    ToObject(): object {
-        return {
-            ...super.ToObject(),
-            params: this.params
-        } as object;
-    }
-
     /**
      * 执行页面导航指令
      * @returns 执行结果，包含导航的 URL 和执行时间

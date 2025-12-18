@@ -6,20 +6,8 @@ import { BaseInstructionClass } from './BaseInstruction';
  * 
  */
 export class ExecuteScriptInstructionClass extends BaseInstructionClass {
-  public params: any;
-
   constructor(instruction: ExecuteScriptInstruction) {
     super(instruction);
-
-    this.params = instruction.params;
-  }
-
-  ToObject(): object {
-    return {
-      ...super.ToObject(),
-
-      params: this.params
-    } as object;
   }
 
   public async Execute(): Promise<InstructionResult> {

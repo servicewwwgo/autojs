@@ -106,11 +106,4 @@ export class InputInstructionClass extends BaseInstructionClass {
 
         return result;
     }
-
-    ToObject(): object {
-        return {
-            ...super.ToObject(),
-            params: this.params
-        } as object;
-    }
 }

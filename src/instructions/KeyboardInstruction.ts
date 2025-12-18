@@ -74,13 +74,6 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
         this.params = instruction.params;
     }
 
-    ToObject(): object {
-        return {
-            ...super.ToObject(),
-            params: this.params
-        } as object;
-    }
-
     /**
      * 判断是否为特殊按键
      * @param key - 按键名称

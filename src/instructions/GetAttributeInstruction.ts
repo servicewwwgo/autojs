@@ -13,13 +13,6 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
     usage?: "variable" | "data" | "none";
   };
 
-  ToObject(): object {
-    return {
-      ...super.ToObject(),
-      params: this.params
-    } as object;
-  }
-
   constructor(instruction: GetAttributeInstruction) {
     super(instruction);
     this.params = instruction.params;
