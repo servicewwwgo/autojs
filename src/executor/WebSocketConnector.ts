@@ -5,7 +5,7 @@ import { nodeConfig } from '../managers';
 // 检查消息大小，避免发送过大的消息
 const MAX_MESSAGE_SIZE = 10 * 1024 * 1024; // 10MB
 
-const HEARTBEAT_INTERVAL = 300000; // 300秒心跳间隔
+const HEARTBEAT_INTERVAL = 120000; // 120秒心跳间隔
 const RECONNECT_INTERVAL = 5000; // 5秒重连间隔
 
 /**
