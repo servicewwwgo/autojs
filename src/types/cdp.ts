@@ -75,22 +75,7 @@ export interface CdpExecuteJavaScriptMessage extends CdpMessage {
     type: 'execute_javascript';
     data?: {
         tabId: number;
-        expression: string;
-        returnByValue?: boolean;
-        awaitPromise?: boolean;
-        userGesture?: boolean;
-        silent?: boolean;
-        contextId?: any;
-        objectGroup?: string;
-        generatePreview?: boolean;
-        includeCommandLineAPI?: boolean;
-        throwOnSideEffect?: boolean;
-        timeout?: number;
-        disableBreaks?: boolean;
-        replMode?: boolean;
-        allowUnsafeEvalBlockedByCSP?: boolean;
-        uniqueContextId?: string;
-        serializationOptions?: any;
+        params: any;
     };
 }
 
