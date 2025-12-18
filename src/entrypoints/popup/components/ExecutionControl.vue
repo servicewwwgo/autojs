@@ -202,7 +202,7 @@ const startExecution = async () => {
 
     try {
         if (!selectedTabId.value) {
-            throw new Error('请选择标签页');
+            throw new Error('Please select a tab');
         }
 
         const response = await SendMessageToBackgroundScript({

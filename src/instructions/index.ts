@@ -64,7 +64,7 @@ export class InstructionFactory {
       default:
         // 使用类型守卫确保类型安全
         const unknownType = (instruction as any).type;
-        throw new Error(`未知的指令类型: ${unknownType}`);
+        throw new Error(`Unknown instruction type: ${unknownType}`);
     }
   }
 

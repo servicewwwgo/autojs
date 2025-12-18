@@ -105,7 +105,7 @@ export abstract class BaseInstructionClass implements BaseInstruction {
             instructionID: this.instructionID,
             tabId: this.tabId,
             success: false,
-            error: lastError?.message || `执行失败：已重试 ${maxAttempts} 次`,
+            error: lastError?.message || `Execution failed after ${maxAttempts} attempts`,
             duration: Date.now() - startTime
         } as InstructionResult;
     }

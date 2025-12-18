@@ -89,7 +89,7 @@ export default defineBackground(() => {
             const instructions: any[] = JSON.parse(instructionsJsonString);
 
             if (!Array.isArray(instructions)) {
-                sendResponse({ success: false, error: '指令集必须是数组格式' });
+                sendResponse({ success: false, error: 'Instructions must be in array format' });
                 return;
             }
 
@@ -127,7 +127,7 @@ export default defineBackground(() => {
             sendResponse({ success: true, count: processedInstructions.length });
         } else {
             OutputLogToFile(`[Background] Failed to add instructions: missing tabId or instructionsJsonString parameter`, { level: LogLevel.ERROR });
-            sendResponse({ success: false, error: '缺少tabId或instructionsJsonString参数' });
+            sendResponse({ success: false, error: 'Missing tabId or instructionsJsonString parameter' });
         }
     }
 
@@ -146,7 +146,7 @@ export default defineBackground(() => {
             }, 1000);
         } else {
             OutputLogToFile(`[Background] Failed to execute instructions: missing tabId`, { level: LogLevel.ERROR });
-            sendResponse({ success: false, error: '缺少tabId' });
+            sendResponse({ success: false, error: 'Missing tabId' });
         }
     }
 
@@ -198,7 +198,7 @@ export default defineBackground(() => {
             sendResponse({ success: true });
         } else {
             OutputLogToFile(`[Background] WebSocket connection failed: missing URL`, { level: LogLevel.ERROR });
-            sendResponse({ success: false, error: '缺少WebSocket URL' });
+            sendResponse({ success: false, error: 'Missing WebSocket URL' });
         }
     }
 
@@ -219,7 +219,7 @@ export default defineBackground(() => {
             const connected = await wsConnector.testConnection(url);
             sendResponse({ success: true, data: { connected } });
         } else {
-            sendResponse({ success: false, error: '缺少WebSocket URL' });
+            sendResponse({ success: false, error: 'Missing WebSocket URL' });
         }
     }
 
@@ -233,7 +233,7 @@ export default defineBackground(() => {
             sendResponse({ success: true });
         } else {
             OutputLogToFile(`[Background] Failed to send execution results to server: WebSocket not connected`, { level: LogLevel.ERROR });
-            sendResponse({ success: false, error: 'WebSocket未连接' });
+            sendResponse({ success: false, error: 'WebSocket not connected' });
         }
     }
 
@@ -335,15 +335,15 @@ export default defineBackground(() => {
             if (handler) {
                 handler(message, sender, sendResponse).catch((error) => {
                     OutputLogToFile(`[Background] Error processing message (type: ${message.type}): ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
-                    sendResponse({ success: false, error: `处理消息时发生错误: ${error} ${JSON.stringify(message)}` });
+                    sendResponse({ success: false, error: `Error processing message: ${error} ${JSON.stringify(message)}` });
                 });
             } else {
                 OutputLogToFile(`[Background] Unknown message type: ${message.type}`, { level: LogLevel.WARN });
-                sendResponse({ success: false, error: `未知的消息类型: ${message.type} ${JSON.stringify(message)}` });
+                sendResponse({ success: false, error: `Unknown message type: ${message.type} ${JSON.stringify(message)}` });
             }
         } catch (error) {
             OutputLogToFile(`[Background] Uncaught error processing message (type: ${message.type}): ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
-            sendResponse({ success: false, error: `处理消息时发生未捕获的错误: ${error} ${JSON.stringify(message)}` });
+            sendResponse({ success: false, error: `Uncaught error processing message: ${error} ${JSON.stringify(message)}` });
         }
 
         return true; // 保持消息通道开放

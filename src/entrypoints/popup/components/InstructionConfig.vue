@@ -100,14 +100,14 @@ const validateJson = () => {
 const sendInstructions = async () => {
     try {
         if (!selectedTabId.value) {
-            throw new Error('请先选择标签页');
+            throw new Error('Please select a tab first');
         }
 
         // 验证JSON格式，但不解析
         const parsed = JSON.parse(instructionsJson.value);
 
         if (!Array.isArray(parsed)) {
-            throw new Error('JSON格式错误：必须是数组');
+            throw new Error('JSON format error: must be an array');
         }
 
         const tabId = selectedTabId.value as number;

@@ -43,7 +43,7 @@ export async function SendMessageToContentScript(tabId: number, message: Content
     return new Promise((resolve, reject) => {
         browser.tabs.sendMessage(tabId, message, (result) => {
             if (browser.runtime.lastError) {
-                reject(new Error(browser.runtime.lastError.message || '消息发送失败'));
+                reject(new Error(browser.runtime.lastError.message || 'Failed to send message'));
             } else {
                 resolve(result);
             }
@@ -61,7 +61,7 @@ export async function SendMessageToBackgroundScript(message: BackgroundScriptMes
     return new Promise((resolve, reject) => {
         browser.runtime.sendMessage(message, (result) => {
             if (browser.runtime.lastError) {
-                reject(new Error(browser.runtime.lastError.message || '消息发送失败'));
+                reject(new Error(browser.runtime.lastError.message || 'Failed to send message'));
             } else {
                 resolve(result);
             }
@@ -120,7 +120,7 @@ export async function ExecuteCDPCommand(tabId: number, method: string, params?: 
         browser.debugger.sendCommand({ tabId: tabId }, method, params, (result) => {
             // 检查 runtime.lastError（API 层面的错误）
             if (browser.runtime.lastError) {
-                reject(new Error(browser.runtime.lastError.message || `CDP命令执行失败: ${method}`));
+                reject(new Error(browser.runtime.lastError.message || `CDP command execution failed: ${method}`));
                 return;
             }
 

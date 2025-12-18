@@ -30,7 +30,7 @@ export class ScreenshotInstructionClass extends BaseInstructionClass {
       const tab = await browser.tabs.get(this.tabId) as Browser.tabs.Tab;
 
       if (!tab) {
-        throw new Error('无法获取标签页');
+        throw new Error('Failed to get tab');
       }
 
       const dataUrl = await browser.tabs.captureVisibleTab(Number(tab.windowId), { format, quality: format === 'jpeg' ? quality : undefined });
