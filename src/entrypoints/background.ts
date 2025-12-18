@@ -1,11 +1,11 @@
 import { defineBackground } from 'wxt/utils/define-background';
-import { BackgroundScriptMessageType, ExecutorStatus, TabInfo, Instruction, WSMessage, CdpMessage, CdpResult, InstructionResults } from '../types';
-import { InstructionFactory, BaseInstructionClass } from '../instructions';
-import { nodeConfig } from '../managers';
-import { InstructionExecutor, CdpExecutor, WebSocketConnector } from '../executor';
-import { example } from '../example';
-import { OutputLogToFile, LogLevel } from '../utils';
 import { WEBSOCKET_CONN_URL } from '../consts';
+import { example } from '../example';
+import { CdpExecutor, InstructionExecutor, WebSocketConnector } from '../executor';
+import { BaseInstructionClass, InstructionFactory } from '../instructions';
+import { nodeConfig } from '../managers';
+import { BackgroundScriptMessageType, CdpMessage, CdpResult, ExecutorStatus, Instruction, InstructionResults, TabInfo, WSMessage } from '../types';
+import { LogLevel, OutputLogToFile } from '../utils';
 
 // Background script entry point
 /// <reference types="chrome" />
@@ -296,6 +296,36 @@ export default defineBackground(() => {
         },
     };
 
+    async function ws_check(): Promise<void> {
+        // 如果已经连接，直接返回，不执行 send_tabs
+        if (wsConnector.isConnected()) {
+            OutputLogToFile('[Background] WebSocket already connected, skipping connection and send_tabs', { level: LogLevel.INFO });
+            return;
+        }
+
+        // 启动连接（异步操作，不等待完成）
+        wsConnector.connect().catch(error => {
+            OutputLogToFile(`[Background] Failed to connect WebSocket: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+        });
+
+        // 连接启动后，使用轮询检查连接状态，等待登录完成，然后发送标签页
+        // 使用轮询检查连接状态，最多等待10秒
+        let attempts = 0;
+        const maxAttempts = 10;
+        const checkInterval = setInterval(() => {
+            attempts++;
+            if (wsConnector.isConnected()) {
+                clearInterval(checkInterval);
+                // 只有在真正新建立的连接时才执行 send_tabs
+                OutputLogToFile('[Background] WebSocket connected and logged in, sending tabs', { level: LogLevel.INFO });
+                send_tabs().catch(error => OutputLogToFile(`[Background] Failed to send tabs after connection: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR }));
+            } else if (attempts >= maxAttempts) {
+                clearInterval(checkInterval);
+                OutputLogToFile('[Background] WebSocket connection check timeout, connection may have failed', { level: LogLevel.WARN });
+            }
+        }, 1000); // 每1000ms检查一次
+    }
+
     // 监听来自 popup 和 content script 的消息
     browser.runtime.onMessage.addListener((message: any, sender, sendResponse) => {
 
@@ -431,17 +461,11 @@ export default defineBackground(() => {
     browser.runtime.onInstalled.addListener(async (details) => {
         // 输出日志
         OutputLogToFile(`[Background] Extension installed/updated, reason: ${details.reason}, initializing`, { level: LogLevel.INFO });
+        // 初始化
         await initialize();
 
-        // 连接
-        wsConnector.connect().catch(error => {
-            OutputLogToFile(`[Background] Failed to connect WebSocket: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
-        });
-
-        // 发送标签页
-        send_tabs().catch(error => {
-            OutputLogToFile(`[Background] Failed to send tabs: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
-        });
+        // 检查WebSocket连接
+        await ws_check();
     });
 
     // 监听标签页激活
@@ -481,33 +505,7 @@ export default defineBackground(() => {
         switch (alarm.name) {
             case 'connect_websocket':
                 {
-                    // 如果已经连接，直接返回，不执行 send_tabs
-                    if (wsConnector.isConnected()) {
-                        OutputLogToFile('[Background] WebSocket already connected, skipping connection and send_tabs', { level: LogLevel.INFO });
-                        break;
-                    }
-
-                    // 启动连接（异步操作，不等待完成）
-                    wsConnector.connect().catch(error => {
-                        OutputLogToFile(`[Background] Failed to connect WebSocket: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
-                    });
-
-                    // 连接启动后，使用轮询检查连接状态，等待登录完成，然后发送标签页
-                    // 使用轮询检查连接状态，最多等待10秒
-                    let attempts = 0;
-                    const maxAttempts = 10;
-                    const checkInterval = setInterval(() => {
-                        attempts++;
-                        if (wsConnector.isConnected()) {
-                            clearInterval(checkInterval);
-                            // 只有在真正新建立的连接时才执行 send_tabs
-                            OutputLogToFile('[Background] WebSocket connected and logged in, sending tabs', { level: LogLevel.INFO });
-                            send_tabs().catch(error => OutputLogToFile(`[Background] Failed to send tabs after connection: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR }));
-                        } else if (attempts >= maxAttempts) {
-                            clearInterval(checkInterval);
-                            OutputLogToFile('[Background] WebSocket connection check timeout, connection may have failed', { level: LogLevel.WARN });
-                        }
-                    }, 1000); // 每1000ms检查一次
+                    await ws_check();
                     break;
                 }
             default:
