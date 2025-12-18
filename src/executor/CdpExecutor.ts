@@ -1,4 +1,4 @@
-import type { CdpMessage, CdpResult, CdpConnectMessage, CdpConnectResult, CdpDisconnectMessage, CdpDisconnectResult, CdpListTargetsMessage, CdpListTargetsResult, CdpExecuteJavaScriptMessage, CdpExecuteJavaScriptResult, CdpTakeElementScreenshotMessage, CdpTakeElementScreenshotResult, CdpSendCommandMessage, CdpSendCommandResult, CdpGrepSourceMessage, CdpGrepSourceResult, CdpGetNetworkLogsMessage, CdpGetNetworkLogsResult, CdpInitNetworkLogsMessage, CdpInitNetworkLogsResult, CdpGetConsoleLogsMessage, CdpGetConsoleLogsResult, CdpInitConsoleLogsMessage, CdpInitConsoleLogsResult } from '../types';
+import type { CdpMessage, CdpResult, CdpConnectMessage, CdpConnectResult, CdpDisconnectMessage, CdpDisconnectResult, CdpListTargetsMessage, CdpListTargetsResult, CdpExecuteJavaScriptMessage, CdpExecuteJavaScriptResult, CdpTakeElementScreenshotMessage, CdpTakeElementScreenshotResult, CdpSendCommandMessage, CdpSendCommandResult, CdpGrepSourceMessage, CdpGrepSourceResult, CdpGetNetworkLogsMessage, CdpGetNetworkLogsResult, CdpInitNetworkLogsMessage, CdpInitNetworkLogsResult, CdpGetConsoleLogsMessage, CdpGetConsoleLogsResult, CdpInitConsoleLogsMessage, CdpInitConsoleLogsResult, CdpCloseNetworkLogsMessage, CdpCloseNetworkLogsResult, CdpCloseConsoleLogsMessage, CdpCloseConsoleLogsResult } from '../types';
 import { EnsureCDPConnected, DisconnectCDP, ExecuteCDPCommand, OutputLogToFile, LogLevel } from '../utils';
 
 /**
@@ -28,6 +28,8 @@ export class CdpExecutor {
             'get_console_logs': (data: any) => this.handleGetConsoleLogs(data),
             'init_network_logs': (data: any) => this.handleInitNetworkLogs(data),
             'init_console_logs': (data: any) => this.handleInitConsoleLogs(data),
+            'close_network_logs': (data: any) => this.handleCloseNetworkLogs(data),
+            'close_console_logs': (data: any) => this.handleCloseConsoleLogs(data),
         };
     }
 
@@ -537,6 +539,58 @@ export class CdpExecutor {
         this.sendResult?.(defaultResult as CdpInitConsoleLogsResult);
 
         // 注意：不断开连接，以便持续收集日志
+    }
+
+    // 关闭网络日志收集
+    private async handleCloseNetworkLogs(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpCloseNetworkLogsMessage = cdpMessage as CdpCloseNetworkLogsMessage;
+        let defaultResult: CdpCloseNetworkLogsResult | undefined;
+
+        if (msg.data === undefined) {
+            throw new Error('data is undefined in close_network_logs');
+        }
+
+        if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
+            throw new Error('tabId is required and must be a number in close_network_logs');
+        }
+
+        // 禁用 Network 域以停止收集网络日志
+        await ExecuteCDPCommand(msg.data.tabId, 'Network.disable');
+
+        // 如果请求清空日志，则清空该标签页的网络日志
+        if (msg.data?.clear) {
+            this.clearNetworkLogs(msg.data.tabId);
+        }
+
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId, message: 'Network logs collection disabled' } } as CdpCloseNetworkLogsResult;
+        OutputLogToFile(`[CdpExecutor] Network log collection closed successfully, tabId: ${msg.data.tabId}`, { level: LogLevel.INFO });
+        this.sendResult?.(defaultResult as CdpCloseNetworkLogsResult);
+    }
+
+    // 关闭控制台日志收集
+    private async handleCloseConsoleLogs(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpCloseConsoleLogsMessage = cdpMessage as CdpCloseConsoleLogsMessage;
+        let defaultResult: CdpCloseConsoleLogsResult | undefined;
+
+        if (msg.data === undefined) {
+            throw new Error('data is undefined in close_console_logs');
+        }
+
+        if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
+            throw new Error('tabId is required and must be a number in close_console_logs');
+        }
+
+        // 禁用 Runtime 域以停止收集控制台日志
+        await ExecuteCDPCommand(msg.data.tabId, 'Runtime.disable');
+
+        // 如果请求清空日志，则清空该标签页的控制台日志
+        if (msg.data?.clear) {
+            this.clearConsoleLogs(msg.data.tabId);
+        }
+
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId, message: 'Console logs collection disabled' } } as CdpCloseConsoleLogsResult;
+        OutputLogToFile(`[CdpExecutor] Console log collection closed successfully, tabId: ${msg.data.tabId}`, { level: LogLevel.INFO });
+        this.sendResult?.(defaultResult as CdpCloseConsoleLogsResult);
     }
 
     /**

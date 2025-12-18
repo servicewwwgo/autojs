@@ -38,3 +38,5 @@ export { CdpGetNetworkLogsMessage, CdpGetNetworkLogsResult } from './cdp';
 export { CdpInitNetworkLogsMessage, CdpInitNetworkLogsResult } from './cdp';
 export { CdpGetConsoleLogsMessage, CdpGetConsoleLogsResult } from './cdp';
 export { CdpInitConsoleLogsMessage, CdpInitConsoleLogsResult } from './cdp';
+export { CdpCloseNetworkLogsMessage, CdpCloseNetworkLogsResult } from './cdp';
+export { CdpCloseConsoleLogsMessage, CdpCloseConsoleLogsResult } from './cdp';
