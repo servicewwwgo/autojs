@@ -141,37 +141,15 @@ export class CdpExecutor {
             throw new Error('tabId is required and must be a number in execute_javascript');
         }
 
-        if (!msg.data.expression || typeof msg.data.expression !== 'string') {
-            throw new Error('expression is required and must be a string in execute_javascript');
+        if (!msg.data.params || typeof msg.data.params !== 'object') {
+            throw new Error('params is required and must be a object in execute_javascript');
         }
 
         // 启用 Runtime 域
         await ExecuteCDPCommand(msg.data.tabId, 'Runtime.enable');
 
-        // 构建 Runtime.evaluate 参数
-        const params: any = {
-            expression: msg.data.expression
-        };
-
-        // 添加可选参数
-        if (msg.data.returnByValue !== undefined) params.returnByValue = msg.data.returnByValue;
-        if (msg.data.awaitPromise !== undefined) params.awaitPromise = msg.data.awaitPromise;
-        if (msg.data.userGesture !== undefined) params.userGesture = msg.data.userGesture;
-        if (msg.data.silent !== undefined) params.silent = msg.data.silent;
-        if (msg.data.contextId !== undefined) params.contextId = msg.data.contextId;
-        if (msg.data.objectGroup !== undefined) params.objectGroup = msg.data.objectGroup;
-        if (msg.data.generatePreview !== undefined) params.generatePreview = msg.data.generatePreview;
-        if (msg.data.includeCommandLineAPI !== undefined) params.includeCommandLineAPI = msg.data.includeCommandLineAPI;
-        if (msg.data.throwOnSideEffect !== undefined) params.throwOnSideEffect = msg.data.throwOnSideEffect;
-        if (msg.data.disableBreaks !== undefined) params.disableBreaks = msg.data.disableBreaks;
-        if (msg.data.replMode !== undefined) params.replMode = msg.data.replMode;
-        if (msg.data.allowUnsafeEvalBlockedByCSP !== undefined) params.allowUnsafeEvalBlockedByCSP = msg.data.allowUnsafeEvalBlockedByCSP;
-        if (msg.data.uniqueContextId !== undefined) params.uniqueContextId = msg.data.uniqueContextId;
-        if (msg.data.serializationOptions !== undefined) params.serializationOptions = msg.data.serializationOptions;
-        if (msg.data.timeout !== undefined) params.timeout = msg.data.timeout;
-
         // 执行 JavaScript 代码
-        const evalResult = await ExecuteCDPCommand(msg.data.tabId, 'Runtime.evaluate', params);
+        const evalResult = await ExecuteCDPCommand(msg.data.tabId, 'Runtime.evaluate', msg.data.params);
 
         defaultResult = { type: msg.type, id: msg.id, success: true, data: { result: evalResult?.result, exceptionDetails: evalResult?.exceptionDetails } } as CdpExecuteJavaScriptResult;
         OutputLogToFile(`[CdpExecutor] Executed JavaScript successfully, tabId: ${msg.data.tabId}`, { level: LogLevel.INFO });
