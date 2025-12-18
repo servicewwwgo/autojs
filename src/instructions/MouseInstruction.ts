@@ -7,28 +7,23 @@ import { OutputLogToFile, LogLevel } from '../utils';
  * 鼠标操作指令
  */
 export class MouseInstructionClass extends BaseInstructionClass {
-    public action: 'click' | 'dblclick' | 'rightclick' | 'hover' | 'left_mousedown' | 'left_mouseup' | 'right_mousedown' | 'right_mouseup' | 'move_to';
-    public elementName?: string;
-    public x?: number;
-    public y?: number;
-    public simulate?: 'calculated' | 'simulated' | 'none';
+    public params: {
+        action: 'click' | 'dblclick' | 'rightclick' | 'hover' | 'left_mousedown' | 'left_mouseup' | 'right_mousedown' | 'right_mouseup' | 'move_to';
+        simulate?: 'calculated' | 'simulated' | 'none';
+        elementName?: string;
+        x?: number;
+        y?: number;
+    };
 
     constructor(instruction: MouseInstruction) {
         super(instruction);
-        this.action = instruction.action;
-        this.elementName = instruction.elementName;
-        this.x = instruction.x;
-        this.y = instruction.y;
-        this.simulate = instruction.simulate;
+        this.params = instruction.params;
     }
 
     ToObject(): object {
         return {
             ...super.ToObject(),
-            action: this.action,
-            elementName: this.elementName,
-            x: this.x,
-            y: this.y
+            params: this.params
         } as object;
     }
 
@@ -276,7 +271,7 @@ export class MouseInstructionClass extends BaseInstructionClass {
      * @param targetY - 目標 Y 坐標
      */
     private async MoveMouseTo(targetX: number, targetY: number): Promise<void> {
-        const simulateType = this.simulate || 'calculated'; // 默認使用 calculated
+        const simulateType = this.params.simulate || 'calculated'; // 默認使用 calculated
 
         switch (simulateType) {
             case 'none':
@@ -303,23 +298,23 @@ export class MouseInstructionClass extends BaseInstructionClass {
         const result = await this.Retry(async () => {
             let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
-            let x = this.x || 0;
-            let y = this.y || 0;
+            let x = this.params.x || 0;
+            let y = this.params.y || 0;
 
             // 如果指定了元素，获取元素位置
-            if (this.elementName) {
+            if (this.params.elementName) {
                 // 从 elementManager 获取元素
-                const element = elementManager.GetElementByName(this.tabId, this.elementName);
+                const element = elementManager.GetElementByName(this.tabId, this.params.elementName);
 
                 if (!element) {
-                    return { ...defaultResult, error: `Element "${this.elementName}" not found in element manager` };
+                    return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` };
                 }
 
                 // 获取元素的 nodeId
                 const nodeId = element.GetNodeId();
 
                 if (!nodeId) {
-                    return { ...defaultResult, error: `Element "${this.elementName}" has no nodeId. Make sure the element was found using FindElementInstruction first.` };
+                    return { ...defaultResult, error: `Element "${this.params.elementName}" has no nodeId. Make sure the element was found using FindElementInstruction first.` };
                 }
 
                 // 启用 DOM 域
@@ -348,7 +343,7 @@ export class MouseInstructionClass extends BaseInstructionClass {
             }
 
             // 执行鼠标操作
-            switch (this.action) {
+            switch (this.params.action) {
                 case 'click':
                     await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
                         type: 'mousePressed',
@@ -457,7 +452,7 @@ export class MouseInstructionClass extends BaseInstructionClass {
                     break;
             }
 
-            return { ...defaultResult, success: true, data: { x, y, action: this.action } };
+            return { ...defaultResult, success: true, data: { x, y, action: this.params.action } };
         });
 
         return result;

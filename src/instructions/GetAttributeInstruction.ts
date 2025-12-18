@@ -7,23 +7,22 @@ import { OutputLogToFile, LogLevel } from '../utils';
  * 获取元素属性指令
  */
 export class GetAttributeInstructionClass extends BaseInstructionClass {
-  public elementName: string;
-  public attribute?: string;
-  public usage?: "variable" | "data" | "none";
+  public params: {
+    elementName: string;
+    attribute?: string;
+    usage?: "variable" | "data" | "none";
+  };
 
   ToObject(): object {
     return {
       ...super.ToObject(),
-      elementName: this.elementName,
-      attribute: this.attribute
+      params: this.params
     } as object;
   }
 
   constructor(instruction: GetAttributeInstruction) {
     super(instruction);
-    this.elementName = instruction.elementName;
-    this.attribute = instruction.attribute;
-    this.usage = instruction.usage;
+    this.params = instruction.params;
   }
 
   public async Execute(): Promise<InstructionResult> {
@@ -31,17 +30,10 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
       let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
       // 从 elementManager 获取元素
-      const element = elementManager.GetElementByName(this.tabId, this.elementName);
+      const element = elementManager.GetElementByName(this.tabId, this.params.elementName);
 
       if (!element) {
-        return { ...defaultResult, error: `Element "${this.elementName}" not found in element manager` };
-      }
-
-      // 获取元素的 tag
-      const tag = element.GetTag();
-
-      if (!tag) {
-        return { ...defaultResult, error: `Element "${this.elementName}" has no tag. Make sure the element was found using FindElementInstruction first.` };
+        return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` };
       }
 
       // 使用 CDP 协议获取元素属性
@@ -51,7 +43,7 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
 
       OutputLogToFile(`[GetAttributeInstruction] Attributes: ${JSON.stringify(attributes)}`, { level: LogLevel.INFO });
 
-      return { ...defaultResult, success: true, data: { usage: this.usage, value: "test" } };
+      return { ...defaultResult, success: true, data: { usage: this.params.usage, value: attributes[this.params.attribute || 'text'] ?? undefined } };
     });
 
     return result;

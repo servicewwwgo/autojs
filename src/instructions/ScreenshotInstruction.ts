@@ -5,24 +5,22 @@ import { BaseInstructionClass } from './BaseInstruction';
  * 页面截图指令
  */
 export class ScreenshotInstructionClass extends BaseInstructionClass {
-  public format?: 'png' | 'jpeg';
-  public quality?: number;
-  public fullPage?: boolean;
+  public params: {
+    format?: 'png' | 'jpeg';
+    quality?: number;
+    fullPage?: boolean;
+  };
 
   constructor(instruction: ScreenshotInstruction) {
     super(instruction);
 
-    this.format = instruction.format;
-    this.quality = instruction.quality;
-    this.fullPage = instruction.fullPage;
+    this.params = instruction.params;
   }
 
   ToObject(): object {
     return {
       ...super.ToObject(),
-      format: this.format,
-      quality: this.quality,
-      fullPage: this.fullPage
+      params: this.params
     } as object;
   }
 
@@ -31,8 +29,8 @@ export class ScreenshotInstructionClass extends BaseInstructionClass {
     const result = await this.Retry(async () => {
       let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
-      const format = this.format || 'png';
-      const quality = this.quality || 100;
+      const format = this.params.format ?? 'png';
+      const quality = this.params.quality ?? 100;
 
       // 使用Chrome Tabs API截图
       // 注意：captureVisibleTab 需要 windowId，这里使用 tabId 对应的 windowId

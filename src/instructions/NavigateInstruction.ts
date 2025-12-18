@@ -6,12 +6,21 @@ import { OutputLogToFile, LogLevel } from '../utils';
  * 页面导航指令
  */
 export class NavigateInstructionClass extends BaseInstructionClass {
-    public url: string;
+    public params: {
+        url: string;
+        waitUntil?: 'load' | 'domcontentloaded' | 'networkidle0' | 'networkidle2';
+    };
 
     constructor(instruction: NavigateInstruction) {
         super(instruction);
+        this.params = instruction.params;
+    }
 
-        this.url = instruction.url;
+    ToObject(): object {
+        return {
+            ...super.ToObject(),
+            params: this.params
+        } as object;
     }
 
     /**
@@ -30,12 +39,12 @@ export class NavigateInstructionClass extends BaseInstructionClass {
             await this.Delay(this.delay);
 
             // 使用 browser.tabs API 导航到指定 URL
-            await browser.tabs.update(this.tabId, { url: this.url });
+            await browser.tabs.update(this.tabId, { url: this.params.url });
 
             // 等待页面加载完成
             await this.WaitForPageLoad();
 
-            return { ...defaultResult, success: true, data: { url: this.url } };
+            return { ...defaultResult, success: true, data: { url: this.params.url } };
         });
 
         return result;
@@ -63,12 +72,5 @@ export class NavigateInstructionClass extends BaseInstructionClass {
                 resolve();
             }, 30000);
         });
-    }
-
-    ToObject(): object {
-        return {
-            ...super.ToObject(),
-            url: this.url
-        } as object;
     }
 }

@@ -56,7 +56,10 @@ export interface BaseInstruction {
  */
 export interface NavigateInstruction extends BaseInstruction {
   type: 'navigate';
-  url: string;
+  params: {
+    url: string;
+    waitUntil?: 'load' | 'domcontentloaded' | 'networkidle0' | 'networkidle2';
+  };
 }
 
 /**
@@ -72,7 +75,9 @@ export interface ExecuteScriptInstruction extends BaseInstruction {
  */
 export interface FindElementInstruction extends BaseInstruction {
   type: 'find_element';
-  element: ElementData;
+  params: {
+    element: ElementData;
+  };
 }
 
 /**
@@ -80,9 +85,11 @@ export interface FindElementInstruction extends BaseInstruction {
  */
 export interface InputInstruction extends BaseInstruction {
   type: 'input';
-  elementName: string;
-  text: string;
-  clear?: boolean;
+  params: {
+    elementName: string;
+    text: string;
+    clear?: boolean;
+  };
 }
 
 /**
@@ -90,9 +97,11 @@ export interface InputInstruction extends BaseInstruction {
  */
 export interface KeyboardInstruction extends BaseInstruction {
   type: 'keyboard';
-  elementName?: string;
-  action: 'press' | 'type' | 'keydown' | 'keyup';
-  key: string;
+  params: {
+    elementName?: string;
+    action: 'press' | 'type' | 'keydown' | 'keyup';
+    key: string;
+  };
 }
 
 /**
@@ -100,11 +109,13 @@ export interface KeyboardInstruction extends BaseInstruction {
  */
 export interface MouseInstruction extends BaseInstruction {
   type: 'mouse';
-  action: 'click' | 'dblclick' | 'rightclick' | 'hover' | 'left_mousedown' | 'left_mouseup' | 'right_mousedown' | 'right_mouseup' | 'move_to';
-  simulate?: 'calculated' | 'simulated' | 'none';
-  elementName?: string;
-  x?: number;
-  y?: number;
+  params: {
+    action: 'click' | 'dblclick' | 'rightclick' | 'hover' | 'left_mousedown' | 'left_mouseup' | 'right_mousedown' | 'right_mouseup' | 'move_to';
+    simulate?: 'calculated' | 'simulated' | 'none';
+    elementName?: string;
+    x?: number;
+    y?: number;
+  };
 }
 
 /**
@@ -112,9 +123,11 @@ export interface MouseInstruction extends BaseInstruction {
  */
 export interface GetAttributeInstruction extends BaseInstruction {
   type: 'get_attribute';
-  elementName: string;
-  attribute?: string;
-  usage?: "variable" | "data" | "none";
+  params: {
+    elementName: string;
+    attribute?: string;
+    usage?: "variable" | "data" | "none";
+  };
 }
 
 /**
@@ -122,9 +135,11 @@ export interface GetAttributeInstruction extends BaseInstruction {
  */
 export interface SetAttributeInstruction extends BaseInstruction {
   type: 'set_attribute';
-  elementName: string;
-  attribute: string;
-  value: string;
+  params: {
+    elementName: string;
+    attribute: string;
+    value: string;
+  };
 }
 
 /**
@@ -132,9 +147,11 @@ export interface SetAttributeInstruction extends BaseInstruction {
  */
 export interface ScreenshotInstruction extends BaseInstruction {
   type: 'screenshot';
-  format?: 'png' | 'jpeg';
-  quality?: number;
-  fullPage?: boolean;
+  params: {
+    format?: 'png' | 'jpeg';
+    quality?: number;
+    fullPage?: boolean;
+  };
 }
 
 /**

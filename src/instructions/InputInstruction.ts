@@ -6,16 +6,16 @@ import { elementManager } from '../managers';
  * 文本输入指令
  */
 export class InputInstructionClass extends BaseInstructionClass {
-    public elementName: string;
-    public text: string;
-    public clear?: boolean;
+    public params: {
+        elementName: string;
+        text: string;
+        clear?: boolean;
+    };
 
     constructor(instruction: InputInstruction) {
         super(instruction);
 
-        this.elementName = instruction.elementName;
-        this.text = instruction.text;
-        this.clear = instruction.clear;
+        this.params = instruction.params;
     }
 
     public async Execute(): Promise<InstructionResult> {
@@ -23,10 +23,10 @@ export class InputInstructionClass extends BaseInstructionClass {
             let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
             // 从 elementManager 获取元素
-            const element = elementManager.GetElementByName(this.tabId, this.elementName);
+            const element = elementManager.GetElementByName(this.tabId, this.params.elementName);
 
             if (!element) {
-                return { ...defaultResult, error: `Element "${this.elementName}" not found in element manager` };
+                return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` };
             }
 
             // 获取元素的 nodeId 和 tag
@@ -34,7 +34,7 @@ export class InputInstructionClass extends BaseInstructionClass {
             const tag = element.GetTag();
 
             if (!nodeId) {
-                return { ...defaultResult, error: `Element "${this.elementName}" has no nodeId. Make sure the element was found using FindElementInstruction first.` };
+                return { ...defaultResult, error: `Element "${this.params.elementName}" has no nodeId. Make sure the element was found using FindElementInstruction first.` };
             }
 
             // 启用 DOM 域
@@ -45,7 +45,7 @@ export class InputInstructionClass extends BaseInstructionClass {
             await this.ExecuteCDPCommand('DOM.focus', { nodeId: nodeId });
 
             // 如果需要清空输入框，先选中所有文本（Ctrl+A）
-            if (this.clear === true) {
+            if (this.params.clear === true) {
                 // 按下 Ctrl 键
                 await this.ExecuteCDPCommand('Input.dispatchKeyEvent', {
                     type: 'keyDown',
@@ -83,7 +83,7 @@ export class InputInstructionClass extends BaseInstructionClass {
             // 输入文本 - 支持中文字符和 Unicode 字符输入
             // 使用 Array.from 确保正确处理 Unicode 字符（包括代理对和 emoji）
             // 虽然 for...of 已经能正确处理 Unicode，但 Array.from 更明确和可靠
-            const textArray = Array.from(this.text);
+            const textArray = Array.from(this.params.text);
 
             for (const char of textArray) {
                 // 如果设置了延迟，在输入每个字符前等待
@@ -101,7 +101,7 @@ export class InputInstructionClass extends BaseInstructionClass {
                 });
             }
 
-            return { ...defaultResult, success: true, data: { text: this.text } };
+            return { ...defaultResult, success: true, data: { text: this.params.text } };
         });
 
         return result;
@@ -110,9 +110,7 @@ export class InputInstructionClass extends BaseInstructionClass {
     ToObject(): object {
         return {
             ...super.ToObject(),
-            elementName: this.elementName,
-            text: this.text,
-            clear: this.clear
+            params: this.params
         } as object;
     }
 }

@@ -8,17 +8,19 @@ import { BaseInstructionClass } from './BaseInstruction';
  * 元素查找指令
  */
 export class FindElementInstructionClass extends BaseInstructionClass {
-    public elementData: ElementData;
+    public params: {
+        element: ElementData;
+    };
 
     constructor(instruction: FindElementInstruction) {
         super(instruction);
-        this.elementData = instruction.element;
+        this.params = instruction.params;
     }
 
     ToObject(): object {
         return {
             ...super.ToObject(),
-            element: this.elementData
+            params: this.params
         } as object;
     }
 
@@ -37,7 +39,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
             });
 
             if (!documentResult?.root?.nodeId) {
-                OutputLogToFile(`[FindElementInstruction] Failed to get document root node for "${this.elementData.name}"`, { level: LogLevel.ERROR });
+                OutputLogToFile(`[FindElementInstruction] Failed to get document root node for "${this.params.element.name}"`, { level: LogLevel.ERROR });
                 return [];
             }
 
@@ -55,7 +57,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
                         });
                         candidateNodeIds = queryResult?.nodeIds || [];
                     } catch (error) {
-                        OutputLogToFile(`[FindElementInstruction] CDP querySelectorAll failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+                        OutputLogToFile(`[FindElementInstruction] CDP querySelectorAll failed for "${this.params.element.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
                         throw error;
                     }
                     break;
@@ -68,7 +70,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
                         });
                         candidateNodeIds = queryResult?.nodeIds || [];
                     } catch (error) {
-                        OutputLogToFile(`[FindElementInstruction] CDP querySelectorAll (id) failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+                        OutputLogToFile(`[FindElementInstruction] CDP querySelectorAll (id) failed for "${this.params.element.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
                         throw error;
                     }
                     break;
@@ -81,7 +83,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
                         });
 
                         if (!searchResult?.searchId) {
-                            OutputLogToFile(`[FindElementInstruction] XPath search did not return a searchId for "${this.elementData.name}"`, { level: LogLevel.WARN });
+                            OutputLogToFile(`[FindElementInstruction] XPath search did not return a searchId for "${this.params.element.name}"`, { level: LogLevel.WARN });
                             candidateNodeIds = [];
                             break;
                         }
@@ -100,7 +102,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
 
                             // 检查是否有更多结果被截断
                             if (candidateNodeIds.length >= maxResults) {
-                                OutputLogToFile(`[FindElementInstruction] XPath search returned ${candidateNodeIds.length} results for "${this.elementData.name}", which may be truncated (max: ${maxResults})`, { level: LogLevel.WARN });
+                                OutputLogToFile(`[FindElementInstruction] XPath search returned ${candidateNodeIds.length} results for "${this.params.element.name}", which may be truncated (max: ${maxResults})`, { level: LogLevel.WARN });
                             }
                         } finally {
                             // 确保清理搜索资源，即使获取结果时出错
@@ -109,11 +111,11 @@ export class FindElementInstructionClass extends BaseInstructionClass {
                                     searchId: searchId
                                 });
                             } catch (discardError) {
-                                OutputLogToFile(`[FindElementInstruction] Failed to discard search results for "${this.elementData.name}": ${discardError instanceof Error ? discardError.message : String(discardError)}`, { level: LogLevel.WARN });
+                                OutputLogToFile(`[FindElementInstruction] Failed to discard search results for "${this.params.element.name}": ${discardError instanceof Error ? discardError.message : String(discardError)}`, { level: LogLevel.WARN });
                             }
                         }
                     } catch (error) {
-                        OutputLogToFile(`[FindElementInstruction] CDP performSearch (xpath) failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+                        OutputLogToFile(`[FindElementInstruction] CDP performSearch (xpath) failed for "${this.params.element.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
                         throw error;
                     }
                     break;
@@ -124,7 +126,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
 
             return candidateNodeIds;
         } catch (error) {
-            OutputLogToFile(`[FindElementInstruction] Error finding all matching elements for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[FindElementInstruction] Error finding all matching elements for "${this.params.element.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
             return [];
         }
     }
@@ -546,24 +548,24 @@ export class FindElementInstructionClass extends BaseInstructionClass {
             await this.ExecuteCDPCommand('Runtime.enable');
 
             // 查找所有匹配的元素
-            const candidateNodeIds = await this.FindAllMatchingElementNodeIds(this.elementData.selectorType, this.elementData.selector);
+            const candidateNodeIds = await this.FindAllMatchingElementNodeIds(this.params.element.selectorType, this.params.element.selector);
 
             // 如果没有找到任何候选元素
             if (candidateNodeIds.length === 0) {
-                return { ...defaultResult, error: `Element "${this.elementData.name}" not found with selector: ${this.elementData.selector}` };
+                return { ...defaultResult, error: `Element "${this.params.element.name}" not found with selector: ${this.params.element.selector}` };
             }
 
             // 使用相对关系筛选候选元素
             let selectedNodeId: number | undefined = undefined;
 
             // 如果有相对关系条件（parentName, childrenName, siblingName），使用筛选方法
-            if (this.elementData.parentName || this.elementData.childrenName || this.elementData.siblingName) {
+            if (this.params.element.parentName || this.params.element.childrenName || this.params.element.siblingName) {
                 // 直接传入所有候选节点，方法内部会进行筛选
-                selectedNodeId = await this.checkNodeRelations(candidateNodeIds, this.elementData.parentName, this.elementData.childrenName, this.elementData.siblingName, this.elementData.siblingOffset);
+                selectedNodeId = await this.checkNodeRelations(candidateNodeIds, this.params.element.parentName, this.params.element.childrenName, this.params.element.siblingName, this.params.element.siblingOffset);
 
                 // 如果筛选后没有找到符合条件的节点
                 if (!selectedNodeId) {
-                    return { ...defaultResult, error: `Element "${this.elementData.name}" found but does not match relation criteria (parent: ${this.elementData.parentName || 'none'}, children: ${this.elementData.childrenName || 'none'}, sibling: ${this.elementData.siblingName || 'none'})` };
+                    return { ...defaultResult, error: `Element "${this.params.element.name}" found but does not match relation criteria (parent: ${this.params.element.parentName || 'none'}, children: ${this.params.element.childrenName || 'none'}, sibling: ${this.params.element.siblingName || 'none'})` };
                 }
             } else if (candidateNodeIds.length > 1) {
                 // 選取所有候選元素中，可見的元素
@@ -591,7 +593,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
                 });
 
                 const elementDataWithNodeId: ElementData = {
-                    ...this.elementData,
+                    ...this.params.element,
                     nodeId: selectedNodeId,
                     tag: tag,
                     tabId: this.tabId
@@ -600,12 +602,12 @@ export class FindElementInstructionClass extends BaseInstructionClass {
                 const element = new ElementClass(elementDataWithNodeId);
 
                 // 添加到 elementManager
-                elementManager.SetElementByName(this.tabId, this.elementData.name, element);
+                elementManager.SetElementByName(this.tabId, this.params.element.name, element);
 
                 return { ...defaultResult, success: true, data: element };
             }
 
-            return { ...defaultResult, error: `Element "${this.elementData.name}" not found or failed to set nodeId` };
+            return { ...defaultResult, error: `Element "${this.params.element.name}" not found or failed to set nodeId` };
         });
 
         return result;
