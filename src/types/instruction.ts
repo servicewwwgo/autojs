@@ -126,7 +126,7 @@ export interface GetAttributeInstruction extends BaseInstruction {
   type: 'get_attribute';
   params: {
     elementName: string;
-    attribute?: string;
+    attribute: string;
     usage?: "variable" | "data" | "none";
   };
 }
