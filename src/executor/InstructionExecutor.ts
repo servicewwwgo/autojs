@@ -1,7 +1,7 @@
-import { EnsureCDPConnected, DisconnectCDP, OutputLogToFile, LogLevel } from '../utils';
-import { BaseInstruction, ExecutorStatus, InstructionResult, InstructionResults, WSMessage } from '../types';
 import { BaseInstructionClass, InstructionFactory } from '../instructions';
 import { InstructionManager, ResultManager } from '../managers';
+import { BaseInstruction, ExecutorStatus, InstructionResult, InstructionResults, WSMessage } from '../types';
+import { DisconnectCDP, EnsureCDPConnected, LogLevel, OutputLogToFile } from '../utils';
 
 /**
  * 指令执行器
@@ -155,11 +155,27 @@ export class InstructionExecutor {
 
         for (const tabId of tabIds) {
           try {
-            // 如果标签页不存在，则跳过
-            const tab = await browser.tabs.get(tabId);
+            // 如果标签页不存在，则跳过并清理该 tab 的指令
+            let tab;
+
+            try {
+              tab = await browser.tabs.get(tabId);
+            } catch (tabError) {
+              const errorMsg = tabError instanceof Error ? tabError.message : String(tabError);
+              // 如果 tab 不存在，清理该 tab 的所有指令，避免重复尝试
+              if (errorMsg.includes('No tab with id') || errorMsg.includes('No tab with given id')) {
+                const instructionCount = this.instructionManager.GetCountByTabId(tabId);
+                this.instructionManager.DeleteInstructionsByTabId(tabId);
+                OutputLogToFile(`[InstructionExecutor] Tab ${tabId} does not exist, removed ${instructionCount} pending instructions`, { level: LogLevel.WARN });
+                continue;
+              }
+              throw tabError;
+            }
 
             if (!tab || tab.id !== tabId) {
-              OutputLogToFile(`[InstructionExecutor] Tab not found or ID mismatch, tabId: ${tabId}`, { level: LogLevel.WARN });
+              const instructionCount = this.instructionManager.GetCountByTabId(tabId);
+              this.instructionManager.DeleteInstructionsByTabId(tabId);
+              OutputLogToFile(`[InstructionExecutor] Tab not found or ID mismatch, tabId: ${tabId}, removed ${instructionCount} pending instructions`, { level: LogLevel.WARN });
               continue;
             }
 
@@ -194,7 +210,15 @@ export class InstructionExecutor {
             const results = this.resultManager.GetResultAndDelete(tabId) ?? [];
             this.sendResult?.({ tabId: tabId, results: results });
           } catch (error) {
-            OutputLogToFile(`[InstructionExecutor] Error processing tab ${tabId}: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            // 如果是因为 tab 不存在导致的错误，清理该 tab 的指令
+            if (errorMsg.includes('No tab with id') || errorMsg.includes('No tab with given id')) {
+              const instructionCount = this.instructionManager.GetCountByTabId(tabId);
+              this.instructionManager.DeleteInstructionsByTabId(tabId);
+              OutputLogToFile(`[InstructionExecutor] Tab ${tabId} does not exist, removed ${instructionCount} pending instructions`, { level: LogLevel.WARN });
+            } else {
+              OutputLogToFile(`[InstructionExecutor] Error processing tab ${tabId}: ${errorMsg}`, { level: LogLevel.ERROR });
+            }
           } finally {
             await DisconnectCDP(tabId);
           }

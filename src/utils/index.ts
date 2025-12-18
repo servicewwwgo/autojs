@@ -1,4 +1,4 @@
-import type { ContentScriptMessageType, BackgroundScriptMessageType, PopupScriptMessageType } from '../types';
+import type { BackgroundScriptMessageType, ContentScriptMessageType, PopupScriptMessageType } from '../types';
 
 /**
  * 生成UUID
@@ -118,11 +118,25 @@ export async function SendMessageToPopupWindow(message: PopupScriptMessageType):
 export async function ExecuteCDPCommand(tabId: number, method: string, params?: any): Promise<any> {
     return new Promise((resolve, reject) => {
         browser.debugger.sendCommand({ tabId: tabId }, method, params, (result) => {
+            // 检查 runtime.lastError（API 层面的错误）
             if (browser.runtime.lastError) {
                 reject(new Error(browser.runtime.lastError.message || `CDP命令执行失败: ${method}`));
-            } else {
-                resolve(result);
+                return;
             }
+
+            // 检查 CDP 响应中的错误（CDP 协议层面的错误）
+            // CDP 错误响应格式: { code: number, message: string }
+            if (result && typeof result === 'object' && 'code' in result && 'message' in result) {
+                const errorCode = (result as any).code;
+                const errorMessage = (result as any).message;
+                // CDP 错误码通常为负数，成功响应不会有 code 字段或 code 为 0
+                if (errorCode !== undefined && errorCode !== 0 && errorCode !== null) {
+                    reject(new Error(JSON.stringify({ code: errorCode, message: errorMessage })));
+                    return;
+                }
+            }
+
+            resolve(result);
         });
     });
 }
