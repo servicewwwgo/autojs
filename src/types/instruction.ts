@@ -64,21 +64,7 @@ export interface NavigateInstruction extends BaseInstruction {
  */
 export interface ExecuteScriptInstruction extends BaseInstruction {
   type: 'execute_script';
-  expression: string;
-  objectGroup?: string;
-  includeCommandLineAPI?: boolean;
-  silent?: boolean;
-  contextId?: any;
-  returnByValue?: boolean;
-  generatePreview?: boolean;
-  userGesture?: boolean;
-  awaitPromise?: boolean;
-  throwOnSideEffect?: boolean;
-  disableBreaks?: boolean;
-  replMode?: boolean;
-  allowUnsafeEvalBlockedByCSP?: boolean;
-  uniqueContextId?: string;
-  serializationOptions?: any;
+  params: any;
 }
 
 /**
