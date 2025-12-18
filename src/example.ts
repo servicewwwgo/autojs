@@ -1,13 +1,13 @@
 // 导入所有指令类型，用于测试用例
 import type {
-    NavigateInstruction,
+    ExecuteScriptInstruction,
     FindElementInstruction,
-    MouseInstruction,
+    GetAttributeInstruction,
     InputInstruction,
     KeyboardInstruction,
-    GetAttributeInstruction,
-    ScreenshotInstruction,
-    ExecuteScriptInstruction
+    MouseInstruction,
+    NavigateInstruction,
+    ScreenshotInstruction
 } from './types';
 
 import { InstructionFactory } from './instructions';
@@ -19,7 +19,9 @@ const navigateInstruction_nav_1: NavigateInstruction = {
     type: 'navigate',
     tabId: 0,
     instructionID: 'inst_nav_1',
-    url: 'https://www.google.com',
+    params: {
+        url: 'https://www.google.com'
+    },
     delay: 1,
     retry: 1,
     timeout: 30,
@@ -32,13 +34,15 @@ const findElementInstruction_find_2_0: FindElementInstruction = {
     type: 'find_element',
     tabId: 0,
     instructionID: 'inst_find_2_0',
-    element: {
-        tabId: 0,
-        name: 'searchButton',
-        description: 'Google 搜索按钮',
-        backup: 'Google 搜索',
-        selector: 'input[aria-label="Google 搜索"]',
-        selectorType: 'css'
+    params: {
+        element: {
+            tabId: 0,
+            name: 'searchButton',
+            description: 'Google 搜索按钮',
+            backup: 'Google 搜索',
+            selector: 'input[aria-label="Google 搜索"]',
+            selectorType: 'css'
+        }
     },
     created_at: Date.now()
 };
@@ -48,13 +52,15 @@ const findElementInstruction_find_2_1: FindElementInstruction = {
     type: 'find_element',
     tabId: 0,
     instructionID: 'inst_find_2_1',
-    element: {
-        tabId: 0,
-        name: 'searchInput',
-        description: 'Google 搜索输入框',
-        backup: '',
-        selector: 'textarea[aria-label="搜索"]',
-        selectorType: 'css'
+    params: {
+        element: {
+            tabId: 0,
+            name: 'searchInput',
+            description: 'Google 搜索输入框',
+            backup: '',
+            selector: 'textarea[aria-label="搜索"]',
+            selectorType: 'css'
+        }
     },
     created_at: Date.now()
 };
@@ -64,9 +70,11 @@ const inputInstruction_input_3_0: InputInstruction = {
     type: 'input',
     tabId: 0,
     instructionID: 'inst_input_3_0',
-    elementName: 'searchInput',
-    text: '電腦',
-    clear: true,
+    params: {
+        elementName: 'searchInput',
+        text: '電腦',
+        clear: true
+    },
     delay: 0.1,
     retry: 1,
     created_at: Date.now()
@@ -77,8 +85,10 @@ const clickInstruction_click_4_0: MouseInstruction = {
     type: 'mouse',
     tabId: 0,
     instructionID: 'inst_click_4_0',
-    elementName: 'searchButton',
-    action: 'click',
+    params: {
+        elementName: 'searchButton',
+        action: 'click'
+    },
     created_at: Date.now()
 };
 
@@ -87,9 +97,11 @@ const keyboardInstruction_key_1_0: KeyboardInstruction = {
     type: 'keyboard',
     tabId: 0,
     instructionID: 'inst_key_1',
-    elementName: 'searchInput',
-    action: 'press',
-    key: 'a',
+    params: {
+        elementName: 'searchInput',
+        action: 'press',
+        key: 'a'
+    },
     delay: 0.5,
     created_at: Date.now()
 };
@@ -99,9 +111,11 @@ const keyboardInstruction_key_1_1: KeyboardInstruction = {
     type: 'keyboard',
     tabId: 0,
     instructionID: 'inst_key_1',
-    elementName: 'searchInput',
-    action: 'press',
-    key: 'Enter',
+    params: {
+        elementName: 'searchInput',
+        action: 'press',
+        key: 'Enter'
+    },
     delay: 0.5,
     created_at: Date.now()
 };
@@ -111,8 +125,10 @@ const getAttributeInstruction_attr_1: GetAttributeInstruction = {
     type: 'get_attribute',
     tabId: 0,
     instructionID: 'inst_attr_1',
-    elementName: 'searchInput',
-    attribute: 'value',
+    params: {
+        elementName: 'searchInput',
+        attribute: 'value'
+    },
     created_at: Date.now()
 };
 
@@ -121,9 +137,11 @@ const screenshotInstruction_screen_1: ScreenshotInstruction = {
     type: 'screenshot',
     tabId: 0,
     instructionID: 'inst_screen_1',
-    format: 'png',
-    quality: 100,
-    fullPage: false,
+    params: {
+        format: 'png',
+        quality: 100,
+        fullPage: false
+    },
     created_at: Date.now()
 };
 
@@ -132,14 +150,16 @@ const executeScriptInstruction_script_1: ExecuteScriptInstruction = {
     type: 'execute_script',
     tabId: 0,
     instructionID: 'inst_script_1',
-    expression: 'alert("Hello, world!");',
-    returnByValue: true,
-    timeout: 30,
-    disableBreaks: false,
-    replMode: false,
-    allowUnsafeEvalBlockedByCSP: false,
-    uniqueContextId: '',
-    serializationOptions: {},
+    params: {
+        expression: 'alert("Hello, world!");',
+        returnByValue: true,
+        timeout: 30,
+        disableBreaks: false,
+        replMode: false,
+        allowUnsafeEvalBlockedByCSP: false,
+        uniqueContextId: '',
+        serializationOptions: {}
+    },
     created_at: Date.now()
 };
 
