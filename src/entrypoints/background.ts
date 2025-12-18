@@ -432,6 +432,16 @@ export default defineBackground(() => {
         // 输出日志
         OutputLogToFile(`[Background] Extension installed/updated, reason: ${details.reason}, initializing`, { level: LogLevel.INFO });
         await initialize();
+
+        // 连接
+        wsConnector.connect().catch(error => {
+            OutputLogToFile(`[Background] Failed to connect WebSocket: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+        });
+
+        // 发送标签页
+        send_tabs().catch(error => {
+            OutputLogToFile(`[Background] Failed to send tabs: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+        });
     });
 
     // 监听标签页激活

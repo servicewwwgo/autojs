@@ -133,75 +133,82 @@ export class InstructionExecutor {
 
     OutputLogToFile(`[InstructionExecutor] Execution started, pending instructions: ${instructions.length}`, { level: LogLevel.INFO });
 
-    // 执行指令循环（FIFO 队列）
-    for (let i = 0; i < 10; i++) {
-      // 如果请求停止，则退出循环
-      if (this.stopRequested) {
-        break;
-      }
+    try {
+      // 执行指令循环（FIFO 队列）
+      for (let i = 0; i < 10; i++) {
+        // 如果请求停止，则退出循环
+        if (this.stopRequested) {
+          break;
+        }
 
-      // 如果执行器被暂停，等待恢复
-      if (this.isPaused) {
-        await this.Delay(100);
-        continue;
-      }
+        // 如果执行器被暂停，等待恢复
+        if (this.isPaused) {
+          await this.Delay(100);
+          continue;
+        }
 
-      const tabIds = this.instructionManager.GetAllTabIds();
+        const tabIds = this.instructionManager.GetAllTabIds();
 
-      if (tabIds.length === 0) {
-        break;
-      }
+        if (tabIds.length === 0) {
+          break;
+        }
 
-      for (const tabId of tabIds) {
-        try {
-          // 如果标签页不存在，则跳过
-          const tab = await browser.tabs.get(tabId);
+        for (const tabId of tabIds) {
+          try {
+            // 如果标签页不存在，则跳过
+            const tab = await browser.tabs.get(tabId);
 
-          if (!tab || tab.id !== tabId) {
-            OutputLogToFile(`[InstructionExecutor] Tab not found or ID mismatch, tabId: ${tabId}`, { level: LogLevel.WARN });
-            continue;
-          }
-
-          // 确保 CDP 已连接到标签页（执行 CDP 命令的前提条件）
-          await EnsureCDPConnected(tabId);
-
-          while (true) {
-            // 从指令管理器获取第一个待执行的指令（FIFO）
-            const instruction = this.instructionManager.GetFirstInstructionByTabId(tabId);
-
-            if (!instruction) {
-              break;
+            if (!tab || tab.id !== tabId) {
+              OutputLogToFile(`[InstructionExecutor] Tab not found or ID mismatch, tabId: ${tabId}`, { level: LogLevel.WARN });
+              continue;
             }
 
-            // 执行指令，获取执行结果
-            const result: InstructionResult = await instruction.Execute();
+            // 确保 CDP 已连接到标签页（执行 CDP 命令的前提条件）
+            await EnsureCDPConnected(tabId);
 
-            // 更新执行统计信息
-            this.executedCount++; // 总执行数 +1
+            while (true) {
+              // 从指令管理器获取第一个待执行的指令（FIFO）
+              const instruction = this.instructionManager.GetFirstInstructionByTabId(tabId);
 
-            if (result.success) {
-              this.successCount++; // 成功数 +1
-              OutputLogToFile(`[InstructionExecutor] Instruction executed successfully: ${instruction.instructionID} (${instruction.type}), duration: ${result.duration}ms`, { level: LogLevel.INFO });
-            } else {
-              this.errorCount++; // 失败数 +1
-              OutputLogToFile(`[InstructionExecutor] Instruction execution failed: ${instruction.instructionID} (${instruction.type}), error: ${result.error || 'unknown error'}, duration: ${result.duration}ms`, { level: LogLevel.ERROR });
+              if (!instruction) {
+                break;
+              }
+
+              // 执行指令，获取执行结果
+              const result: InstructionResult = await instruction.Execute();
+
+              // 更新执行统计信息
+              this.executedCount++; // 总执行数 +1
+
+              if (result.success) {
+                this.successCount++; // 成功数 +1
+                OutputLogToFile(`[InstructionExecutor] Instruction executed successfully: ${instruction.instructionID} (${instruction.type}), duration: ${result.duration}ms`, { level: LogLevel.INFO });
+              } else {
+                this.errorCount++; // 失败数 +1
+                OutputLogToFile(`[InstructionExecutor] Instruction execution failed: ${instruction.instructionID} (${instruction.type}), error: ${result.error || 'unknown error'}, duration: ${result.duration}ms`, { level: LogLevel.ERROR });
+              }
+
+              this.resultManager.SaveResult(result);
             }
 
-            this.resultManager.SaveResult(result);
+            const results = this.resultManager.GetResultAndDelete(tabId) ?? [];
+            this.sendResult?.({ tabId: tabId, results: results });
+          } catch (error) {
+            OutputLogToFile(`[InstructionExecutor] Error processing tab ${tabId}: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+          } finally {
+            await DisconnectCDP(tabId);
           }
-
-          const results = this.resultManager.GetResultAndDelete(tabId) ?? [];
-          this.sendResult?.({ tabId: tabId, results: results });
-        } finally {
-          await DisconnectCDP(tabId);
         }
       }
+    } catch (error) {
+      OutputLogToFile(`[InstructionExecutor] Execution error: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+    } finally {
+      // 确保无论是否发生异常，都重置执行状态
+      this.isRunning = false;
+      this.isPaused = false;
+      this.stopRequested = false;
+      OutputLogToFile(`[InstructionExecutor] Execution finished, statistics: total=${this.executedCount}, success=${this.successCount}, failed=${this.errorCount}`, { level: LogLevel.INFO });
     }
-
-    this.isRunning = false;
-    this.isPaused = false;
-    this.stopRequested = true;
-    OutputLogToFile(`[InstructionExecutor] Execution finished, statistics: total=${this.executedCount}, success=${this.successCount}, failed=${this.errorCount}`, { level: LogLevel.INFO });
   }
 
   /**
