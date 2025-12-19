@@ -1,5 +1,5 @@
 import type { BaseInstructionClass } from '../instructions';
-import { OutputLogToFile, LogLevel } from '../utils';
+import { LogLevel, OutputLogToFile } from '../utils';
 
 /**
  * 指令对象管理器
@@ -56,7 +56,7 @@ export class InstructionManager {
       this.instructionsMap.set(tabId, []);
     }
     // 根据 created_at 排序，时间越早的越靠前（FIFO 队列）
-    instructions.sort((a, b) => a.created_at - b.created_at);
+    instructions.sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0));
     // 将排序后的指令添加到该标签页的指令列表
     this.instructionsMap.get(tabId)!.push(...instructions);
     OutputLogToFile(`[InstructionManager] Added instructions to tab successfully, tabId: ${tabId}, count: ${instructions.length}`, { level: LogLevel.INFO });
@@ -125,7 +125,7 @@ export class InstructionManager {
   public DeleteInstructionsByCreatedAtBefore(tabId: number, created_at: number): void {
     const instructions = this.instructionsMap.get(tabId);
     if (instructions) {
-      const filtered = instructions.filter(inst => inst.created_at > created_at);
+      const filtered = instructions.filter(inst => (inst.created_at ?? 0) > created_at);
       // 如果过滤后数组为空，删除对应的 key
       if (filtered.length === 0) {
         this.instructionsMap.delete(tabId);
