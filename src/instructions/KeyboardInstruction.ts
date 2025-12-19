@@ -1,6 +1,6 @@
-import type { KeyboardInstruction, InstructionResult } from '../types';
-import { BaseInstructionClass } from './BaseInstruction';
 import { elementManager } from '../managers';
+import type { InstructionResult, KeyboardInstruction } from '../types';
+import { BaseInstructionClass } from './BaseInstruction';
 
 /**
  * 键盘操作指令
@@ -102,40 +102,6 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
     }
 
     /**
-     * 准备元素（聚焦、滚动等）
-     * @returns 成功返回 true，失败返回错误信息
-     */
-    private async prepareElement(): Promise<{ success: true } | { success: false; error: string }> {
-        if (!this.params.elementName) {
-            return { success: true };
-        }
-
-        // 从 elementManager 获取元素
-        const element = elementManager.GetElementByName(this.tabId, this.params.elementName);
-
-        if (!element) {
-            return { success: false, error: `Element "${this.params.elementName}" not found in element manager` };
-        }
-
-        // 获取元素的 nodeId 和 tag
-        const nodeId = element.GetNodeId();
-        const tag = element.GetTag();
-
-        if (!nodeId) {
-            return { success: false, error: `Element "${this.params.elementName}" has no nodeId. Make sure the element was found using FindElementInstruction first.` };
-        }
-
-        // 启用 DOM 域
-        await this.ExecuteCDPCommand('DOM.enable');
-        // 滚动到元素位置
-        await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: nodeId });
-        // 聚焦元素
-        await this.ExecuteCDPCommand('DOM.focus', { nodeId: nodeId });
-
-        return { success: true };
-    }
-
-    /**
      * 发送键盘事件
      * @param type - 事件类型：'keyDown' | 'keyUp' | 'char'
      * @param key - 按键
@@ -219,11 +185,24 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
         const result = await this.Retry(async () => {
             let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
-            // 准备元素（聚焦、滚动等）
-            const prepareResult = await this.prepareElement();
+            if (this.params.elementName) {
+                // 从 elementManager 获取元素
+                const element = elementManager.GetElementByName(this.tabId, this.params.elementName);
 
-            if (!prepareResult.success) {
-                return { ...defaultResult, error: prepareResult.error };
+                if (!element) {
+                    return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` };
+                }
+
+                if (!await element.LocateElement()) {
+                    return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` };
+                }
+
+                const nodeId = element.GetNodeId();
+
+                // 滚动到元素位置
+                await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: nodeId });
+                // 聚焦元素
+                await this.ExecuteCDPCommand('DOM.focus', { nodeId: nodeId });
             }
 
             // 根据操作类型执行相应的键盘操作

@@ -1,7 +1,7 @@
-import type { MouseInstruction, InstructionResult } from '../types';
-import { BaseInstructionClass } from './BaseInstruction';
 import { elementManager } from '../managers';
-import { OutputLogToFile, LogLevel } from '../utils';
+import type { InstructionResult, MouseInstruction } from '../types';
+import { LogLevel, OutputLogToFile } from '../utils';
+import { BaseInstructionClass } from './BaseInstruction';
 
 /**
  * 鼠标操作指令
@@ -303,23 +303,20 @@ export class MouseInstructionClass extends BaseInstructionClass {
                     return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` };
                 }
 
-                // 获取元素的 nodeId
-                const nodeId = element.GetNodeId();
-
-                if (!nodeId) {
-                    return { ...defaultResult, error: `Element "${this.params.elementName}" has no nodeId. Make sure the element was found using FindElementInstruction first.` };
+                if (!await element.LocateElement()) {
+                    return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` };
                 }
 
                 // 启用 DOM 域
                 await this.ExecuteCDPCommand('DOM.enable');
                 // 滚动到元素位置
-                await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: nodeId });
+                await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: element.GetNodeId() });
                 // 聚焦元素
-                await this.ExecuteCDPCommand('DOM.focus', { nodeId: nodeId });
+                await this.ExecuteCDPCommand('DOM.focus', { nodeId: element.GetNodeId() });
 
                 // 使用 CDP 获取元素的边界框
                 const boxModel = await this.ExecuteCDPCommand('DOM.getBoxModel', {
-                    nodeId: nodeId
+                    nodeId: element.GetNodeId()
                 });
 
                 if (boxModel?.model?.content && boxModel.model.content.length >= 8) {

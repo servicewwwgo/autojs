@@ -5,7 +5,7 @@ export interface ElementData {
   dom?: HTMLElement;                      // 元素DOM
   nodeId?: number;                        // CDP节点ID
   tag?: string;                           // 元素标签 - 由 background script 脚本在定位到元素后設置
-  tabId?: number;                         // 标签页ID
+  tabId: number;                          // 标签页ID
   name: string;                           // 元素名称
   description: string;                    // 元素描述
   backup?: string;                        // 元素備注

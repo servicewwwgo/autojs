@@ -29,39 +29,15 @@ export class InputInstructionClass extends BaseInstructionClass {
                 return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` };
             }
 
-            // 获取元素的 nodeId 和 tag
-            const nodeId = element.GetNodeId();
-            const tag = element.GetTag();
-
-            if (!nodeId) {
-                return { ...defaultResult, error: `Element "${this.params.elementName}" has no nodeId. Make sure the element was found using FindElementInstruction first.` };
-            }
-
-            // 验证 nodeId 是否为有效数字
-            if (typeof nodeId !== 'number' || nodeId <= 0 || !Number.isInteger(nodeId)) {
-                return { ...defaultResult, error: `Element "${this.params.elementName}" has invalid nodeId: ${nodeId}. nodeId must be a positive integer.` };
-            }
-
-            // 启用 DOM 域
-            await this.ExecuteCDPCommand('DOM.enable');
-
-            // 验证 nodeId 是否仍然有效（通过尝试获取节点信息）
-            try {
-                await this.ExecuteCDPCommand('DOM.describeNode', { nodeId: nodeId });
-            } catch (error) {
-                const errorMsg = error instanceof Error ? error.message : String(error);
-                // 如果 nodeId 无效，返回更明确的错误信息
-                if (errorMsg.includes('Could not find node') || errorMsg.includes('node with given id')) {
-                    return { ...defaultResult, error: `Element "${this.params.elementName}" nodeId (${nodeId}) is no longer valid. The element may have been removed from the DOM. Please re-find the element using FindElementInstruction.` };
-                }
-                // 其他错误继续抛出
-                throw error;
+            // 定位元素
+            if (!await element.LocateElement()) {
+                return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` };
             }
 
             // 滚动到元素位置
-            await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: nodeId });
+            await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: element.GetNodeId() });
             // 聚焦元素
-            await this.ExecuteCDPCommand('DOM.focus', { nodeId: nodeId });
+            await this.ExecuteCDPCommand('DOM.focus', { nodeId: element.GetNodeId() });
 
             // 如果需要清空输入框，先选中所有文本（Ctrl+A）
             if (this.params.clear === true) {

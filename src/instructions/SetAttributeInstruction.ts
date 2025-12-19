@@ -1,7 +1,7 @@
-import type { SetAttributeInstruction, InstructionResult } from '../types';
-import { BaseInstructionClass } from './BaseInstruction';
 import { elementManager } from '../managers';
-import { OutputLogToFile, LogLevel } from '../utils';
+import type { InstructionResult, SetAttributeInstruction } from '../types';
+import { LogLevel, OutputLogToFile } from '../utils';
+import { BaseInstructionClass } from './BaseInstruction';
 
 /**
  * 设置元素属性指令
@@ -29,11 +29,8 @@ export class SetAttributeInstructionClass extends BaseInstructionClass {
                 return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` };
             }
 
-            // 获取元素的 nodeId
-            const nodeId = element.GetNodeId();
-
-            if (!nodeId) {
-                return { ...defaultResult, error: `Element "${this.params.elementName}" has no nodeId. Make sure the element was found using FindElementInstruction first.` };
+            if (!await element.LocateElement()) {
+                return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` };
             }
 
             // 如果设置了延迟，先等待
@@ -41,7 +38,7 @@ export class SetAttributeInstructionClass extends BaseInstructionClass {
 
             // 使用 CDP 的 DOM.setAttributeValue 方法设置属性
             await this.ExecuteCDPCommand('DOM.setAttributeValue', {
-                nodeId: nodeId,
+                nodeId: element.GetNodeId(),
                 name: this.params.attribute,
                 value: this.params.value
             });
