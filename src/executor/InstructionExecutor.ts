@@ -1,7 +1,7 @@
 import { BaseInstructionClass, InstructionFactory } from '../instructions';
 import { InstructionManager, ResultManager } from '../managers';
 import { BaseInstruction, ExecutorStatus, InstructionResult, InstructionResults, WSMessage } from '../types';
-import { DisconnectCDP, EnsureCDPConnected, LogLevel, OutputLogToFile } from '../utils';
+import { EnsureCDPConnected, LogLevel, OutputLogToFile } from '../utils';
 
 /**
  * 指令执行器
@@ -219,8 +219,6 @@ export class InstructionExecutor {
             } else {
               OutputLogToFile(`[InstructionExecutor] Error processing tab ${tabId}: ${errorMsg}`, { level: LogLevel.ERROR });
             }
-          } finally {
-            await DisconnectCDP(tabId);
           }
         }
       }
