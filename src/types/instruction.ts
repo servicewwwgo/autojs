@@ -58,7 +58,8 @@ export interface BaseInstruction {
 export interface NavigateInstruction extends BaseInstruction {
   type: 'navigate';
   params: {
-    url: string;
+    url?: string;
+    target?: 'current' | 'new_tab';
     waitUntil?: 'load' | 'domcontentloaded' | 'networkidle0' | 'networkidle2';
   };
 }

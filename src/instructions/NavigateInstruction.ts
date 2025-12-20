@@ -1,13 +1,13 @@
-import type { NavigateInstruction, InstructionResult } from '../types';
+import type { InstructionResult, NavigateInstruction } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
-import { OutputLogToFile, LogLevel } from '../utils';
 
 /**
  * 页面导航指令
  */
 export class NavigateInstructionClass extends BaseInstructionClass {
     public params: {
-        url: string;
+        url?: string;
+        target?: 'current' | 'new_tab';
         waitUntil?: 'load' | 'domcontentloaded' | 'networkidle0' | 'networkidle2';
     };
 
@@ -31,8 +31,12 @@ export class NavigateInstructionClass extends BaseInstructionClass {
             // 如果设置了延迟，先等待
             await this.Delay(this.delay);
 
-            // 使用 browser.tabs API 导航到指定 URL
-            await browser.tabs.update(this.tabId, { url: this.params.url });
+            // 根据目标类型导航
+            if (this.params.target === 'current') {
+                await browser.tabs.update(this.tabId, { url: this.params.url ?? '' });
+            } else if (this.params.target === 'new_tab') {
+                await browser.tabs.create({ url: this.params.url ?? '' });
+            }
 
             // 等待页面加载完成
             await this.WaitForPageLoad();
