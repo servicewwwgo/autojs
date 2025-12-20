@@ -2,9 +2,9 @@
  * 元素对象成员类型
  */
 export interface ElementData {
-  dom?: HTMLElement;                      // 元素DOM
-  nodeId?: number;                        // CDP节点ID
-  tag?: string;                           // 元素标签 - 由 background script 脚本在定位到元素后設置
+  dom?: HTMLElement;                      // 元素DOM - 由系统自动生成
+  nodeId?: number;                        // CDP节点ID - 由系统自动生成
+  tag?: string;                           // 元素标签 - 由 background script 脚本在定位到元素后設置 - 由系统自动生成, 用户不可设置
   tabId: number;                          // 标签页ID
   name: string;                           // 元素名称
   description: string;                    // 元素描述

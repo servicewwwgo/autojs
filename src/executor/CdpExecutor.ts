@@ -1,4 +1,4 @@
-import type { CdpCloseConsoleLogsMessage, CdpCloseConsoleLogsResult, CdpCloseNetworkLogsMessage, CdpCloseNetworkLogsResult, CdpConnectMessage, CdpConnectResult, CdpDisconnectMessage, CdpDisconnectResult, CdpExecuteJavaScriptMessage, CdpExecuteJavaScriptResult, CdpGetConsoleLogsMessage, CdpGetConsoleLogsResult, CdpGetNetworkLogsMessage, CdpGetNetworkLogsResult, CdpGrepSourceMessage, CdpGrepSourceResult, CdpInitConsoleLogsMessage, CdpInitConsoleLogsResult, CdpInitNetworkLogsMessage, CdpInitNetworkLogsResult, CdpListTargetsMessage, CdpListTargetsResult, CdpMessage, CdpResult, CdpSendCommandMessage, CdpSendCommandResult, CdpTakeElementScreenshotMessage, CdpTakeElementScreenshotResult } from '../types';
+import type { CdpCloseConsoleLogsMessage, CdpCloseConsoleLogsResult, CdpCloseNetworkLogsMessage, CdpCloseNetworkLogsResult, CdpConnectMessage, CdpConnectResult, CdpCreateTabAndNavigateMessage, CdpCreateTabAndNavigateResult, CdpDisconnectMessage, CdpDisconnectResult, CdpExecuteJavaScriptMessage, CdpExecuteJavaScriptResult, CdpGetConsoleLogsMessage, CdpGetConsoleLogsResult, CdpGetNetworkLogsMessage, CdpGetNetworkLogsResult, CdpGrepSourceMessage, CdpGrepSourceResult, CdpInitConsoleLogsMessage, CdpInitConsoleLogsResult, CdpInitNetworkLogsMessage, CdpInitNetworkLogsResult, CdpListTargetsMessage, CdpListTargetsResult, CdpMessage, CdpResult, CdpSendCommandMessage, CdpSendCommandResult, CdpTakeElementScreenshotMessage, CdpTakeElementScreenshotResult } from '../types';
 import { DisconnectCDP, EnsureCDPConnected, ExecuteCDPCommand, LogLevel, OutputLogToFile } from '../utils';
 
 /**
@@ -30,6 +30,7 @@ export class CdpExecutor {
             'init_console_logs': (data: any) => this.handleInitConsoleLogs(data),
             'close_network_logs': (data: any) => this.handleCloseNetworkLogs(data),
             'close_console_logs': (data: any) => this.handleCloseConsoleLogs(data),
+            'create_tab_and_navigate': (data: any) => this.handleCreateTabAndNavigate(data),
         };
     }
 
@@ -128,6 +129,73 @@ export class CdpExecutor {
         defaultResult = { type: msg.type, id: msg.id, success: true, data: tabs } as CdpListTargetsResult;
         OutputLogToFile(`[CdpExecutor] Listed targets successfully, count: ${tabs.length}`, { level: LogLevel.INFO });
         this.sendResult?.(defaultResult as CdpListTargetsResult);
+    }
+
+    // 创建新标签页并导航到指定URL
+    private async handleCreateTabAndNavigate(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpCreateTabAndNavigateMessage = cdpMessage as CdpCreateTabAndNavigateMessage;
+        let defaultResult: CdpCreateTabAndNavigateResult | undefined;
+
+        if (msg.data === undefined) {
+            throw new Error('data is undefined in create_tab_and_navigate');
+        }
+
+        if (!msg.data.url || typeof msg.data.url !== 'string') {
+            throw new Error('url is required and must be a string in create_tab_and_navigate');
+        }
+
+        // 创建新标签页（创建时指定 URL，浏览器会自动导航）
+        const newTab = await browser.tabs.create({
+            url: msg.data.url,
+            active: msg.data.active !== undefined ? msg.data.active : true
+        });
+
+        if (!newTab.id) {
+            throw new Error('failed to create new tab');
+        }
+
+        const tabId = newTab.id;
+
+        // 等待标签页加载完成
+        await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                browser.tabs.onUpdated.removeListener(listener);
+                reject(new Error('timeout waiting for tab to load'));
+            }, 30000); // 30秒超时
+
+            const listener = (updatedTabId: number, changeInfo: any) => {
+                if (updatedTabId === tabId && changeInfo.status === 'complete') {
+                    clearTimeout(timeout);
+                    browser.tabs.onUpdated.removeListener(listener);
+                    resolve();
+                }
+            };
+            browser.tabs.onUpdated.addListener(listener);
+
+            // 如果标签页已经加载完成，立即解析
+            if (newTab.status === 'complete') {
+                clearTimeout(timeout);
+                browser.tabs.onUpdated.removeListener(listener);
+                resolve();
+            }
+        });
+
+        // 获取标签页信息
+        const tab = await browser.tabs.get(tabId);
+
+        defaultResult = {
+            type: msg.type,
+            id: msg.id,
+            success: true,
+            data: {
+                tabId: tabId,
+                tabIndex: tab.index || 0,
+                url: tab.url || tab.pendingUrl || msg.data.url
+            }
+        } as CdpCreateTabAndNavigateResult;
+
+        OutputLogToFile(`[CdpExecutor] Created tab and navigated successfully, tabId: ${tabId}, url: ${msg.data.url}`, { level: LogLevel.INFO });
+        this.sendResult?.(defaultResult as CdpCreateTabAndNavigateResult);
     }
 
     // 执行 JavaScript 代码

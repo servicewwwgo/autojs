@@ -2,7 +2,7 @@
  * CDP 消息数据映射类型
  */
 export interface CdpMessage {
-    type: 'cdp_connect' | 'cdp_disconnect' | 'list_targets' | 'take_element_screenshot' | 'send_command' | 'grep_source' | 'get_network_logs' | 'get_console_logs' | 'execute_javascript' | 'init_network_logs' | 'init_console_logs' | 'close_network_logs' | 'close_console_logs';
+    type: 'cdp_connect' | 'cdp_disconnect' | 'list_targets' | 'take_element_screenshot' | 'send_command' | 'grep_source' | 'get_network_logs' | 'get_console_logs' | 'execute_javascript' | 'init_network_logs' | 'init_console_logs' | 'close_network_logs' | 'close_console_logs' | 'create_tab_and_navigate';
     id: string;
     data?: any;
 }
@@ -293,5 +293,27 @@ export interface CdpCloseConsoleLogsResult extends CdpResult {
     data?: {
         tabId: number;
         message: string;
+    };
+}
+
+/**
+ * CDP create_tab_and_navigate 消息数据映射类型
+ */
+export interface CdpCreateTabAndNavigateMessage extends CdpMessage {
+    type: 'create_tab_and_navigate';
+    data?: {
+        url: string;
+        active?: boolean;
+    };
+}
+
+/**
+ * CDP create_tab_and_navigate 结果数据映射类型
+ */
+export interface CdpCreateTabAndNavigateResult extends CdpResult {
+    data?: {
+        tabId: number;
+        tabIndex: number;
+        url: string;
     };
 }
