@@ -6,9 +6,7 @@ import { BaseInstructionClass } from './BaseInstruction';
  */
 export class NavigateInstructionClass extends BaseInstructionClass {
     public params: {
-        url?: string;
-        target?: 'current' | 'new_tab';
-        waitUntil?: 'load' | 'domcontentloaded' | 'networkidle0' | 'networkidle2';
+        url: string;
     };
 
     constructor(instruction: NavigateInstruction) {
@@ -31,12 +29,8 @@ export class NavigateInstructionClass extends BaseInstructionClass {
             // 如果设置了延迟，先等待
             await this.Delay(this.delay);
 
-            // 根据目标类型导航
-            if (this.params.target === 'current') {
-                await browser.tabs.update(this.tabId, { url: this.params.url ?? '' });
-            } else if (this.params.target === 'new_tab') {
-                await browser.tabs.create({ url: this.params.url ?? '' });
-            }
+            // 使用 browser.tabs.update API 导航到指定 URL
+            await browser.tabs.update(this.tabId, { url: this.params.url });
 
             // 等待页面加载完成
             await this.WaitForPageLoad();
