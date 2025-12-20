@@ -1,5 +1,5 @@
-import type { CdpMessage, CdpResult, CdpConnectMessage, CdpConnectResult, CdpDisconnectMessage, CdpDisconnectResult, CdpListTargetsMessage, CdpListTargetsResult, CdpExecuteJavaScriptMessage, CdpExecuteJavaScriptResult, CdpTakeElementScreenshotMessage, CdpTakeElementScreenshotResult, CdpSendCommandMessage, CdpSendCommandResult, CdpGrepSourceMessage, CdpGrepSourceResult, CdpGetNetworkLogsMessage, CdpGetNetworkLogsResult, CdpInitNetworkLogsMessage, CdpInitNetworkLogsResult, CdpGetConsoleLogsMessage, CdpGetConsoleLogsResult, CdpInitConsoleLogsMessage, CdpInitConsoleLogsResult, CdpCloseNetworkLogsMessage, CdpCloseNetworkLogsResult, CdpCloseConsoleLogsMessage, CdpCloseConsoleLogsResult } from '../types';
-import { EnsureCDPConnected, DisconnectCDP, ExecuteCDPCommand, OutputLogToFile, LogLevel } from '../utils';
+import type { CdpCloseConsoleLogsMessage, CdpCloseConsoleLogsResult, CdpCloseNetworkLogsMessage, CdpCloseNetworkLogsResult, CdpConnectMessage, CdpConnectResult, CdpDisconnectMessage, CdpDisconnectResult, CdpExecuteJavaScriptMessage, CdpExecuteJavaScriptResult, CdpGetConsoleLogsMessage, CdpGetConsoleLogsResult, CdpGetNetworkLogsMessage, CdpGetNetworkLogsResult, CdpGrepSourceMessage, CdpGrepSourceResult, CdpInitConsoleLogsMessage, CdpInitConsoleLogsResult, CdpInitNetworkLogsMessage, CdpInitNetworkLogsResult, CdpListTargetsMessage, CdpListTargetsResult, CdpMessage, CdpResult, CdpSendCommandMessage, CdpSendCommandResult, CdpTakeElementScreenshotMessage, CdpTakeElementScreenshotResult } from '../types';
+import { DisconnectCDP, EnsureCDPConnected, ExecuteCDPCommand, LogLevel, OutputLogToFile } from '../utils';
 
 /**
  * CDP (Chrome DevTools Protocol) 执行器
@@ -175,6 +175,9 @@ export class CdpExecutor {
             throw new Error('selector is required and must be a string in take_element_screenshot');
         }
 
+        // 确保 CDP 连接
+        await EnsureCDPConnected(msg.data.tabId);
+
         // 步骤1: 启用 DOM 域和 Page 域
         await ExecuteCDPCommand(msg.data.tabId, 'DOM.enable');
         await ExecuteCDPCommand(msg.data.tabId, 'Page.enable');
@@ -289,6 +292,9 @@ export class CdpExecutor {
             throw new Error('method is required and must be a string in send_command');
         }
 
+        // 确保 CDP 连接
+        await EnsureCDPConnected(msg.data.tabId);
+
         // 执行 CDP 命令（params 可以为 undefined，因为某些 CDP 命令不需要参数）
         const result = await ExecuteCDPCommand(msg.data.tabId, msg.data.method, msg.data.params);
 
@@ -319,6 +325,10 @@ export class CdpExecutor {
         const tabId = data.tabId;
         const pattern = data.pattern;
         const caseSensitive = data.caseSensitive;
+
+        // 确保 CDP 连接
+        await EnsureCDPConnected(tabId);
+
         // 启用 Page 域以获取页面源码
         await ExecuteCDPCommand(tabId, 'Page.enable');
 
@@ -498,6 +508,9 @@ export class CdpExecutor {
             throw new Error('tabId is required and must be a number in init_network_logs');
         }
 
+        // 确保 CDP 连接
+        await EnsureCDPConnected(msg.data.tabId);
+
         // 启用 Network 域以开始收集网络日志
         await ExecuteCDPCommand(msg.data.tabId, 'Network.enable');
 
@@ -525,6 +538,9 @@ export class CdpExecutor {
         if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
             throw new Error('tabId is required and must be a number in init_console_logs');
         }
+
+        // 确保 CDP 连接
+        await EnsureCDPConnected(msg.data.tabId);
 
         // 启用 Runtime 域以开始收集控制台日志（控制台日志通过 Runtime.consoleAPICalled 事件收集）
         await ExecuteCDPCommand(msg.data.tabId, 'Runtime.enable');
@@ -554,6 +570,9 @@ export class CdpExecutor {
             throw new Error('tabId is required and must be a number in close_network_logs');
         }
 
+        // 确保 CDP 连接
+        await EnsureCDPConnected(msg.data.tabId);
+
         // 禁用 Network 域以停止收集网络日志
         await ExecuteCDPCommand(msg.data.tabId, 'Network.disable');
 
@@ -579,6 +598,9 @@ export class CdpExecutor {
         if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
             throw new Error('tabId is required and must be a number in close_console_logs');
         }
+
+        // 确保 CDP 连接
+        await EnsureCDPConnected(msg.data.tabId);
 
         // 禁用 Runtime 域以停止收集控制台日志
         await ExecuteCDPCommand(msg.data.tabId, 'Runtime.disable');
