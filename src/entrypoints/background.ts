@@ -297,11 +297,14 @@ export default defineBackground(() => {
     };
 
     async function ws_check(): Promise<void> {
-        // 如果已经连接，直接返回，不执行 send_tabs
+        // 实际检查 WebSocket 连接状态，防止 Service Worker 休眠后状态不一致
+        // 如果已经连接且 WebSocket 实际处于 OPEN 状态，直接返回
         if (wsConnector.isConnected()) {
             OutputLogToFile('[Background] WebSocket already connected, skipping connection and send_tabs', { level: LogLevel.INFO });
             return;
         }
+
+        OutputLogToFile('[Background] WebSocket not connected or connection lost, attempting to connect...', { level: LogLevel.INFO });
 
         // 启动连接（异步操作，不等待完成）
         wsConnector.connect().catch(error => {
@@ -444,9 +447,11 @@ export default defineBackground(() => {
         await initialize();
     });
 
-    // Chrome 程序暂停时
+    // Chrome Service Worker 暂停时（Manifest V3）
     browser.runtime.onSuspend.addListener(async () => {
-        OutputLogToFile('[Background] Chrome program suspended, stopping execution', { level: LogLevel.INFO });
+        OutputLogToFile('[Background] Service Worker suspended, WebSocket connection may be lost', { level: LogLevel.WARN });
+        // 注意：Service Worker 休眠时，WebSocket 连接会被断开
+        // 当 Service Worker 被唤醒时（通过 alarm），会通过 ws_check() 重新连接
     });
 
     // 点击扩展图标时打开侧边栏
@@ -505,6 +510,8 @@ export default defineBackground(() => {
         switch (alarm.name) {
             case 'connect_websocket':
                 {
+                    // Service Worker 可能刚从休眠中唤醒，检查并修复连接状态
+                    OutputLogToFile('[Background] Checking WebSocket connection after Service Worker wake-up', { level: LogLevel.INFO });
                     await ws_check();
                     break;
                 }

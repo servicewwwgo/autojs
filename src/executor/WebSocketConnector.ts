@@ -1,11 +1,11 @@
-import type { WSMessage, WSLoginMessage, WSLoginResponse, WSHeartbeatMessage, WSHeartbeatResponse, WSErrorMessage, TabInfo, BackgroundScriptMessageType } from '../types';
-import { OutputLogToFile, LogLevel, SendMessageToBackgroundScript } from '../utils';
 import { nodeConfig } from '../managers';
+import type { TabInfo, WSErrorMessage, WSHeartbeatMessage, WSHeartbeatResponse, WSLoginMessage, WSLoginResponse, WSMessage } from '../types';
+import { LogLevel, OutputLogToFile } from '../utils';
 
 // 检查消息大小，避免发送过大的消息
 const MAX_MESSAGE_SIZE = 10 * 1024 * 1024; // 10MB
 
-const HEARTBEAT_INTERVAL = 120000; // 120秒心跳间隔
+const HEARTBEAT_INTERVAL = 30000; // 30秒心跳间隔（缩短以更快检测断开）
 const RECONNECT_INTERVAL = 5000; // 5秒重连间隔
 
 /**
@@ -43,6 +43,17 @@ export class WebSocketConnector {
      * @throws {Error} 如果 URL 无效或连接失败
      */
     public async connect(): Promise<void> {
+        // 检查 WebSocket 实际状态，如果存在但状态不是 OPEN，需要清理
+        if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
+            OutputLogToFile(`[WebSocket] WebSocket exists but state is not OPEN (state: ${this.ws.readyState}), cleaning up`, { level: LogLevel.WARN });
+            this.clearReconnectTimer();
+            this.stopHeartbeat();
+            this.cleanupWebSocket();
+            this.ws = null;
+            this.connected = false;
+            this.isLoggedIn = false;
+        }
+
         // 如果已经连接且已登录，直接返回
         if (this.isWebSocketOpen() && this.isConnected()) {
             OutputLogToFile('[WebSocket] Already connected and logged in, returning', { level: LogLevel.INFO });
@@ -344,7 +355,20 @@ export class WebSocketConnector {
      * @returns 是否已连接且已登录
      */
     public isConnected(): boolean {
-        return this.connected && this.isLoggedIn;
+        // 实际检查 WebSocket 状态，防止 Service Worker 休眠后状态不一致
+        const wsOpen = this.isWebSocketOpen();
+        const stateMatch = this.connected && this.isLoggedIn;
+
+        // 如果状态不一致，修正状态
+        if (stateMatch && !wsOpen) {
+            OutputLogToFile('[WebSocket] State mismatch detected: marked as connected but WebSocket is not open, correcting state', { level: LogLevel.WARN });
+            this.connected = false;
+            this.isLoggedIn = false;
+            this.stopHeartbeat();
+            return false;
+        }
+
+        return wsOpen && stateMatch;
     }
 
     /**
