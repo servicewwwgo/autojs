@@ -1,5 +1,5 @@
+import { DEBUG_MODE } from '../consts';
 import type { BackgroundScriptMessageType, ContentScriptMessageType, PopupScriptMessageType } from '../types';
-
 /**
  * 生成UUID
  * 
@@ -361,6 +361,11 @@ function formatLogMessage(message: string, options: LogOptions = {}): {
  */
 export function OutputLogToFile(message: string | object, options: LogOptions = {}): void {
     try {
+        // 只有DEBUG_MODE为true时才输出日志
+        if (!DEBUG_MODE) {
+            return;
+        }
+
         // 格式化日志消息
         const formattedLog = formatLogMessage(
             typeof message === 'string' ? message : JSON.stringify(message),
