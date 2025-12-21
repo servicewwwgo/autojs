@@ -1,11 +1,11 @@
 import { nodeConfig } from '../managers';
-import type { TabInfo, WSErrorMessage, WSHeartbeatMessage, WSHeartbeatResponse, WSLoginMessage, WSLoginResponse, WSMessage } from '../types';
+import type { WSErrorMessage, WSHeartbeatMessage, WSHeartbeatResponse, WSLoginMessage, WSLoginResponse, WSMessage } from '../types';
 import { LogLevel, OutputLogToFile } from '../utils';
 
 // 检查消息大小，避免发送过大的消息
 const MAX_MESSAGE_SIZE = 10 * 1024 * 1024; // 10MB
 
-const HEARTBEAT_INTERVAL = 30000; // 30秒心跳间隔（缩短以更快检测断开）
+const HEARTBEAT_INTERVAL = 15000; // 15秒心跳间隔（缩短以更快检测断开）
 const RECONNECT_INTERVAL = 5000; // 5秒重连间隔
 
 /**
@@ -278,26 +278,6 @@ export class WebSocketConnector {
         const jsonString = JSON.stringify(message);
 
         this.ws?.send(jsonString);
-
-        return true;
-    }
-
-    /**
-     * 发送所有标签页信息
-     */
-    private async sendAllTabsInfo(): Promise<boolean> {
-        const tabs = await browser.tabs.query({});
-
-        for (const tab of tabs) {
-            const message: WSMessage = {
-                type: 'tabs', data: {
-                    tabId: tab.id as number,
-                    tabIndex: tab.index as number,
-                    url: tab.url as string
-                } as TabInfo
-            } as WSMessage;
-            this.sendMessage(message);
-        }
 
         return true;
     }
