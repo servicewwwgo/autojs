@@ -155,6 +155,24 @@ export interface ScreenshotInstruction extends BaseInstruction {
 }
 
 /**
+ * 等待指令
+ */
+export interface WaitInstruction extends BaseInstruction {
+  type: 'wait';
+  params: {
+    waitType: 'wait_title_contains' | 'wait_element_exists' | 'wait_element_visible' | 'wait_attribute_contains';
+    // wait_title_contains 参数
+    titleText?: string;
+    // wait_element_exists 和 wait_element_visible 参数
+    element?: ElementData;
+    elementName?: string;
+    // wait_attribute_contains 参数
+    attribute?: string;
+    attributeText?: string;
+  };
+}
+
+/**
  * 指令联合类型
  */
 export type Instruction =
@@ -167,4 +185,5 @@ export type Instruction =
   | SetAttributeInstruction
   | NavigateInstruction
   | ScreenshotInstruction
-  | ExecuteScriptInstruction;
+  | ExecuteScriptInstruction
+  | WaitInstruction;

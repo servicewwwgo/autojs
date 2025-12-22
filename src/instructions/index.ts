@@ -1,7 +1,7 @@
 /**
  * 指令类统一导出
  */
-import type { Instruction, FindElementInstruction, KeyboardInstruction, MouseInstruction, InputInstruction, GetAttributeInstruction, SetAttributeInstruction, NavigateInstruction, ScreenshotInstruction, ExecuteScriptInstruction } from '../types';
+import type { Instruction, FindElementInstruction, KeyboardInstruction, MouseInstruction, InputInstruction, GetAttributeInstruction, SetAttributeInstruction, NavigateInstruction, ScreenshotInstruction, ExecuteScriptInstruction, WaitInstruction } from '../types';
 
 import { BaseInstructionClass } from './BaseInstruction';
 import { FindElementInstructionClass } from './FindElementInstruction';
@@ -13,6 +13,7 @@ import { SetAttributeInstructionClass } from './SetAttributeInstruction';
 import { NavigateInstructionClass } from './NavigateInstruction';
 import { ScreenshotInstructionClass } from './ScreenshotInstruction';
 import { ExecuteScriptInstructionClass } from './ExecuteScriptInstruction';
+import { WaitInstructionClass } from './WaitInstruction';
 
 // 导出基础类
 export { BaseInstructionClass } from './BaseInstruction';
@@ -27,6 +28,7 @@ export { SetAttributeInstructionClass } from './SetAttributeInstruction';
 export { NavigateInstructionClass } from './NavigateInstruction';
 export { ScreenshotInstructionClass } from './ScreenshotInstruction';
 export { ExecuteScriptInstructionClass } from './ExecuteScriptInstruction';
+export { WaitInstructionClass } from './WaitInstruction';
 
 /**
  * 指令工厂类
@@ -61,6 +63,8 @@ export class InstructionFactory {
         return new ScreenshotInstructionClass(instruction as ScreenshotInstruction);
       case 'execute_script':
         return new ExecuteScriptInstructionClass(instruction as ExecuteScriptInstruction);
+      case 'wait':
+        return new WaitInstructionClass(instruction as WaitInstruction);
       default:
         // 使用类型守卫确保类型安全
         const unknownType = (instruction as any).type;

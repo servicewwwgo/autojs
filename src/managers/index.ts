@@ -6,4 +6,4 @@
 export { NodeConfig, nodeConfig } from './NodeManager';
 export { InstructionManager } from './InstructionManager';
 export { ResultManager } from './InstructionResultManager';
-export { ElementClass, ElementManager, elementManager } from './ElementManager';
+export { ElementClass, ElementManager, elementManager, IElement } from './ElementManager';
