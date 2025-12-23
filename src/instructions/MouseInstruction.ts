@@ -29,11 +29,18 @@ export class MouseInstructionClass extends BaseInstructionClass {
     private async NoneMouseTrajectory(targetX: number, targetY: number): Promise<void> {
         try {
             // 直接移動到目標位置，不進行任何軌跡模擬
+            // 注意：CDP 的 mouseMoved 事件不會更新瀏覽器窗口中實際的鼠標指針位置
+            // 這是 Chrome 的安全特性，防止通過 CDP 控制用戶的鼠標指針
+            // 但事件會正確觸發，頁面上的 hover 等事件會正常工作
             await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
                 type: 'mouseMoved',
                 x: targetX,
-                y: targetY
+                y: targetY,
+                button: 'none',
+                modifiers: 0
             });
+            // 等待瀏覽器處理鼠標移動事件
+            await this.Delay(0.05); // 50毫秒
         } catch (error) {
             OutputLogToFile(`[MouseInstruction] Error moving mouse to target position: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
             throw error;
@@ -69,10 +76,22 @@ export class MouseInstructionClass extends BaseInstructionClass {
             const distance = Math.sqrt(Math.pow(targetX - startX, 2) + Math.pow(targetY - startY, 2));
 
             // 根據距離動態調整步數和速度
-            // 距離越遠，步數越多，但每步的間隔時間也會稍微增加
-            const minSteps = 10;
-            const maxSteps = 50;
-            const steps = Math.max(minSteps, Math.min(maxSteps, Math.floor(distance / 20)));
+            // 目標總時間：短距離（<200px）至少 200ms，長距離（>500px）至少 500ms
+            // 確保移動過程可見，模擬真實的鼠標移動速度
+            const minTotalTime = 0.2; // 最小總時間 200ms
+            const maxTotalTime = 0.8; // 最大總時間 800ms
+            const targetTotalTime = Math.min(maxTotalTime, Math.max(minTotalTime, distance / 1000)); // 根據距離計算目標總時間
+
+            // 增加步數，確保移動流暢可見
+            const minSteps = 20;
+            const maxSteps = 80;
+            const steps = Math.max(minSteps, Math.min(maxSteps, Math.floor(distance / 15)));
+
+            // 計算每步的平均延遲時間
+            const avgDelayPerStep = targetTotalTime / steps;
+            // 每步延遲範圍：平均值的 0.7-1.3 倍，添加隨機性
+            const minDelayPerStep = avgDelayPerStep * 0.7;
+            const maxDelayPerStep = avgDelayPerStep * 1.3;
 
             // 生成貝塞爾曲線控制點（添加一些隨機性）
             const controlPoint1X = startX + (targetX - startX) * 0.25 + (Math.random() - 0.5) * distance * 0.1;
@@ -81,7 +100,7 @@ export class MouseInstructionClass extends BaseInstructionClass {
             const controlPoint2Y = startY + (targetY - startY) * 0.75 + (Math.random() - 0.5) * distance * 0.1;
 
             // 生成軌跡點
-            const trajectory: Array<{ x: number; y: number }> = [];
+            const trajectory: Array<{ x: number; y: number; delay: number }> = [];
 
             for (let i = 0; i <= steps; i++) {
                 const t = i / steps;
@@ -101,27 +120,41 @@ export class MouseInstructionClass extends BaseInstructionClass {
                 const jitterX = (Math.random() - 0.5) * 2;
                 const jitterY = (Math.random() - 0.5) * 2;
 
+                // 計算速度曲線（ease-in-out，中間快，兩端慢）
+                const speedFactor = t < 0.5
+                    ? 2 * t * t  // 加速階段
+                    : 1 - Math.pow(-2 * t + 2, 2) / 2; // 減速階段
+
+                // 根據速度曲線計算延遲（中間快，兩端慢）
+                const delay = minDelayPerStep + (maxDelayPerStep - minDelayPerStep) * (1 - speedFactor) + Math.random() * (maxDelayPerStep - minDelayPerStep) * 0.1;
+
                 trajectory.push({
                     x: Math.round(x + jitterX),
-                    y: Math.round(y + jitterY)
+                    y: Math.round(y + jitterY),
+                    delay: Math.max(0.01, delay) // 確保最小延遲 10ms
                 });
             }
 
             // 執行鼠標移動，每個點之間添加隨機延遲
+            // 注意：CDP 的 mouseMoved 事件不會更新瀏覽器窗口中實際的鼠標指針位置
+            // 這是 Chrome 的安全特性，但事件會正確觸發，頁面上的 hover 等事件會正常工作
             for (let i = 0; i < trajectory.length; i++) {
                 const point = trajectory[i];
 
                 await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
                     type: 'mouseMoved',
                     x: point.x,
-                    y: point.y
+                    y: point.y,
+                    button: 'none',
+                    modifiers: 0
                 });
 
-                // 添加隨機延遲（5-15毫秒），模擬真實的鼠標移動速度變化
-                // 注意：Delay 方法使用秒為單位
+                // 使用計算出的延遲時間
                 if (i < trajectory.length - 1) {
-                    const delay = 0.005 + Math.random() * 0.01; // 5-15毫秒
-                    await this.Delay(delay);
+                    await this.Delay(point.delay);
+                } else {
+                    // 最後一個點也需要等待，確保瀏覽器處理鼠標移動事件
+                    await this.Delay(0.05); // 50毫秒
                 }
             }
         } catch (error) {
@@ -130,8 +163,12 @@ export class MouseInstructionClass extends BaseInstructionClass {
             await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
                 type: 'mouseMoved',
                 x: targetX,
-                y: targetY
+                y: targetY,
+                button: 'none',
+                modifiers: 0
             });
+            // 等待瀏覽器處理鼠標移動事件
+            await this.Delay(0.05); // 50毫秒
         }
     }
 
@@ -163,12 +200,24 @@ export class MouseInstructionClass extends BaseInstructionClass {
             // 計算距離
             const distance = Math.sqrt(Math.pow(targetX - startX, 2) + Math.pow(targetY - startY, 2));
 
+            // 根據距離動態調整總時間，確保移動過程可見
+            // 目標總時間：短距離（<200px）至少 250ms，長距離（>500px）至少 600ms
+            const minTotalTime = 0.25; // 最小總時間 250ms
+            const maxTotalTime = 1.0; // 最大總時間 1000ms
+            const targetTotalTime = Math.min(maxTotalTime, Math.max(minTotalTime, distance / 800)); // 根據距離計算目標總時間
+
             // 使用更真實的步數計算（基於 humanize 算法）
             // 步數與距離的關係更接近真實人類移動
-            const minSteps = 15;
-            const maxSteps = 80;
+            const minSteps = 25;
+            const maxSteps = 100;
             // 使用對數函數來計算步數，使短距離和長距離的步數更合理
-            const steps = Math.max(minSteps, Math.min(maxSteps, Math.floor(Math.log(distance + 1) * 10 + distance / 15)));
+            const steps = Math.max(minSteps, Math.min(maxSteps, Math.floor(Math.log(distance + 1) * 12 + distance / 12)));
+
+            // 計算每步的平均延遲時間
+            const avgDelayPerStep = targetTotalTime / steps;
+            // 每步延遲範圍：平均值的 0.6-1.4 倍，添加更多隨機性
+            const minDelayPerStep = avgDelayPerStep * 0.6;
+            const maxDelayPerStep = avgDelayPerStep * 1.4;
 
             // 使用多段貝塞爾曲線（更真實）
             // 將路徑分成多段，每段使用不同的控制點
@@ -219,32 +268,37 @@ export class MouseInstructionClass extends BaseInstructionClass {
                         ? 2 * t * t  // 加速階段
                         : 1 - Math.pow(-2 * t + 2, 2) / 2; // 減速階段
 
-                    // 根據速度曲線計算延遲（中間快，兩端慢）
-                    const baseDelay = 0.008; // 8毫秒基礎延遲
-                    const maxDelay = 0.025; // 25毫秒最大延遲
-                    const delay = baseDelay + (maxDelay - baseDelay) * (1 - speedFactor) + Math.random() * 0.01;
+                    // 根據速度曲線和目標總時間計算延遲（中間快，兩端慢）
+                    const delay = minDelayPerStep + (maxDelayPerStep - minDelayPerStep) * (1 - speedFactor) + Math.random() * (maxDelayPerStep - minDelayPerStep) * 0.15;
 
                     trajectory.push({
                         x: Math.round(x + jitterX),
                         y: Math.round(y + jitterY),
-                        delay: delay
+                        delay: Math.max(0.012, delay) // 確保最小延遲 12ms
                     });
                 }
             }
 
             // 執行鼠標移動
+            // 注意：CDP 的 mouseMoved 事件不會更新瀏覽器窗口中實際的鼠標指針位置
+            // 這是 Chrome 的安全特性，但事件會正確觸發，頁面上的 hover 等事件會正常工作
             for (let i = 0; i < trajectory.length; i++) {
                 const point = trajectory[i];
 
                 await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
                     type: 'mouseMoved',
                     x: point.x,
-                    y: point.y
+                    y: point.y,
+                    button: 'none',
+                    modifiers: 0
                 });
 
-                // 使用計算出的延遲（最後一個點不需要延遲）
+                // 使用計算出的延遲
                 if (i < trajectory.length - 1) {
                     await this.Delay(point.delay);
+                } else {
+                    // 最後一個點也需要等待，確保瀏覽器處理鼠標移動事件
+                    await this.Delay(0.05); // 50毫秒
                 }
             }
         } catch (error) {
@@ -253,8 +307,12 @@ export class MouseInstructionClass extends BaseInstructionClass {
             await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
                 type: 'mouseMoved',
                 x: targetX,
-                y: targetY
+                y: targetY,
+                button: 'none',
+                modifiers: 0
             });
+            // 等待瀏覽器處理鼠標移動事件
+            await this.Delay(0.05); // 50毫秒
         }
     }
 
@@ -335,6 +393,9 @@ export class MouseInstructionClass extends BaseInstructionClass {
             // 执行鼠标操作
             switch (this.params.action) {
                 case 'click':
+                    // 先移动鼠标到目标位置，确保事件正确触发
+                    await this.MoveMouseTo(x, y);
+                    await this.Delay(this.delay);
                     await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
                         type: 'mousePressed',
                         x,
@@ -353,6 +414,9 @@ export class MouseInstructionClass extends BaseInstructionClass {
                     break;
 
                 case 'rightclick':
+                    // 先移动鼠标到目标位置，确保事件正确触发
+                    await this.MoveMouseTo(x, y);
+                    await this.Delay(this.delay);
                     await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
                         type: 'mousePressed',
                         x,
@@ -371,24 +435,43 @@ export class MouseInstructionClass extends BaseInstructionClass {
                     break;
 
                 case 'dblclick':
-                    for (let i = 0; i < 2; i++) {
-                        await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
-                            type: 'mousePressed',
-                            x,
-                            y,
-                            button: 'left',
-                            clickCount: i + 1
-                        });
-                        await this.Delay(0.1);
-                        await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
-                            type: 'mouseReleased',
-                            x,
-                            y,
-                            button: 'left',
-                            clickCount: i + 1
-                        });
-                        if (i === 0) await this.Delay(0.5);
-                    }
+                    // 先移动鼠标到目标位置，确保事件正确触发
+                    await this.MoveMouseTo(x, y);
+                    await this.Delay(this.delay);
+                    // 第一次点击
+                    await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
+                        type: 'mousePressed',
+                        x,
+                        y,
+                        button: 'left',
+                        clickCount: 1
+                    });
+                    await this.Delay(0.1);
+                    await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
+                        type: 'mouseReleased',
+                        x,
+                        y,
+                        button: 'left',
+                        clickCount: 1
+                    });
+                    // 双击间隔：通常 50-200ms，这里使用 150ms
+                    await this.Delay(0.15);
+                    // 第二次点击（clickCount 为 2 表示双击）
+                    await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
+                        type: 'mousePressed',
+                        x,
+                        y,
+                        button: 'left',
+                        clickCount: 2
+                    });
+                    await this.Delay(0.1);
+                    await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
+                        type: 'mouseReleased',
+                        x,
+                        y,
+                        button: 'left',
+                        clickCount: 2
+                    });
                     break;
 
                 case 'hover':

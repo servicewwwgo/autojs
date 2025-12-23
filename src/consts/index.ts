@@ -12,4 +12,4 @@ export const WEBSOCKET_CONN_URL: string = 'ws://test.caiyisong.net:8000/ws';
 /**
  * 调试模式
  */
-export const DEBUG_MODE: boolean = false;
+export const DEBUG_MODE: boolean = true;
