@@ -1,33 +1,35 @@
 /**
  * 指令类统一导出
  */
-import type { Instruction, FindElementInstruction, KeyboardInstruction, MouseInstruction, InputInstruction, GetAttributeInstruction, SetAttributeInstruction, NavigateInstruction, ScreenshotInstruction, ExecuteScriptInstruction, WaitInstruction } from '../types';
+import type { ExecuteScriptInstruction, FindElementInstruction, GetAttributeInstruction, GetUrlInstruction, InputInstruction, Instruction, KeyboardInstruction, MouseInstruction, NavigateInstruction, ScreenshotInstruction, SetAttributeInstruction, WaitInstruction } from '../types';
 
 import { BaseInstructionClass } from './BaseInstruction';
+import { ExecuteScriptInstructionClass } from './ExecuteScriptInstruction';
 import { FindElementInstructionClass } from './FindElementInstruction';
+import { GetAttributeInstructionClass } from './GetAttributeInstruction';
+import { GetUrlInstructionClass } from './GetUrlInstruction';
+import { InputInstructionClass } from './InputInstruction';
 import { KeyboardInstructionClass } from './KeyboardInstruction';
 import { MouseInstructionClass } from './MouseInstruction';
-import { InputInstructionClass } from './InputInstruction';
-import { GetAttributeInstructionClass } from './GetAttributeInstruction';
-import { SetAttributeInstructionClass } from './SetAttributeInstruction';
 import { NavigateInstructionClass } from './NavigateInstruction';
 import { ScreenshotInstructionClass } from './ScreenshotInstruction';
-import { ExecuteScriptInstructionClass } from './ExecuteScriptInstruction';
+import { SetAttributeInstructionClass } from './SetAttributeInstruction';
 import { WaitInstructionClass } from './WaitInstruction';
 
 // 导出基础类
 export { BaseInstructionClass } from './BaseInstruction';
 
 // 导出具体指令类
+export { ExecuteScriptInstructionClass } from './ExecuteScriptInstruction';
 export { FindElementInstructionClass } from './FindElementInstruction';
+export { GetAttributeInstructionClass } from './GetAttributeInstruction';
+export { GetUrlInstructionClass } from './GetUrlInstruction';
+export { InputInstructionClass } from './InputInstruction';
 export { KeyboardInstructionClass } from './KeyboardInstruction';
 export { MouseInstructionClass } from './MouseInstruction';
-export { InputInstructionClass } from './InputInstruction';
-export { GetAttributeInstructionClass } from './GetAttributeInstruction';
-export { SetAttributeInstructionClass } from './SetAttributeInstruction';
 export { NavigateInstructionClass } from './NavigateInstruction';
 export { ScreenshotInstructionClass } from './ScreenshotInstruction';
-export { ExecuteScriptInstructionClass } from './ExecuteScriptInstruction';
+export { SetAttributeInstructionClass } from './SetAttributeInstruction';
 export { WaitInstructionClass } from './WaitInstruction';
 
 /**
@@ -65,6 +67,8 @@ export class InstructionFactory {
         return new ExecuteScriptInstructionClass(instruction as ExecuteScriptInstruction);
       case 'wait':
         return new WaitInstructionClass(instruction as WaitInstruction);
+      case 'get_url':
+        return new GetUrlInstructionClass(instruction as GetUrlInstruction);
       default:
         // 使用类型守卫确保类型安全
         const unknownType = (instruction as any).type;

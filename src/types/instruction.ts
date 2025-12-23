@@ -173,6 +173,16 @@ export interface WaitInstruction extends BaseInstruction {
 }
 
 /**
+ * 获取当前标签页URL指令
+ */
+export interface GetUrlInstruction extends BaseInstruction {
+  type: 'get_url';
+  params: {
+    usage?: "variable" | "data" | "none";
+  };
+}
+
+/**
  * 指令联合类型
  */
 export type Instruction =
@@ -186,4 +196,5 @@ export type Instruction =
   | NavigateInstruction
   | ScreenshotInstruction
   | ExecuteScriptInstruction
-  | WaitInstruction;
+  | WaitInstruction
+  | GetUrlInstruction;
