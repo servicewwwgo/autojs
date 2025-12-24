@@ -369,8 +369,8 @@ export class MouseInstructionClass extends BaseInstructionClass {
                 await this.ExecuteCDPCommand('DOM.enable');
                 // 滚动到元素位置
                 await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: element.GetNodeId() });
-                // 聚焦元素
-                await this.ExecuteCDPCommand('DOM.focus', { nodeId: element.GetNodeId() });
+                // // 聚焦元素
+                // await this.ExecuteCDPCommand('DOM.focus', { nodeId: element.GetNodeId() });
 
                 // 使用 CDP 获取元素的边界框
                 const boxModel = await this.ExecuteCDPCommand('DOM.getBoxModel', {

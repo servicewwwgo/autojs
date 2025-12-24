@@ -83,7 +83,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
             };
         }
 
-        const checkInterval = 200; // 每 200ms 检查一次
+        const checkInterval = 500; // 每 500ms 检查一次
         const targetText = this.params.titleText.toLowerCase();
 
         while (Date.now() - startTime < timeoutMs) {
@@ -141,7 +141,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
             };
         }
 
-        const checkInterval = 200; // 每 200ms 检查一次
+        const checkInterval = 500; // 每 500ms 检查一次
 
         while (Date.now() - startTime < timeoutMs) {
             try {
@@ -191,7 +191,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
             };
         }
 
-        const checkInterval = 200; // 每 200ms 检查一次
+        const checkInterval = 500; // 每 500ms 检查一次
 
         while (Date.now() - startTime < timeoutMs) {
             try {
@@ -261,7 +261,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
             };
         }
 
-        const checkInterval = 200; // 每 200ms 检查一次
+        const checkInterval = 500; // 每 500ms 检查一次
         const targetText = this.params.attributeText.toLowerCase();
 
         while (Date.now() - startTime < timeoutMs) {

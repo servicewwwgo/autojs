@@ -34,7 +34,7 @@ export interface IElement {
     GetSelector(): string | undefined;
 
     // 获取元素选择器类型
-    GetSelectorType(): 'css' | 'xpath' | 'id';
+    GetSelectorType(): 'css' | 'xpath' | 'id' | 'tag';
 
     // 获取元素父元素名称
     GetParentName(): string | undefined;
@@ -109,6 +109,21 @@ export class ElementClass implements IElement {
                         candidateNodeIds = queryResult?.nodeIds || [];
                     } catch (error) {
                         OutputLogToFile(`[ElementManager] CDP querySelectorAll (id) failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+                        throw error;
+                    }
+                    break;
+
+                case 'tag':
+                    try {
+                        // tag 类型使用 ElementTag 属性查找元素
+                        const escapedTag = selector.replace(/"/g, '\\"');
+                        const queryResult = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.querySelectorAll', {
+                            nodeId: rootNodeId,
+                            selector: `[${ElementTag}="${escapedTag}"]`
+                        });
+                        candidateNodeIds = queryResult?.nodeIds || [];
+                    } catch (error) {
+                        OutputLogToFile(`[ElementManager] CDP querySelectorAll (tag) failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
                         throw error;
                     }
                     break;
@@ -709,7 +724,7 @@ export class ElementClass implements IElement {
             return false;
         }
 
-        if (!['css', 'xpath', 'id'].includes(this.elementData.selectorType)) {
+        if (!['css', 'xpath', 'id', 'tag'].includes(this.elementData.selectorType)) {
             return false;
         }
 
@@ -750,7 +765,7 @@ export class ElementClass implements IElement {
         return this.elementData.selector;
     }
 
-    public GetSelectorType(): 'css' | 'xpath' | 'id' {
+    public GetSelectorType(): 'css' | 'xpath' | 'id' | 'tag' {
         return this.elementData.selectorType;
     }
 

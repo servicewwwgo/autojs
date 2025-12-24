@@ -38,41 +38,102 @@ export class InputInstructionClass extends BaseInstructionClass {
             await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: element.GetNodeId() });
             // 聚焦元素
             await this.ExecuteCDPCommand('DOM.focus', { nodeId: element.GetNodeId() });
+            // 等待元素获得焦点
+            await this.Delay(0.2);
 
-            // 如果需要清空输入框，先选中所有文本（Ctrl+A）
+            // 如果需要清空输入框，使用 Runtime.evaluate 直接设置 value 并触发事件
             if (this.params.clear === true) {
-                // 按下 Ctrl 键
-                await this.ExecuteCDPCommand('Input.dispatchKeyEvent', {
-                    type: 'keyDown',
-                    windowsVirtualKeyCode: 17, // Ctrl 键的虚拟键码
-                    code: 'ControlLeft',
-                    key: 'Control'
-                });
-                // 按下 A 键（全选）
-                await this.ExecuteCDPCommand('Input.dispatchKeyEvent', {
-                    type: 'keyDown',
-                    windowsVirtualKeyCode: 65, // A 键的虚拟键码
-                    code: 'KeyA',
-                    key: 'a'
-                });
-                // 释放 A 键
-                await this.ExecuteCDPCommand('Input.dispatchKeyEvent', {
-                    type: 'keyUp',
-                    windowsVirtualKeyCode: 65,
-                    code: 'KeyA',
-                    key: 'a'
-                });
-                // 释放 Ctrl 键
-                await this.ExecuteCDPCommand('Input.dispatchKeyEvent', {
-                    type: 'keyUp',
-                    windowsVirtualKeyCode: 17,
-                    code: 'ControlLeft',
-                    key: 'Control'
+                // 获取元素的 objectId，用于 Runtime.evaluate
+                const objectIdResult = await this.ExecuteCDPCommand('DOM.resolveNode', {
+                    nodeId: element.GetNodeId()
                 });
 
-                // 等待 100 毫秒，确保全选操作完成
-                // 注意：Delay 方法使用秒为单位，所以 100 毫秒 = 0.1 秒
-                await this.Delay(0.1);
+                if (objectIdResult?.object?.objectId) {
+                    // 使用 Runtime.evaluate 直接设置 value 为空并触发 input 和 change 事件
+                    await this.ExecuteCDPCommand('Runtime.callFunctionOn', {
+                        objectId: objectIdResult.object.objectId,
+                        functionDeclaration: `
+                            function() {
+                                // 设置 value 属性
+                                this.value = '';
+                                
+                                // 触发 input 事件
+                                const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+                                this.dispatchEvent(inputEvent);
+                                
+                                // 触发 change 事件
+                                const changeEvent = new Event('change', { bubbles: true, cancelable: true });
+                                this.dispatchEvent(changeEvent);
+                                
+                                // 对于 React 等框架，还需要触发更底层的事件
+                                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                                    window.HTMLInputElement.prototype,
+                                    'value'
+                                )?.set;
+                                if (nativeInputValueSetter) {
+                                    nativeInputValueSetter.call(this, '');
+                                    const event = new Event('input', { bubbles: true });
+                                    this.dispatchEvent(event);
+                                }
+                                
+                                return true;
+                            }
+                        `,
+                        returnByValue: true
+                    });
+                } else {
+                    // 如果无法获取 objectId，回退到键盘事件方法
+                    // 按下 Ctrl 键
+                    await this.ExecuteCDPCommand('Input.dispatchKeyEvent', {
+                        type: 'keyDown',
+                        windowsVirtualKeyCode: 17, // Ctrl 键的虚拟键码
+                        code: 'ControlLeft',
+                        key: 'Control'
+                    });
+                    await this.Delay(0.1);
+                    // 按下 A 键（全选）
+                    await this.ExecuteCDPCommand('Input.dispatchKeyEvent', {
+                        type: 'keyDown',
+                        windowsVirtualKeyCode: 65, // A 键的虚拟键码
+                        code: 'KeyA',
+                        key: 'a'
+                    });
+                    await this.Delay(0.1);
+                    // 释放 A 键
+                    await this.ExecuteCDPCommand('Input.dispatchKeyEvent', {
+                        type: 'keyUp',
+                        windowsVirtualKeyCode: 65,
+                        code: 'KeyA',
+                        key: 'a'
+                    });
+                    await this.Delay(0.1);
+                    // 释放 Ctrl 键
+                    await this.ExecuteCDPCommand('Input.dispatchKeyEvent', {
+                        type: 'keyUp',
+                        windowsVirtualKeyCode: 17,
+                        code: 'ControlLeft',
+                        key: 'Control'
+                    });
+                    // 等待全选操作完成
+                    await this.Delay(0.2);
+                    // 按下 Delete 键删除选中的文本
+                    await this.ExecuteCDPCommand('Input.dispatchKeyEvent', {
+                        type: 'keyDown',
+                        windowsVirtualKeyCode: 46, // Delete 键的虚拟键码
+                        code: 'Delete',
+                        key: 'Delete'
+                    });
+                    await this.Delay(0.1);
+                    // 释放 Delete 键
+                    await this.ExecuteCDPCommand('Input.dispatchKeyEvent', {
+                        type: 'keyUp',
+                        windowsVirtualKeyCode: 46,
+                        code: 'Delete',
+                        key: 'Delete'
+                    });
+                    // 等待删除操作完成
+                    await this.Delay(0.2);
+                }
             }
 
             // 输入文本 - 支持中文字符和 Unicode 字符输入

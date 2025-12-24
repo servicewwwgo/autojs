@@ -31,7 +31,7 @@ function hideWebdriver(): void {
  * @param selectorType - 选择器类型
  * @returns 找到的 DOM 元素节点，如果未找到则返回 null
  */
-function FindElement(selector: string, selectorType: 'css' | 'xpath' | 'id'): HTMLElement | undefined {
+function FindElement(selector: string, selectorType: 'css' | 'xpath' | 'id' | 'tag'): HTMLElement | undefined {
 
   let element: HTMLElement | undefined;
 
@@ -51,6 +51,13 @@ function FindElement(selector: string, selectorType: 'css' | 'xpath' | 'id'): HT
     case 'id':
       {
         element = document.getElementById(selector) as HTMLElement;
+        break;
+      }
+    case 'tag':
+      {
+        // tag 类型使用 ElementTag 属性查找元素
+        const escapedTag = EscapeCSSSelector(selector);
+        element = FindElement(`[${ElementTag}="${escapedTag}"]`, 'css');
         break;
       }
     default:

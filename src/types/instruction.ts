@@ -10,7 +10,7 @@ export interface ElementData {
   description: string;                    // 元素描述
   backup?: string;                        // 元素備注
   selector: string;                       // 元素选择器
-  selectorType: 'css' | 'xpath' | 'id';   // 元素选择器类型
+  selectorType: 'css' | 'xpath' | 'id' | 'tag';   // 元素选择器类型
   parentName?: string;                    // 父元素名称 - 儅存在多個元素匹配時, 使用父元素名称來區分, 通過 elementManager 來獲取這個元素的父元素對象, 並通過相對關係匹配
   childrenName?: string;                  // 子元素名称 - 儅存在多個元素匹配時, 使用子元素名称來區分, 通過 elementManager 來獲取這個元素的子元素對象, 並通過相對關係匹配
   siblingName?: string;                   // 兄弟元素名称 - 儅存在多個元素匹配時, 使用兄弟元素名称來區分, 通過 elementManager 來獲取這個元素的兄弟元素對象, 並通過相對關係匹配
@@ -183,6 +183,20 @@ export interface GetUrlInstruction extends BaseInstruction {
 }
 
 /**
+ * 通过文本内容查找元素指令
+ */
+export interface FindElementByTextInstruction extends BaseInstruction {
+  type: 'find_element_by_text';
+  params: {
+    searchText: string;                    // 搜索字符串
+    elementName: string;                    // 元素名称
+    tagName?: string;                       // 标签名称（可选，如 'div', 'span', 'button' 等）
+    description?: string;                   // 元素描述（可选）
+    backup?: string;                       // 元素备注（可选）
+  };
+}
+
+/**
  * 指令联合类型
  */
 export type Instruction =
@@ -197,4 +211,5 @@ export type Instruction =
   | ScreenshotInstruction
   | ExecuteScriptInstruction
   | WaitInstruction
-  | GetUrlInstruction;
+  | GetUrlInstruction
+  | FindElementByTextInstruction;
