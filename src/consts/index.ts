@@ -7,7 +7,7 @@ export const ElementTag: string = 'cdp-locate-id';
 /**
  * WebSocket 默认连接 URL
  */
-export const WEBSOCKET_CONN_URL: string = 'ws://browser.caiyisong.net:8000/ws';
+export const WEBSOCKET_CONN_URL: string = 'ws://browser.autowave.dev:8000/ws';
 
 /**
  * 调试模式

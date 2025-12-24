@@ -115,45 +115,87 @@ export class ElementClass implements IElement {
 
                 case 'xpath':
                     try {
-                        const searchResult = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.performSearch', {
-                            query: selector,
-                            includeUserAgentShadowDOM: false
+                        // 使用 Runtime.callFunctionOn 执行 XPath 查询
+                        // 注意：CDP 的 DOM.performSearch 不支持 XPath，必须使用 JavaScript 执行
+                        const escapedSelector = JSON.stringify(selector);
+                        const maxResults = 1000; // 限制最多返回 1000 个结果
+
+                        // 使用 callFunctionOn 更简洁，直接返回节点数组
+                        const callResult = await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.callFunctionOn', {
+                            functionDeclaration: `
+                                function(xpath, maxCount) {
+                                    try {
+                                        const result = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+                                        const nodes = [];
+                                        const count = Math.min(result.snapshotLength, maxCount);
+                                        for (let i = 0; i < count; i++) {
+                                            const node = result.snapshotItem(i);
+                                            if (node && node.nodeType === Node.ELEMENT_NODE) {
+                                                nodes.push(node);
+                                            }
+                                        }
+                                        return nodes;
+                                    } catch (e) {
+                                        return [];
+                                    }
+                                }
+                            `,
+                            arguments: [
+                                { value: selector },
+                                { value: maxResults }
+                            ],
+                            returnByValue: false // 返回对象引用，以便后续获取 nodeId
                         });
 
-                        if (!searchResult?.searchId) {
-                            OutputLogToFile(`[ElementManager] XPath search did not return a searchId for "${this.elementData.name}"`, { level: LogLevel.WARN });
+                        if (!callResult?.result?.objectId) {
+                            OutputLogToFile(`[ElementManager] XPath evaluation did not return objectId for "${this.elementData.name}"`, { level: LogLevel.WARN });
                             candidateNodeIds = [];
                             break;
                         }
 
-                        const searchId = searchResult.searchId;
-                        const maxResults = 1000; // 限制最多返回 1000 个结果
+                        // 获取数组的所有属性（包括索引属性）
+                        const objectId = callResult.result.objectId;
+                        const propertiesResult = await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.getProperties', {
+                            objectId: objectId,
+                            ownProperties: true
+                        });
 
-                        try {
-                            const getSearchResults = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.getSearchResults', {
-                                searchId: searchId,
-                                fromIndex: 0,
-                                toIndex: maxResults
-                            });
+                        candidateNodeIds = [];
 
-                            candidateNodeIds = getSearchResults?.nodeIds || [];
-
-                            // 检查是否有更多结果被截断
-                            if (candidateNodeIds.length >= maxResults) {
-                                OutputLogToFile(`[ElementManager] XPath search returned ${candidateNodeIds.length} results for "${this.elementData.name}", which may be truncated (max: ${maxResults})`, { level: LogLevel.WARN });
-                            }
-                        } finally {
-                            // 确保清理搜索资源，即使获取结果时出错
-                            try {
-                                await ExecuteCDPCommand(this.elementData.tabId, 'DOM.discardSearchResults', {
-                                    searchId: searchId
-                                });
-                            } catch (discardError) {
-                                OutputLogToFile(`[ElementManager] Failed to discard search results for "${this.elementData.name}": ${discardError instanceof Error ? discardError.message : String(discardError)}`, { level: LogLevel.WARN });
+                        if (propertiesResult?.result) {
+                            // 遍历所有属性，获取每个节点的 nodeId
+                            for (const property of propertiesResult.result) {
+                                // 只处理数字索引（数组元素）
+                                if (property.name && /^\d+$/.test(property.name) && property.value?.objectId) {
+                                    try {
+                                        const nodeIdResult = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.requestNode', {
+                                            objectId: property.value.objectId
+                                        });
+                                        if (nodeIdResult?.nodeId) {
+                                            candidateNodeIds.push(nodeIdResult.nodeId);
+                                        }
+                                    } catch (nodeIdError) {
+                                        OutputLogToFile(`[ElementManager] Failed to get nodeId for XPath result at index ${property.name}: ${nodeIdError instanceof Error ? nodeIdError.message : String(nodeIdError)}`, { level: LogLevel.WARN });
+                                    }
+                                }
                             }
                         }
+
+                        // 释放数组对象引用
+                        try {
+                            await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.releaseObject', {
+                                objectId: objectId
+                            });
+                        } catch (releaseError) {
+                            OutputLogToFile(`[ElementManager] Failed to release object for "${this.elementData.name}": ${releaseError instanceof Error ? releaseError.message : String(releaseError)}`, { level: LogLevel.WARN });
+                        }
+
+                        // 检查是否有更多结果被截断
+                        if (candidateNodeIds.length >= maxResults) {
+                            OutputLogToFile(`[ElementManager] XPath search returned ${candidateNodeIds.length} results for "${this.elementData.name}", which may be truncated (max: ${maxResults})`, { level: LogLevel.WARN });
+                        }
                     } catch (error) {
-                        OutputLogToFile(`[ElementManager] CDP performSearch (xpath) failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+                        OutputLogToFile(`[ElementManager] XPath evaluation failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
                         throw error;
                     }
                     break;
