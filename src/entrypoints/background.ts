@@ -237,16 +237,6 @@ export default defineBackground(() => {
         }
     }
 
-    async function send_tabs(): Promise<void> {
-        // 发送所有标签页信息
-        const tabs = await browser.tabs.query({});
-
-        for (const tab of tabs) {
-            const message: WSMessage = { type: 'tabs', data: { tabId: tab.id as number, tabIndex: tab.index as number, url: tab.url as string } as TabInfo };
-            wsConnector.sendMessage(message);
-        }
-    }
-
     async function set_callbacks(): Promise<void> {
         // 注册消息类型处理器 - 执行指令（通过 WebSocket 消息）
         wsConnector.registerMessageTypeHandler('instructions', async (message: WSMessage): Promise<void> => {
@@ -286,10 +276,6 @@ export default defineBackground(() => {
         'disconnect_websocket': disconnect_websocket,
         'test_websocket': test_websocket,
         'send_results_to_server': send_results_to_server,
-        'send_tabs': async (message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) => {
-            await send_tabs();
-            sendResponse({ success: true });
-        },
         'setCallbacks': async (message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) => {
             set_callbacks();
             sendResponse({ success: true });
@@ -310,23 +296,6 @@ export default defineBackground(() => {
         wsConnector.connect().catch(error => {
             OutputLogToFile(`[Background] Failed to connect WebSocket: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
         });
-
-        // 连接启动后，使用轮询检查连接状态，等待登录完成，然后发送标签页
-        // 使用轮询检查连接状态，最多等待10秒
-        let attempts = 0;
-        const maxAttempts = 10;
-        const checkInterval = setInterval(() => {
-            attempts++;
-            if (wsConnector.isConnected()) {
-                clearInterval(checkInterval);
-                // 只有在真正新建立的连接时才执行 send_tabs
-                OutputLogToFile('[Background] WebSocket connected and logged in, sending tabs', { level: LogLevel.INFO });
-                send_tabs().catch(error => OutputLogToFile(`[Background] Failed to send tabs after connection: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR }));
-            } else if (attempts >= maxAttempts) {
-                clearInterval(checkInterval);
-                OutputLogToFile('[Background] WebSocket connection check timeout, connection may have failed', { level: LogLevel.WARN });
-            }
-        }, 1000); // 每1000ms检查一次
     }
 
     // 监听来自 popup 和 content script 的消息

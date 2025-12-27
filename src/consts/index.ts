@@ -10,7 +10,7 @@ export const ElementTag: string = 'cdp-locate-id';
  * 环境变量名: VITE_WEBSOCKET_CONN_URL
  */
 export const WEBSOCKET_CONN_URL: string =
-    import.meta.env.VITE_WEBSOCKET_CONN_URL || 'ws://localhost:8000/ws';
+    import.meta.env.VITE_WEBSOCKET_CONN_URL || 'wss://browser.autowave.dev/ws';
 
 /**
  * 调试模式
