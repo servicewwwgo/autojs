@@ -9,8 +9,9 @@ export interface ElementData {
   name: string;                           // 元素名称
   description: string;                    // 元素描述
   backup?: string;                        // 元素備注
+  text?: string;                           // 元素文本
   selector: string;                       // 元素选择器
-  selectorType: 'css' | 'xpath' | 'id' | 'tag';   // 元素选择器类型
+  selectorType: 'css' | 'id' | 'tag' | 'text';   // 元素选择器类型
   parentName?: string;                    // 父元素名称 - 儅存在多個元素匹配時, 使用父元素名称來區分, 通過 elementManager 來獲取這個元素的父元素對象, 並通過相對關係匹配
   childrenName?: string;                  // 子元素名称 - 儅存在多個元素匹配時, 使用子元素名称來區分, 通過 elementManager 來獲取這個元素的子元素對象, 並通過相對關係匹配
   siblingName?: string;                   // 兄弟元素名称 - 儅存在多個元素匹配時, 使用兄弟元素名称來區分, 通過 elementManager 來獲取這個元素的兄弟元素對象, 並通過相對關係匹配

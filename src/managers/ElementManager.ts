@@ -34,7 +34,7 @@ export interface IElement {
     GetSelector(): string | undefined;
 
     // 获取元素选择器类型
-    GetSelectorType(): 'css' | 'xpath' | 'id' | 'tag';
+    GetSelectorType(): 'css' | 'id' | 'tag' | 'text';
 
     // 获取元素父元素名称
     GetParentName(): string | undefined;
@@ -68,7 +68,7 @@ export class ElementClass implements IElement {
      * @param selector - 选择器
      * @returns 元素nodeId列表
      */
-    private async FindAllMatchingElementNodeIds(selectorType: string, selector: string): Promise<number[]> {
+    private async FindAllMatchingElementNodeIds(selectorType: string, selector: string, text: string): Promise<number[]> {
         try {
             // 获取文档根节点
             const documentResult = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.getDocument', {
@@ -128,93 +128,62 @@ export class ElementClass implements IElement {
                     }
                     break;
 
-                case 'xpath':
+                case 'text':
+                    // 通过文本内容查找所有匹配的元素, 并返回元素
                     try {
-                        // 使用 Runtime.callFunctionOn 执行 XPath 查询
-                        // 注意：CDP 的 DOM.performSearch 不支持 XPath，必须使用 JavaScript 执行
-                        const escapedSelector = JSON.stringify(selector);
-                        const maxResults = 1000; // 限制最多返回 1000 个结果
-
-                        // 使用 callFunctionOn 更简洁，直接返回节点数组
-                        const callResult = await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.callFunctionOn', {
-                            functionDeclaration: `
-                                function(xpath, maxCount) {
-                                    try {
-                                        const result = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-                                        const nodes = [];
-                                        const count = Math.min(result.snapshotLength, maxCount);
-                                        for (let i = 0; i < count; i++) {
-                                            const node = result.snapshotItem(i);
-                                            if (node && node.nodeType === Node.ELEMENT_NODE) {
-                                                nodes.push(node);
-                                            }
+                        // 转义搜索文本，防止注入攻击
+                        const escapedSearchText = text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r') || '';
+                        const escapedSelector = selector;
+                        // 使用 Runtime.evaluate 在页面上下文中搜索包含指定文本的所有元素
+                        // 返回元素数组引用以便后续获取所有 nodeId
+                        const findElementExpression = `
+                            (function() {
+                                const searchText = '${escapedSearchText}';
+                                const searchSelector = ${escapedSelector};
+                                const allElements = document.querySelectorAll(searchSelector);
+                                
+                                for (let element of allElements) {                        
+                                    const text = element.textContent || element.innerText || '';
+                                    if (text.includes(searchText)) {
+                                        // 检查元素是否可见
+                                        const style = window.getComputedStyle(element);
+                                        if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+                                            return element;
                                         }
-                                        return nodes;
-                                    } catch (e) {
-                                        return [];
                                     }
                                 }
-                            `,
-                            arguments: [
-                                { value: selector },
-                                { value: maxResults }
-                            ],
-                            returnByValue: false // 返回对象引用，以便后续获取 nodeId
+                                return null;
+                            })()
+                        `;
+
+                        const findResult = await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.evaluate', {
+                            expression: findElementExpression,
+                            returnByValue: false  // 返回对象引用，以便获取 nodeId
                         });
 
-                        if (!callResult?.result?.objectId) {
-                            OutputLogToFile(`[ElementManager] XPath evaluation did not return objectId for "${this.elementData.name}"`, { level: LogLevel.WARN });
+                        if (!findResult?.result?.objectId) {
+                            OutputLogToFile(`[ElementManager] No elements found with text "${selector}" for "${this.elementData.name}"`, { level: LogLevel.WARN });
                             candidateNodeIds = [];
                             break;
                         }
 
-                        // 获取数组的所有属性（包括索引属性）
-                        const objectId = callResult.result.objectId;
-                        const propertiesResult = await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.getProperties', {
-                            objectId: objectId,
-                            ownProperties: true
+                        // 将对象引用转换为 nodeId
+                        const requestNodeResult = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.requestNode', {
+                            objectId: findResult.result.objectId
                         });
 
-                        candidateNodeIds = [];
-
-                        if (propertiesResult?.result) {
-                            // 遍历所有属性，获取每个节点的 nodeId
-                            for (const property of propertiesResult.result) {
-                                // 只处理数字索引（数组元素）
-                                if (property.name && /^\d+$/.test(property.name) && property.value?.objectId) {
-                                    try {
-                                        const nodeIdResult = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.requestNode', {
-                                            objectId: property.value.objectId
-                                        });
-                                        if (nodeIdResult?.nodeId) {
-                                            candidateNodeIds.push(nodeIdResult.nodeId);
-                                        }
-                                    } catch (nodeIdError) {
-                                        OutputLogToFile(`[ElementManager] Failed to get nodeId for XPath result at index ${property.name}: ${nodeIdError instanceof Error ? nodeIdError.message : String(nodeIdError)}`, { level: LogLevel.WARN });
-                                    }
-                                }
-                            }
+                        if (!requestNodeResult?.nodeId) {
+                            OutputLogToFile(`[ElementManager] Failed to get nodeId for element with text "${escapedSearchText}"`, { level: LogLevel.WARN });
+                            candidateNodeIds = [];
+                            break;
                         }
 
-                        // 释放数组对象引用
-                        try {
-                            await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.releaseObject', {
-                                objectId: objectId
-                            });
-                        } catch (releaseError) {
-                            OutputLogToFile(`[ElementManager] Failed to release object for "${this.elementData.name}": ${releaseError instanceof Error ? releaseError.message : String(releaseError)}`, { level: LogLevel.WARN });
-                        }
-
-                        // 检查是否有更多结果被截断
-                        if (candidateNodeIds.length >= maxResults) {
-                            OutputLogToFile(`[ElementManager] XPath search returned ${candidateNodeIds.length} results for "${this.elementData.name}", which may be truncated (max: ${maxResults})`, { level: LogLevel.WARN });
-                        }
+                        candidateNodeIds.push(requestNodeResult.nodeId);
                     } catch (error) {
-                        OutputLogToFile(`[ElementManager] XPath evaluation failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+                        OutputLogToFile(`[ElementManager] Text search failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
                         throw error;
                     }
                     break;
-
                 default:
                     throw new Error(`Unsupported selector type: ${selectorType}`);
             }
@@ -646,7 +615,7 @@ export class ElementClass implements IElement {
         }
 
         // 查找所有匹配的元素
-        const candidateNodeIds = await this.FindAllMatchingElementNodeIds(this.elementData.selectorType, this.elementData.selector);
+        const candidateNodeIds = await this.FindAllMatchingElementNodeIds(this.elementData.selectorType, this.elementData.selector, this.elementData.text || '');
 
         // 如果没有找到任何候选元素
         if (candidateNodeIds.length === 0) {
@@ -761,11 +730,15 @@ export class ElementClass implements IElement {
         return this.elementData.description;
     }
 
+    public GetText(): string | undefined {
+        return this.elementData.text;
+    }
+
     public GetSelector(): string | undefined {
         return this.elementData.selector;
     }
 
-    public GetSelectorType(): 'css' | 'xpath' | 'id' | 'tag' {
+    public GetSelectorType(): 'css' | 'id' | 'tag' | 'text' {
         return this.elementData.selectorType;
     }
 
