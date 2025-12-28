@@ -129,18 +129,29 @@ export class ElementClass implements IElement {
                     break;
 
                 case 'text':
-                    // 通过文本内容查找所有匹配的元素, 并返回元素
+                    // 通过文本内容查找所有匹配的元素, 并返回元素nodeId列表
                     try {
+                        // 检查 text 是否存在
+                        if (!text) {
+                            OutputLogToFile(`[ElementManager] Text parameter is required for text selector type for "${this.elementData.name}"`, { level: LogLevel.ERROR });
+                            candidateNodeIds = [];
+                            break;
+                        }
+
                         // 转义搜索文本，防止注入攻击
-                        const escapedSearchText = text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r') || '';
-                        const escapedSelector = selector;
+                        const escapedSearchText = text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+
+                        // 转义 selector，防止注入攻击，并用引号包裹
+                        const escapedSelector = JSON.stringify(selector);
+
                         // 使用 Runtime.evaluate 在页面上下文中搜索包含指定文本的所有元素
                         // 返回元素数组引用以便后续获取所有 nodeId
-                        const findElementExpression = `
+                        const findElementsExpression = `
                             (function() {
                                 const searchText = '${escapedSearchText}';
                                 const searchSelector = ${escapedSelector};
                                 const allElements = document.querySelectorAll(searchSelector);
+                                const matchedElements = [];
                                 
                                 for (let element of allElements) {                        
                                     const text = element.textContent || element.innerText || '';
@@ -148,37 +159,61 @@ export class ElementClass implements IElement {
                                         // 检查元素是否可见
                                         const style = window.getComputedStyle(element);
                                         if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
-                                            return element;
+                                            matchedElements.push(element);
                                         }
                                     }
                                 }
-                                return null;
+                                return matchedElements;
                             })()
                         `;
 
                         const findResult = await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.evaluate', {
-                            expression: findElementExpression,
+                            expression: findElementsExpression,
                             returnByValue: false  // 返回对象引用，以便获取 nodeId
                         });
 
                         if (!findResult?.result?.objectId) {
-                            OutputLogToFile(`[ElementManager] No elements found with text "${selector}" for "${this.elementData.name}"`, { level: LogLevel.WARN });
+                            OutputLogToFile(`[ElementManager] No elements found with text "${text}" and selector "${selector}" for "${this.elementData.name}"`, { level: LogLevel.WARN });
                             candidateNodeIds = [];
                             break;
                         }
 
-                        // 将对象引用转换为 nodeId
-                        const requestNodeResult = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.requestNode', {
-                            objectId: findResult.result.objectId
+                        // 获取数组的所有属性（包括索引属性）
+                        const objectId = findResult.result.objectId;
+                        const propertiesResult = await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.getProperties', {
+                            objectId: objectId,
+                            ownProperties: true
                         });
 
-                        if (!requestNodeResult?.nodeId) {
-                            OutputLogToFile(`[ElementManager] Failed to get nodeId for element with text "${escapedSearchText}"`, { level: LogLevel.WARN });
-                            candidateNodeIds = [];
-                            break;
+                        candidateNodeIds = [];
+
+                        if (propertiesResult?.result) {
+                            // 遍历所有属性，获取每个节点的 nodeId
+                            for (const property of propertiesResult.result) {
+                                // 只处理数字索引（数组元素）
+                                if (property.name && /^\d+$/.test(property.name) && property.value?.objectId) {
+                                    try {
+                                        const nodeIdResult = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.requestNode', {
+                                            objectId: property.value.objectId
+                                        });
+                                        if (nodeIdResult?.nodeId) {
+                                            candidateNodeIds.push(nodeIdResult.nodeId);
+                                        }
+                                    } catch (nodeIdError) {
+                                        OutputLogToFile(`[ElementManager] Failed to get nodeId for text search result at index ${property.name}: ${nodeIdError instanceof Error ? nodeIdError.message : String(nodeIdError)}`, { level: LogLevel.WARN });
+                                    }
+                                }
+                            }
                         }
 
-                        candidateNodeIds.push(requestNodeResult.nodeId);
+                        // 释放数组对象引用
+                        try {
+                            await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.releaseObject', {
+                                objectId: objectId
+                            });
+                        } catch (releaseError) {
+                            OutputLogToFile(`[ElementManager] Failed to release object for text search "${this.elementData.name}": ${releaseError instanceof Error ? releaseError.message : String(releaseError)}`, { level: LogLevel.WARN });
+                        }
                     } catch (error) {
                         OutputLogToFile(`[ElementManager] Text search failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
                         throw error;
