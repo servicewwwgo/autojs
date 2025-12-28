@@ -5,7 +5,7 @@ export { WSErrorMessage, WSHeartbeatMessage, WSHeartbeatResponse, WSLoginMessage
 
 export { ExecutorStatus } from './executor';
 
-export { BaseInstruction, ElementData, ExecuteScriptInstruction, FindElementByTextInstruction, FindElementInstruction, GetAttributeInstruction, GetUrlInstruction, InputInstruction, Instruction, InstructionResult, InstructionResults, KeyboardInstruction, MouseInstruction, NavigateInstruction, ScreenshotInstruction, SetAttributeInstruction, WaitInstruction } from './instruction';
+export { ActivateTabInstruction, BaseInstruction, ElementData, ExecuteScriptInstruction, FindElementByTextInstruction, FindElementInstruction, GetAttributeInstruction, GetUrlInstruction, InputInstruction, Instruction, InstructionResult, InstructionResults, KeyboardInstruction, MouseInstruction, NavigateInstruction, ScreenshotInstruction, SetAttributeInstruction, WaitInstruction } from './instruction';
 
 export { BackgroundScriptMessageType } from './background';
 export { ContentScriptMessageType } from './content';

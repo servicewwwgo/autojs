@@ -197,6 +197,14 @@ export interface FindElementByTextInstruction extends BaseInstruction {
 }
 
 /**
+ * 激活标签页指令
+ */
+export interface ActivateTabInstruction extends BaseInstruction {
+  type: 'activate_tab';
+  params?: {};  // 无需额外参数，使用指令的 tabId 属性
+}
+
+/**
  * 指令联合类型
  */
 export type Instruction =
@@ -212,4 +220,5 @@ export type Instruction =
   | ExecuteScriptInstruction
   | WaitInstruction
   | GetUrlInstruction
-  | FindElementByTextInstruction;
+  | FindElementByTextInstruction
+  | ActivateTabInstruction;

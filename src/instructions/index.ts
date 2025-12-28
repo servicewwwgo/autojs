@@ -1,8 +1,9 @@
 /**
  * 指令类统一导出
  */
-import type { ExecuteScriptInstruction, FindElementInstruction, FindElementByTextInstruction, GetAttributeInstruction, GetUrlInstruction, InputInstruction, Instruction, KeyboardInstruction, MouseInstruction, NavigateInstruction, ScreenshotInstruction, SetAttributeInstruction, WaitInstruction } from '../types';
+import type { ActivateTabInstruction, ExecuteScriptInstruction, FindElementInstruction, FindElementByTextInstruction, GetAttributeInstruction, GetUrlInstruction, InputInstruction, Instruction, KeyboardInstruction, MouseInstruction, NavigateInstruction, ScreenshotInstruction, SetAttributeInstruction, WaitInstruction } from '../types';
 
+import { ActivateTabInstructionClass } from './ActivateTabInstruction';
 import { BaseInstructionClass } from './BaseInstruction';
 import { ExecuteScriptInstructionClass } from './ExecuteScriptInstruction';
 import { FindElementInstructionClass } from './FindElementInstruction';
@@ -21,6 +22,7 @@ import { WaitInstructionClass } from './WaitInstruction';
 export { BaseInstructionClass } from './BaseInstruction';
 
 // 导出具体指令类
+export { ActivateTabInstructionClass } from './ActivateTabInstruction';
 export { ExecuteScriptInstructionClass } from './ExecuteScriptInstruction';
 export { FindElementInstructionClass } from './FindElementInstruction';
 export { FindElementByTextInstructionClass } from './FindElementByTextInstruction';
@@ -73,6 +75,8 @@ export class InstructionFactory {
         return new GetUrlInstructionClass(instruction as GetUrlInstruction);
       case 'find_element_by_text':
         return new FindElementByTextInstructionClass(instruction as FindElementByTextInstruction);
+      case 'activate_tab':
+        return new ActivateTabInstructionClass(instruction as ActivateTabInstruction);
       default:
         // 使用类型守卫确保类型安全
         const unknownType = (instruction as any).type;
