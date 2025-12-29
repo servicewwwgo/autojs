@@ -1,4 +1,4 @@
-import { DEBUG_MODE, ElementTag } from '../consts';
+import { ElementTag } from '../consts';
 import type { ElementData } from '../types';
 import { ExecuteCDPCommand, GenerateRandomString, LogLevel, OutputLogToFile } from '../utils';
 
@@ -66,6 +66,7 @@ export class ElementClass implements IElement {
      * 查找所有匹配的元素, 并返回元素nodeId列表
      * @param selectorType - 选择器类型
      * @param selector - 选择器
+     * @param text - 文本内容（用于 text 类型选择器）
      * @returns 元素nodeId列表
      */
     private async FindAllMatchingElementNodeIds(selectorType: string, selector: string, text: string): Promise<number[]> {
@@ -234,290 +235,6 @@ export class ElementClass implements IElement {
     }
 
     /**
-     * 递归检查节点是否包含指定的子节点
-     * @param parentNodeId - 父节点ID
-     * @param targetChildNodeId - 目标子节点ID
-     * @returns 是否包含指定的子节点
-     */
-    private async checkNodeHasChild(parentNodeId: number, targetChildNodeId: number): Promise<boolean> {
-        try {
-            const nodeInfo = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.describeNode', {
-                nodeId: parentNodeId,
-                depth: -1
-            });
-
-            if (!nodeInfo.node.children || nodeInfo.node.children.length === 0) {
-                return false;
-            }
-
-            for (const child of nodeInfo.node.children) {
-                if (child.nodeId === targetChildNodeId) {
-                    return true;
-                }
-
-                if (await this.checkNodeHasChild(child.nodeId, targetChildNodeId)) {
-                    return true;
-                }
-            }
-
-            return false;
-        } catch (error) {
-            OutputLogToFile(`[ElementManager] Error checking node has child: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
-            return false;
-        }
-    }
-
-    /**
-     * 挑選元素(從元素列表中，挑選出子元素是childrenName的元素)
-     * @param nodeIds - 元素列表
-     * @param childrenName - 子元素名称
-     * @returns 挑選出的元素ID
-     */
-    private async selectElementByChildren(nodeIds: number[], childrenName: string): Promise<number | undefined> {
-        try {
-            // 获取子元素
-            const childrenElement = elementManager.GetElementByName(this.elementData.tabId, childrenName);
-
-            if (!childrenElement) {
-                OutputLogToFile(`[ElementManager] Children element "${childrenName}" not found in manager`, { level: LogLevel.WARN });
-                return undefined;
-            }
-
-            const targetChildNodeId = await childrenElement.GetNodeId();
-
-            if (!targetChildNodeId) {
-                OutputLogToFile(`[ElementManager] Target child node id not found for children element "${childrenName}"`, { level: LogLevel.WARN });
-                return undefined;
-            }
-
-            // 遍历所有候选元素，找到包含目标子节点的元素
-            for (const nodeId of nodeIds) {
-                const hasChild = await this.checkNodeHasChild(nodeId, targetChildNodeId);
-
-                if (hasChild) {
-                    return nodeId;
-                }
-            }
-
-            return undefined;
-        } catch (error) {
-            OutputLogToFile(`[ElementManager] Error selecting element by children "${childrenName}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
-            return undefined;
-        }
-    }
-
-    /**
-     * 挑選元素(從元素列表中，挑選出父元素或祖父元素是parentName的元素)
-     * @param nodeIds - 元素列表
-     * @param parentName - 父元素名称
-     * @returns 挑選出的元素ID
-     */
-    private async selectElementByParent(nodeIds: number[], parentName: string): Promise<number | undefined> {
-        try {
-            // 获取父元素
-            const parentElement = elementManager.GetElementByName(this.elementData.tabId, parentName);
-
-            if (!parentElement) {
-                OutputLogToFile(`[ElementManager] Parent element "${parentName}" not found in manager`, { level: LogLevel.WARN });
-                return undefined;
-            }
-
-            const targetParentNodeId = await parentElement.GetNodeId();
-
-            if (!targetParentNodeId) {
-                OutputLogToFile(`[ElementManager] Target parent node id not found for parent element "${parentName}"`, { level: LogLevel.WARN });
-                return undefined;
-            }
-
-            // 遍历所有候选元素，找到父节点链中包含目标父节点的元素
-            for (const nodeId of nodeIds) {
-                let currentNodeId = nodeId;
-                let found = false;
-                const maxDepth = 10;
-                let depth = 0;
-
-                // 向上遍历父节点链
-                while (currentNodeId && depth < maxDepth) {
-                    // 获取当前节点的父节点
-                    const nodeInfo = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.describeNode', {
-                        nodeId: currentNodeId,
-                        depth: 0
-                    });
-
-                    if (nodeInfo.node.parentId === targetParentNodeId) {
-                        found = true;
-                        break;
-                    }
-
-                    currentNodeId = nodeInfo.node.parentId;
-                    depth++;
-                }
-
-                if (found) {
-                    return nodeId;
-                }
-            }
-
-            return undefined;
-        } catch (error) {
-            OutputLogToFile(`[ElementManager] Error selecting element by parent "${parentName}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
-            return undefined;
-        }
-    }
-
-    /**
-     * 挑選元素(從元素列表中，挑選出兄弟元素是siblingName的元素, 并根据偏移量挑選出元素)
-     * @param nodeIds - 元素列表
-     * @param siblingName - 兄弟元素名称
-     * @param siblingOffset - 兄弟元素偏移量（可选，如果未指定则检查是否是相邻兄弟节点）
-     * @returns 挑選出的元素ID
-     */
-    private async selectElementBySibling(nodeIds: number[], siblingName: string, siblingOffset?: number): Promise<number | undefined> {
-        try {
-            // 获取兄弟元素
-            const siblingElement = elementManager.GetElementByName(this.elementData.tabId, siblingName);
-
-            if (!siblingElement || !siblingElement.elementData.nodeId) {
-                OutputLogToFile(`[ElementManager] Sibling element "${siblingName}" not found in manager`, { level: LogLevel.WARN });
-                return undefined;
-            }
-
-            const targetSiblingNodeId = await siblingElement.GetNodeId();
-
-            if (!targetSiblingNodeId) {
-                OutputLogToFile(`[ElementManager] Target sibling node id not found for sibling element "${siblingName}"`, { level: LogLevel.WARN });
-                return undefined;
-            }
-
-            // 遍历所有候选元素，找到符合兄弟节点条件的元素
-            for (const candidateNodeId of nodeIds) {
-                try {
-                    // 获取候选节点的父节点
-                    const candidateInfo = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.describeNode', {
-                        nodeId: candidateNodeId,
-                        depth: 0
-                    });
-
-                    const parentId = candidateInfo.node.parentId;
-                    if (!parentId) {
-                        continue; // 没有父节点，跳过
-                    }
-
-                    // 获取父节点的所有子节点
-                    const parentInfo = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.describeNode', {
-                        nodeId: parentId,
-                        depth: 1
-                    });
-
-                    if (!parentInfo.node.children) {
-                        continue; // 没有子节点，跳过
-                    }
-
-                    // 找到兄弟节点和候选节点的索引
-                    let siblingIndex = -1;
-                    let candidateIndex = -1;
-
-                    for (let i = 0; i < parentInfo.node.children.length; i++) {
-                        const child = parentInfo.node.children[i];
-                        if (child.nodeId === targetSiblingNodeId) {
-                            siblingIndex = i;
-                        }
-                        if (child.nodeId === candidateNodeId) {
-                            candidateIndex = i;
-                        }
-                    }
-
-                    // 如果找不到兄弟节点或候选节点，跳过
-                    if (siblingIndex === -1 || candidateIndex === -1) {
-                        continue;
-                    }
-
-                    // 检查偏移量
-                    if (siblingOffset !== undefined) {
-                        // 如果指定了偏移量，检查候选节点是否在兄弟节点的指定偏移位置
-                        const expectedIndex = siblingIndex + siblingOffset;
-                        if (candidateIndex === expectedIndex) {
-                            return candidateNodeId;
-                        }
-                    } else {
-                        // 如果没有指定偏移量，检查是否是相邻兄弟节点
-                        if (Math.abs(candidateIndex - siblingIndex) === 1) {
-                            return candidateNodeId;
-                        }
-                    }
-                } catch (error) {
-                    OutputLogToFile(`[ElementManager] Error checking sibling relation for node ${candidateNodeId}: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
-                    continue; // 继续检查下一个节点
-                }
-            }
-
-            return undefined;
-        } catch (error) {
-            OutputLogToFile(`[ElementManager] Error selecting element by sibling "${siblingName}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
-            return undefined;
-        }
-    }
-
-    /**
-     * 检查节点是否符合相对关系条件
-     * @param candidateNodeIds - 候选节点的 nodeId 数组
-     * @param parentName - 父节点名称（可选）
-     * @param childrenName - 子节点名称（可选）
-     * @param siblingName - 兄弟节点名称（可选）
-     * @param siblingOffset - 兄弟节点偏移量（可选）
-     * @returns 符合所有条件的节点ID，如果不存在则返回 undefined
-     */
-    private async checkNodeRelations(
-        candidateNodeIds: number[],
-        parentName?: string,
-        childrenName?: string,
-        siblingName?: string,
-        siblingOffset?: number
-    ): Promise<number | undefined> {
-        try {
-            // 如果没有候选节点，返回 undefined
-            if (!candidateNodeIds || candidateNodeIds.length === 0) {
-                return undefined;
-            }
-
-            // 先根据父节点条件筛选
-            let filteredNodeIds = candidateNodeIds;
-
-            if (parentName) {
-                const selectedNodeId = await this.selectElementByParent(filteredNodeIds, parentName);
-                if (!selectedNodeId) {
-                    return undefined; // 没有符合父节点条件的节点
-                }
-                filteredNodeIds = [selectedNodeId]; // 只保留符合父节点条件的节点
-            }
-
-            // 再根据子节点条件筛选
-            if (childrenName) {
-                const selectedNodeId = await this.selectElementByChildren(filteredNodeIds, childrenName);
-                if (!selectedNodeId) {
-                    return undefined; // 没有符合子节点条件的节点
-                }
-                filteredNodeIds = [selectedNodeId]; // 只保留符合子节点条件的节点
-            }
-
-            // 最后根据兄弟节点条件筛选
-            if (siblingName) {
-                const selectedNodeId = await this.selectElementBySibling(filteredNodeIds, siblingName, siblingOffset);
-                if (!selectedNodeId) {
-                    return undefined; // 没有符合兄弟节点条件的节点
-                }
-                filteredNodeIds = [selectedNodeId]; // 只保留符合兄弟节点条件的节点
-            }
-
-            // 返回第一个符合所有条件的节点ID
-            return filteredNodeIds.length > 0 ? filteredNodeIds[0] : undefined;
-        } catch (error) {
-            OutputLogToFile(`[ElementManager] Error checking node relations: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
-            return undefined;
-        }
-    }
-
-    /**
      * 檢查節點是否可見
      * @param nodeId - 節點ID
      * @returns 是否可見，如果檢查失敗則返回 undefined
@@ -649,62 +366,48 @@ export class ElementClass implements IElement {
      * @throws 如果元素未找到或定位失败，抛出错误
      */
     public async LocateElement(): Promise<boolean> {
+        let selectorType: string = this.elementData.selectorType;
+        let selector: string = this.elementData.selector;
+        let text: string = this.elementData.text || '';
 
-        // 启用 DOM 域
-        await ExecuteCDPCommand(this.elementData.tabId, 'DOM.enable');
-        // 启用 CSS 域
-        await ExecuteCDPCommand(this.elementData.tabId, 'CSS.enable');
-        // 启用 Runtime 域
-        await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.enable');
+        // 如果有 childrenName 且 selectorType 是 'css'，尝试使用 :has() 优化选择器
+        if (this.elementData.childrenName && this.elementData.selectorType === 'css') {
+            const childrenElement = elementManager.GetElementByName(this.elementData.tabId, this.elementData.childrenName);
 
-        // 验证 nodeId 是否仍然有效（通过尝试获取节点信息）, 如果已经失效, 则重新定位元素
-        if (this.elementData.nodeId) {
-            try {
-                await ExecuteCDPCommand(this.elementData.tabId, 'DOM.describeNode', { nodeId: this.elementData.nodeId });
-                // nodeId 有效，直接返回成功
-                return true;
-            } catch (error) {
-                OutputLogToFile(`[ElementManager] Error checking nodeId validity for element "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
+            if (!childrenElement) {
+                OutputLogToFile(`[ElementManager] Children element "${this.elementData.childrenName}" not found in manager, falling back to original method`, { level: LogLevel.WARN });
+                return false;
             }
+
+            const childElementTag = childrenElement.GetTag();
+            selector = `${selector}:has([${ElementTag}="${childElementTag}"])`;
+        }
+
+        // 如果有 parentName 且 selectorType 是 'css'
+        if (this.elementData.parentName && this.elementData.selectorType === 'css') {
+            const parentElement = elementManager.GetElementByName(this.elementData.tabId, this.elementData.parentName);
+            if (!parentElement) {
+                OutputLogToFile(`[ElementManager] Parent element "${this.elementData.parentName}" not found in manager, falling back to original method`, { level: LogLevel.WARN });
+                return false;
+            }
+            const parentElementTag = parentElement.GetTag();
+            selector = `[${ElementTag}="${parentElementTag}"] ${selector}`;
         }
 
         // 查找所有匹配的元素
-        const candidateNodeIds = await this.FindAllMatchingElementNodeIds(this.elementData.selectorType, this.elementData.selector, this.elementData.text || '');
+        const candidateNodeIds = await this.FindAllMatchingElementNodeIds(selectorType, selector, text);
 
         // 如果没有找到任何候选元素
         if (candidateNodeIds.length === 0) {
-            OutputLogToFile(`[ElementManager] No candidate elements found for element "${this.elementData.name}" with selector: ${this.elementData.selector}`, { level: LogLevel.WARN });
+            OutputLogToFile(`[ElementManager] No candidate elements found for element "${this.elementData.name}" with selector: ${selector}`, { level: LogLevel.WARN });
             return false;
-        }
-
-        if (DEBUG_MODE) {
-            // TODO: 日志输出candidateNodeIds
-            for (const nodeId of candidateNodeIds) {
-                // 设置 test-id 属性
-                let v = GenerateRandomString(14);
-                await ExecuteCDPCommand(this.elementData.tabId, 'DOM.setAttributeValue', {
-                    nodeId: nodeId,
-                    name: "test-id",
-                    value: v
-                });
-            }
         }
 
         // 使用相对关系筛选候选元素
         let selectedNodeId: number | undefined = undefined;
 
-        // 如果有相对关系条件（parentName, childrenName, siblingName），使用筛选方法
-        if (this.elementData.parentName || this.elementData.childrenName || this.elementData.siblingName) {
-            // 直接传入所有候选节点，方法内部会进行筛选
-            selectedNodeId = await this.checkNodeRelations(candidateNodeIds, this.elementData.parentName, this.elementData.childrenName, this.elementData.siblingName, this.elementData.siblingOffset);
-
-            // 如果筛选后没有找到符合条件的节点
-            if (!selectedNodeId) {
-                OutputLogToFile(`[ElementManager] No valid element found for element "${this.elementData.name}" with selector: ${this.elementData.selector} and relation criteria (parent: ${this.elementData.parentName || 'none'}, children: ${this.elementData.childrenName || 'none'}, sibling: ${this.elementData.siblingName || 'none'})`, { level: LogLevel.ERROR });
-                return false;
-            }
-        } else if (candidateNodeIds.length > 1) {
-            // 選取所有候選元素中，可見的元素
+        // 如果有多個候選元素，選取可見的元素, 如果只有一個候選元素，則直接選取
+        if (candidateNodeIds.length > 1) {
             for (const nodeId of candidateNodeIds) {
                 const isVisible = await this.checkNodeIsVisible(nodeId);
                 if (isVisible === true) {
@@ -712,12 +415,13 @@ export class ElementClass implements IElement {
                     break;
                 }
             }
-        } else if (candidateNodeIds.length === 1) {
+        }
+        else if (candidateNodeIds.length === 1) {
             selectedNodeId = candidateNodeIds[0];
         }
 
         if (selectedNodeId === undefined || selectedNodeId === 0) {
-            OutputLogToFile(`[ElementManager] No valid element found for element "${this.elementData.name}" with selector: ${this.elementData.selector}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[ElementManager] No valid element found for element "${this.elementData.name}" with selector: ${selector}`, { level: LogLevel.ERROR });
             return false;
         }
 
