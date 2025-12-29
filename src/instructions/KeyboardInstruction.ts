@@ -197,7 +197,10 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
                     return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` };
                 }
 
-                const nodeId = element.GetNodeId();
+                const nodeId = await element.GetNodeId();
+                if (!nodeId) {
+                    return { ...defaultResult, error: `Failed to get nodeId for element "${this.params.elementName}"` };
+                }
 
                 // 滚动到元素位置
                 await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: nodeId });

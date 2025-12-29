@@ -36,9 +36,15 @@ export class SetAttributeInstructionClass extends BaseInstructionClass {
             // 如果设置了延迟，先等待
             await this.Delay(this.delay);
 
+            // 获取 nodeId
+            const nodeId = await element.GetNodeId();
+            if (!nodeId) {
+                return { ...defaultResult, error: `Failed to get nodeId for element "${this.params.elementName}"` };
+            }
+
             // 使用 CDP 的 DOM.setAttributeValue 方法设置属性
             await this.ExecuteCDPCommand('DOM.setAttributeValue', {
-                nodeId: element.GetNodeId(),
+                nodeId: nodeId,
                 name: this.params.attribute,
                 value: this.params.value
             });

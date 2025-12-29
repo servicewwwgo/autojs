@@ -36,8 +36,14 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
 
       // 使用 CDP 协议获取元素属性
       // DOM.getAttributes 返回格式: { attributes: ["attr1", "value1", "attr2", "value2", ...] }
+      const nodeId = await element.GetNodeId();
+
+      if (!nodeId) {
+        return { ...defaultResult, error: `Failed to get nodeId for element "${this.params.elementName}"` };
+      }
+
       const attributesResult = await this.ExecuteCDPCommand('DOM.getAttributes', {
-        nodeId: element.GetNodeId(),
+        nodeId: nodeId,
       });
 
       // 将成对的数组转换为键值对对象

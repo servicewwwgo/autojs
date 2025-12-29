@@ -196,7 +196,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
             try {
                 // 先定位元素
                 if (await element.LocateElement()) {
-                    const nodeId = element.GetNodeId();
+                    const nodeId = await element.GetNodeId();
                     if (!nodeId) {
                         await new Promise(resolve => setTimeout(resolve, checkInterval));
                         continue;
@@ -267,7 +267,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
             try {
                 // 先定位元素
                 if (await element.LocateElement()) {
-                    const nodeId = element.GetNodeId();
+                    const nodeId = await element.GetNodeId();
                     if (!nodeId) {
                         await new Promise(resolve => setTimeout(resolve, checkInterval));
                         continue;

@@ -16,7 +16,7 @@ export interface IElement {
     ToObject(): object;
 
     // 获取节点ID
-    GetNodeId(): number | undefined;
+    GetNodeId(): Promise<number | undefined>;
 
     // 获取元素tag
     GetTag(): string | undefined;
@@ -283,7 +283,7 @@ export class ElementClass implements IElement {
                 return undefined;
             }
 
-            const targetChildNodeId = childrenElement.GetNodeId();
+            const targetChildNodeId = await childrenElement.GetNodeId();
 
             if (!targetChildNodeId) {
                 OutputLogToFile(`[ElementManager] Target child node id not found for children element "${childrenName}"`, { level: LogLevel.WARN });
@@ -317,22 +317,28 @@ export class ElementClass implements IElement {
             // 获取父元素
             const parentElement = elementManager.GetElementByName(this.elementData.tabId, parentName);
 
-            if (!parentElement || !parentElement.elementData.nodeId) {
+            if (!parentElement) {
                 OutputLogToFile(`[ElementManager] Parent element "${parentName}" not found in manager`, { level: LogLevel.WARN });
                 return undefined;
             }
 
-            const targetParentNodeId = parentElement.elementData.nodeId;
+            const targetParentNodeId = await parentElement.GetNodeId();
+
+            if (!targetParentNodeId) {
+                OutputLogToFile(`[ElementManager] Target parent node id not found for parent element "${parentName}"`, { level: LogLevel.WARN });
+                return undefined;
+            }
 
             // 遍历所有候选元素，找到父节点链中包含目标父节点的元素
             for (const nodeId of nodeIds) {
                 let currentNodeId = nodeId;
                 let found = false;
-                const maxDepth = 20;
+                const maxDepth = 10;
                 let depth = 0;
 
                 // 向上遍历父节点链
                 while (currentNodeId && depth < maxDepth) {
+                    // 获取当前节点的父节点
                     const nodeInfo = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.describeNode', {
                         nodeId: currentNodeId,
                         depth: 0
@@ -376,7 +382,12 @@ export class ElementClass implements IElement {
                 return undefined;
             }
 
-            const targetSiblingNodeId = siblingElement.elementData.nodeId;
+            const targetSiblingNodeId = await siblingElement.GetNodeId();
+
+            if (!targetSiblingNodeId) {
+                OutputLogToFile(`[ElementManager] Target sibling node id not found for sibling element "${siblingName}"`, { level: LogLevel.WARN });
+                return undefined;
+            }
 
             // 遍历所有候选元素，找到符合兄弟节点条件的元素
             for (const candidateNodeId of nodeIds) {
@@ -753,8 +764,42 @@ export class ElementClass implements IElement {
         return this.elementData;
     }
 
-    public GetNodeId(): number | undefined {
-        return this.elementData.nodeId;
+    public async GetNodeId(): Promise<number | undefined> {
+        // 实时获取 nodeId, 通过 tag 选择器查找元素, 并得到 nodeId
+        try {
+            // 检查是否有 tag
+            if (!this.elementData.tag) {
+                OutputLogToFile(`[ElementManager] Element "${this.elementData.name}" has no tag, cannot get nodeId`, { level: LogLevel.WARN });
+                return undefined;
+            }
+
+            // 获取文档根节点
+            const documentResult = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.getDocument', {
+                depth: -1,
+                pierce: false
+            });
+
+            if (!documentResult?.root?.nodeId) {
+                OutputLogToFile(`[ElementManager] Failed to get document root node for element "${this.elementData.name}"`, { level: LogLevel.ERROR });
+                return undefined;
+            }
+
+            const rootNodeId = documentResult.root.nodeId;
+
+            // 转义 tag 值，防止注入攻击
+            const escapedTag = this.elementData.tag.replace(/"/g, '\\"');
+
+            // 使用 tag 选择器查找元素
+            const queryResult = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.querySelector', {
+                nodeId: rootNodeId,
+                selector: `[${ElementTag}="${escapedTag}"]`
+            });
+
+            return queryResult?.nodeId;
+        } catch (error) {
+            OutputLogToFile(`[ElementManager] Error getting nodeId for element "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+            return undefined;
+        }
     }
 
     public GetBackup(): string | undefined {

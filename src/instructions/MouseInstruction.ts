@@ -363,14 +363,20 @@ export class MouseInstructionClass extends BaseInstructionClass {
                     return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` };
                 }
 
+                // 获取 nodeId
+                const nodeId = await element.GetNodeId();
+                if (!nodeId) {
+                    return { ...defaultResult, error: `Failed to get nodeId for element "${this.params.elementName}"` };
+                }
+
                 // 滚动到元素位置
-                await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: element.GetNodeId() });
+                await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: nodeId });
                 // // 聚焦元素
-                // await this.ExecuteCDPCommand('DOM.focus', { nodeId: element.GetNodeId() });
+                // await this.ExecuteCDPCommand('DOM.focus', { nodeId: nodeId });
 
                 // 使用 CDP 获取元素的边界框
                 const boxModel = await this.ExecuteCDPCommand('DOM.getBoxModel', {
-                    nodeId: element.GetNodeId()
+                    nodeId: nodeId
                 });
 
                 if (boxModel?.model?.content && boxModel.model.content.length >= 8) {

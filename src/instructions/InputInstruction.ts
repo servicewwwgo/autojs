@@ -34,10 +34,17 @@ export class InputInstructionClass extends BaseInstructionClass {
                 return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` };
             }
 
+            // 获取 nodeId
+            const nodeId = await element.GetNodeId();
+
+            if (!nodeId) {
+                return { ...defaultResult, error: `Failed to get nodeId for element "${this.params.elementName}"` };
+            }
+
             // 滚动到元素位置
-            await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: element.GetNodeId() });
+            await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: nodeId });
             // 聚焦元素
-            await this.ExecuteCDPCommand('DOM.focus', { nodeId: element.GetNodeId() });
+            await this.ExecuteCDPCommand('DOM.focus', { nodeId: nodeId });
             // 等待元素获得焦点
             await this.Delay(0.2);
 
@@ -45,7 +52,7 @@ export class InputInstructionClass extends BaseInstructionClass {
             if (this.params.clear === true) {
                 // 获取元素的 objectId，用于 Runtime.evaluate
                 const objectIdResult = await this.ExecuteCDPCommand('DOM.resolveNode', {
-                    nodeId: element.GetNodeId()
+                    nodeId: nodeId
                 });
 
                 if (objectIdResult?.object?.objectId) {
