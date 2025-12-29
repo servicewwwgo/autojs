@@ -1,4 +1,4 @@
-import { ElementTag } from '../consts';
+import { DEBUG_MODE, ElementTag } from '../consts';
 import type { ElementData } from '../types';
 import { ExecuteCDPCommand, GenerateRandomString, LogLevel, OutputLogToFile } from '../utils';
 
@@ -675,6 +675,19 @@ export class ElementClass implements IElement {
         if (candidateNodeIds.length === 0) {
             OutputLogToFile(`[ElementManager] No candidate elements found for element "${this.elementData.name}" with selector: ${this.elementData.selector}`, { level: LogLevel.WARN });
             return false;
+        }
+
+        if (DEBUG_MODE) {
+            // TODO: 日志输出candidateNodeIds
+            for (const nodeId of candidateNodeIds) {
+                // 设置 test-id 属性
+                let v = GenerateRandomString(14);
+                await ExecuteCDPCommand(this.elementData.tabId, 'DOM.setAttributeValue', {
+                    nodeId: nodeId,
+                    name: "test-id",
+                    value: v
+                });
+            }
         }
 
         // 使用相对关系筛选候选元素
