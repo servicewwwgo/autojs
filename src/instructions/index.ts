@@ -1,13 +1,12 @@
 /**
  * 指令类统一导出
  */
-import type { ActivateTabInstruction, ExecuteScriptInstruction, FindElementInstruction, FindElementByTextInstruction, GetAttributeInstruction, GetUrlInstruction, InputInstruction, Instruction, KeyboardInstruction, MouseInstruction, NavigateInstruction, ScreenshotInstruction, SetAttributeInstruction, WaitInstruction } from '../types';
+import type { ActivateTabInstruction, ExecuteScriptInstruction, FindElementInstruction, GetAttributeInstruction, GetUrlInstruction, InputInstruction, Instruction, KeyboardInstruction, MouseInstruction, NavigateInstruction, ScreenshotInstruction, SetAttributeInstruction, WaitInstruction } from '../types';
 
 import { ActivateTabInstructionClass } from './ActivateTabInstruction';
 import { BaseInstructionClass } from './BaseInstruction';
 import { ExecuteScriptInstructionClass } from './ExecuteScriptInstruction';
 import { FindElementInstructionClass } from './FindElementInstruction';
-import { FindElementByTextInstructionClass } from './FindElementByTextInstruction';
 import { GetAttributeInstructionClass } from './GetAttributeInstruction';
 import { GetUrlInstructionClass } from './GetUrlInstruction';
 import { InputInstructionClass } from './InputInstruction';
@@ -25,7 +24,6 @@ export { BaseInstructionClass } from './BaseInstruction';
 export { ActivateTabInstructionClass } from './ActivateTabInstruction';
 export { ExecuteScriptInstructionClass } from './ExecuteScriptInstruction';
 export { FindElementInstructionClass } from './FindElementInstruction';
-export { FindElementByTextInstructionClass } from './FindElementByTextInstruction';
 export { GetAttributeInstructionClass } from './GetAttributeInstruction';
 export { GetUrlInstructionClass } from './GetUrlInstruction';
 export { InputInstructionClass } from './InputInstruction';
@@ -73,8 +71,6 @@ export class InstructionFactory {
         return new WaitInstructionClass(instruction as WaitInstruction);
       case 'get_url':
         return new GetUrlInstructionClass(instruction as GetUrlInstruction);
-      case 'find_element_by_text':
-        return new FindElementByTextInstructionClass(instruction as FindElementByTextInstruction);
       case 'activate_tab':
         return new ActivateTabInstructionClass(instruction as ActivateTabInstruction);
       default:

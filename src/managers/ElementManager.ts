@@ -178,6 +178,9 @@ export class ElementClass implements IElement {
                             break;
                         }
 
+                        // TODO: 日志输出findResult
+                        OutputLogToFile(`[ElementManager] Find result: ${JSON.stringify(findResult)}`, { level: LogLevel.INFO });
+
                         // 获取数组的所有属性（包括索引属性）
                         const objectId = findResult.result.objectId;
                         const propertiesResult = await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.getProperties', {
@@ -275,12 +278,17 @@ export class ElementClass implements IElement {
             // 获取子元素
             const childrenElement = elementManager.GetElementByName(this.elementData.tabId, childrenName);
 
-            if (!childrenElement || !childrenElement.elementData.nodeId) {
+            if (!childrenElement) {
                 OutputLogToFile(`[ElementManager] Children element "${childrenName}" not found in manager`, { level: LogLevel.WARN });
                 return undefined;
             }
 
-            const targetChildNodeId = childrenElement.elementData.nodeId;
+            const targetChildNodeId = childrenElement.GetNodeId();
+
+            if (!targetChildNodeId) {
+                OutputLogToFile(`[ElementManager] Target child node id not found for children element "${childrenName}"`, { level: LogLevel.WARN });
+                return undefined;
+            }
 
             // 遍历所有候选元素，找到包含目标子节点的元素
             for (const nodeId of nodeIds) {

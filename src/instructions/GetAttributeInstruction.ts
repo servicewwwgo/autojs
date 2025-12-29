@@ -64,8 +64,6 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
       // 如果 attributesObject 中没有，尝试使用 Runtime.evaluate 获取元素属性（如 value, checked 等）
       if (attributeValue === undefined) {
         try {
-          await this.ExecuteCDPCommand('Runtime.enable');
-
           const attrResult = await this.ExecuteCDPCommand('Runtime.evaluate', {
             expression: `(function() {
                 const node = document.querySelector('[${ElementTag}=${JSON.stringify(element.GetTag())}]');

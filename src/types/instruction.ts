@@ -184,20 +184,6 @@ export interface GetUrlInstruction extends BaseInstruction {
 }
 
 /**
- * 通过文本内容查找元素指令
- */
-export interface FindElementByTextInstruction extends BaseInstruction {
-  type: 'find_element_by_text';
-  params: {
-    searchText: string;                    // 搜索字符串
-    elementName: string;                    // 元素名称
-    tagName?: string;                       // 标签名称（可选，如 'div', 'span', 'button' 等）
-    description?: string;                   // 元素描述（可选）
-    backup?: string;                       // 元素备注（可选）
-  };
-}
-
-/**
  * 激活标签页指令
  */
 export interface ActivateTabInstruction extends BaseInstruction {
@@ -221,5 +207,4 @@ export type Instruction =
   | ExecuteScriptInstruction
   | WaitInstruction
   | GetUrlInstruction
-  | FindElementByTextInstruction
   | ActivateTabInstruction;

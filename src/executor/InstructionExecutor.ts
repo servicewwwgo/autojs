@@ -1,7 +1,7 @@
 import { BaseInstructionClass, InstructionFactory } from '../instructions';
 import { InstructionManager, ResultManager } from '../managers';
 import { BaseInstruction, ExecutorStatus, InstructionResult, InstructionResults, WSMessage } from '../types';
-import { EnsureCDPConnected, LogLevel, OutputLogToFile } from '../utils';
+import { EnsureCDPConnected, ExecuteCDPCommand, LogLevel, OutputLogToFile } from '../utils';
 
 /**
  * 指令执行器
@@ -181,6 +181,12 @@ export class InstructionExecutor {
 
             // 确保 CDP 已连接到标签页（执行 CDP 命令的前提条件）
             await EnsureCDPConnected(tabId);
+
+            // 启用必要的 CDP 域
+            await ExecuteCDPCommand(tabId, 'DOM.enable');
+            await ExecuteCDPCommand(tabId, 'CSS.enable');
+            await ExecuteCDPCommand(tabId, 'Page.enable');
+            await ExecuteCDPCommand(tabId, 'Runtime.enable');
 
             while (true) {
               // 从指令管理器获取第一个待执行的指令（FIFO）

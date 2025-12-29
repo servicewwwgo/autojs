@@ -89,7 +89,6 @@ export class WaitInstructionClass extends BaseInstructionClass {
         while (Date.now() - startTime < timeoutMs) {
             try {
                 // 使用 CDP 获取页面标题
-                await this.ExecuteCDPCommand('Runtime.enable');
                 const result = await this.ExecuteCDPCommand('Runtime.evaluate', {
                     expression: 'document.title',
                     returnByValue: true
@@ -297,7 +296,6 @@ export class WaitInstructionClass extends BaseInstructionClass {
                     // 如果 HTML 属性中没有，尝试使用 Runtime.evaluate 获取元素属性
                     if (attributeValue === undefined) {
                         try {
-                            await this.ExecuteCDPCommand('Runtime.enable');
                             const attrResult = await this.ExecuteCDPCommand('Runtime.evaluate', {
                                 expression: `(function() {
                                     const node = document.querySelector('[${ElementTag}=${JSON.stringify(element.GetTag())}]');
@@ -356,9 +354,6 @@ export class WaitInstructionClass extends BaseInstructionClass {
      */
     private async CheckElementVisible(nodeId: number): Promise<boolean | undefined> {
         try {
-            // 启用 CSS 域
-            await this.ExecuteCDPCommand('CSS.enable');
-
             // 检查 CSS 样式
             const computedStyle = await this.ExecuteCDPCommand('CSS.getComputedStyleForNode', {
                 nodeId: nodeId

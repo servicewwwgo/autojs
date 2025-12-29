@@ -61,7 +61,6 @@ export class MouseInstructionClass extends BaseInstructionClass {
             let viewportHeight = 1080;
 
             try {
-                await this.ExecuteCDPCommand('Page.enable');
                 const viewportResult = await this.ExecuteCDPCommand('Page.getLayoutMetrics');
                 viewportWidth = viewportResult?.cssLayoutViewport?.clientWidth || 1920;
                 viewportHeight = viewportResult?.cssLayoutViewport?.clientHeight || 1080;
@@ -186,7 +185,6 @@ export class MouseInstructionClass extends BaseInstructionClass {
             let viewportHeight = 1080;
 
             try {
-                await this.ExecuteCDPCommand('Page.enable');
                 const viewportResult = await this.ExecuteCDPCommand('Page.getLayoutMetrics');
                 viewportWidth = viewportResult?.cssLayoutViewport?.clientWidth || 1920;
                 viewportHeight = viewportResult?.cssLayoutViewport?.clientHeight || 1080;
@@ -365,8 +363,6 @@ export class MouseInstructionClass extends BaseInstructionClass {
                     return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` };
                 }
 
-                // 启用 DOM 域
-                await this.ExecuteCDPCommand('DOM.enable');
                 // 滚动到元素位置
                 await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: element.GetNodeId() });
                 // // 聚焦元素
