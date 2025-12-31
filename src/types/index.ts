@@ -12,3 +12,5 @@ export { ContentScriptMessageType } from './content';
 export { PopupScriptMessageType } from './popup';
 
 export { CdpCloseConsoleLogsMessage, CdpCloseConsoleLogsResult, CdpCloseNetworkLogsMessage, CdpCloseNetworkLogsResult, CdpConnectMessage, CdpConnectResult, CdpCreateTabAndNavigateMessage, CdpCreateTabAndNavigateResult, CdpDisconnectMessage, CdpDisconnectResult, CdpExecuteJavaScriptMessage, CdpExecuteJavaScriptResult, CdpGetConsoleLogsMessage, CdpGetConsoleLogsResult, CdpGetNetworkLogsMessage, CdpGetNetworkLogsResult, CdpGrepSourceMessage, CdpGrepSourceResult, CdpInitConsoleLogsMessage, CdpInitConsoleLogsResult, CdpInitNetworkLogsMessage, CdpInitNetworkLogsResult, CdpListTargetsMessage, CdpListTargetsResult, CdpMessage, CdpResult, CdpSendCommandMessage, CdpSendCommandResult, CdpTakeElementScreenshotMessage, CdpTakeElementScreenshotResult } from './cdp';
+
+export { HttpMessage, HttpRequestMessage, HttpRequestResult, HttpResult } from './http';

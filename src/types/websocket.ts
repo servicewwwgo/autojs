@@ -4,7 +4,7 @@ import type { NodeProfile } from './node';
  * WebSocket消息类型
  */
 export interface WSMessage {
-  type: 'login' | 'heartbeat' | 'tabs' | 'error' | 'instructions' | 'cdp';
+  type: 'login' | 'heartbeat' | 'tabs' | 'error' | 'instructions' | 'cdp' | 'http';
   data?: any;
 }
 

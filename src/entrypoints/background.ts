@@ -1,10 +1,10 @@
 import { defineBackground } from 'wxt/utils/define-background';
 import { WEBSOCKET_CONN_URL } from '../consts';
 import { example } from '../example';
-import { CdpExecutor, InstructionExecutor, WebSocketConnector } from '../executor';
+import { CdpExecutor, HttpExecutor, InstructionExecutor, WebSocketConnector } from '../executor';
 import { BaseInstructionClass, InstructionFactory } from '../instructions';
 import { nodeConfig } from '../managers';
-import { BackgroundScriptMessageType, CdpMessage, CdpResult, ExecutorStatus, Instruction, InstructionResults, TabInfo, WSMessage } from '../types';
+import { BackgroundScriptMessageType, CdpMessage, CdpResult, ExecutorStatus, HttpMessage, HttpResult, Instruction, InstructionResults, TabInfo, WSMessage } from '../types';
 import { LogLevel, OutputLogToFile } from '../utils';
 
 // Background script entry point
@@ -15,6 +15,7 @@ export default defineBackground(() => {
     // 初始化管理器
     const instructionExecutor = new InstructionExecutor();
     const cdpExecutor = new CdpExecutor();
+    const httpExecutor = new HttpExecutor();
     // 初始化WebSocket连接器
     const wsConnector: WebSocketConnector = new WebSocketConnector(WEBSOCKET_CONN_URL);
 
@@ -258,6 +259,17 @@ export default defineBackground(() => {
         cdpExecutor.setSendResult((result: CdpResult): void => {
             // 通过 WebSocket 发送 CDP 结果
             wsConnector.sendMessage({ type: 'cdp', data: result } as WSMessage);
+        });
+
+        // 注册 http 执行器的统一消息处理器（所有 HTTP 相关消息都通过 handleMessage 处理）
+        wsConnector.registerMessageTypeHandler('http', async (message: WSMessage): Promise<void> => {
+            await httpExecutor.handleMessage(message.data as HttpMessage);
+        });
+
+        // 设置 HTTP 执行器的结果发送回调
+        httpExecutor.setSendResult((result: HttpResult): void => {
+            // 通过 WebSocket 发送 HTTP 结果
+            wsConnector.sendMessage({ type: 'http', data: result } as WSMessage);
         });
     }
 
