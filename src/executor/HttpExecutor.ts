@@ -74,7 +74,10 @@ export class HttpExecutor {
         const url = msg.data.url;
         const headers = msg.data.headers || {};
         const body = msg.data.body;
-        const timeout = msg.data.timeout || 30000; // 默认30秒超时
+        const timeout = msg.data.timeout ? msg.data.timeout * 1000 : 180000; // 默认180秒超时
+
+        // HTTP 方法列表：这些方法不应该包含请求体
+        const methodsWithoutBody = ['GET', 'HEAD', 'DELETE', 'OPTIONS'];
 
         // 准备请求选项
         const fetchOptions: RequestInit = {
@@ -82,8 +85,8 @@ export class HttpExecutor {
             headers: headers,
         };
 
-        // 如果有请求体，添加到选项中
-        if (body !== undefined && body !== null) {
+        // 如果有请求体且方法允许请求体，添加到选项中
+        if (body !== undefined && body !== null && !methodsWithoutBody.includes(method)) {
             if (typeof body === 'string') {
                 // 如果 body 是字符串，直接使用
                 fetchOptions.body = body;
@@ -98,6 +101,9 @@ export class HttpExecutor {
                     };
                 }
             }
+        } else if (methodsWithoutBody.includes(method) && body !== undefined && body !== null) {
+            // 对于不应该有请求体的方法，记录警告但继续执行
+            OutputLogToFile(`[HttpExecutor] Warning: Method ${method} should not have a body, ignoring body`, { level: LogLevel.WARN });
         }
 
         try {

@@ -179,9 +179,6 @@ export class ElementClass implements IElement {
                             break;
                         }
 
-                        // TODO: 日志输出findResult
-                        OutputLogToFile(`[ElementManager] Find result: ${JSON.stringify(findResult)}`, { level: LogLevel.INFO });
-
                         // 获取数组的所有属性（包括索引属性）
                         const objectId = findResult.result.objectId;
                         const propertiesResult = await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.getProperties', {
