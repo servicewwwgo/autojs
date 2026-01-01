@@ -33,6 +33,8 @@ export class HttpExecutor {
     public async handleMessage(httpMessage: HttpMessage): Promise<void> {
         let defaultResult: HttpResult | undefined;
 
+        OutputLogToFile(`[HttpExecutor] handle message: ${JSON.stringify(httpMessage)}`, { level: LogLevel.INFO });
+
         const handler = this.mapTypeToFunction[httpMessage.type];
 
         if (handler) {
@@ -163,7 +165,7 @@ export class HttpExecutor {
                 },
             } as HttpRequestResult;
 
-            OutputLogToFile(`[HttpExecutor] HTTP request executed successfully, method: ${method}, url: ${url}, status: ${status}`, { level: LogLevel.INFO });
+            OutputLogToFile(`[HttpExecutor] HTTP request executed successfully, method: ${method}, url: ${url}, status: ${status}, responseBody: ${JSON.stringify(responseBody)}`, { level: LogLevel.INFO });
             this.sendResult?.(defaultResult as HttpRequestResult);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
