@@ -15,8 +15,6 @@ export class FindElementInstructionClass extends BaseInstructionClass {
         this.params = instruction.params;
     }
 
-
-
     /**
      * 執行元素查找指令(並獲取元素nodeId及設置元素節點的tag)
      * @returns 指令執行結果

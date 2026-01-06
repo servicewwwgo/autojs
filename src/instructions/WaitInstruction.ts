@@ -144,17 +144,31 @@ export class WaitInstructionClass extends BaseInstructionClass {
 
         while (Date.now() - startTime < timeoutMs) {
             try {
-                // 尝试定位元素
-                if (await element.LocateElement()) {
-                    OutputLogToFile(`[WaitInstruction] Element "${element.GetName()}" exists in DOM`, { level: LogLevel.INFO });
-                    return {
-                        tabId: this.tabId,
-                        instructionID: this.instructionID,
-                        success: true,
-                        data: { elementName: element.GetName() },
-                        duration: Date.now() - startTime
-                    };
+                // 先尝试获取 nodeId（如果元素已经定位，可以直接获取）
+                let nodeId = await element.GetNodeId();
+
+                // 如果无法获取 nodeId，尝试定位元素
+                if (!nodeId) {
+                    if (!await element.LocateElement()) {
+                        await new Promise(resolve => setTimeout(resolve, checkInterval));
+                        continue;
+                    }
+                    nodeId = await element.GetNodeId();
+                    if (!nodeId) {
+                        await new Promise(resolve => setTimeout(resolve, checkInterval));
+                        continue;
+                    }
                 }
+
+                // 元素存在
+                OutputLogToFile(`[WaitInstruction] Element "${element.GetName()}" exists in DOM`, { level: LogLevel.INFO });
+                return {
+                    tabId: this.tabId,
+                    instructionID: this.instructionID,
+                    success: true,
+                    data: { elementName: element.GetName() },
+                    duration: Date.now() - startTime
+                };
             } catch (error) {
                 OutputLogToFile(`[WaitInstruction] Error checking element existence: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
             }
@@ -194,26 +208,33 @@ export class WaitInstructionClass extends BaseInstructionClass {
 
         while (Date.now() - startTime < timeoutMs) {
             try {
-                // 先定位元素
-                if (await element.LocateElement()) {
-                    const nodeId = await element.GetNodeId();
+                // 先尝试获取 nodeId（如果元素已经定位，可以直接获取）
+                let nodeId = await element.GetNodeId();
+
+                // 如果无法获取 nodeId，尝试定位元素
+                if (!nodeId) {
+                    if (!await element.LocateElement()) {
+                        await new Promise(resolve => setTimeout(resolve, checkInterval));
+                        continue;
+                    }
+                    nodeId = await element.GetNodeId();
                     if (!nodeId) {
                         await new Promise(resolve => setTimeout(resolve, checkInterval));
                         continue;
                     }
+                }
 
-                    // 检查元素是否可见
-                    const isVisible = await this.CheckElementVisible(nodeId);
-                    if (isVisible === true) {
-                        OutputLogToFile(`[WaitInstruction] Element "${element.GetName()}" is visible`, { level: LogLevel.INFO });
-                        return {
-                            tabId: this.tabId,
-                            instructionID: this.instructionID,
-                            success: true,
-                            data: { elementName: element.GetName() },
-                            duration: Date.now() - startTime
-                        };
-                    }
+                // 检查元素是否可见
+                const isVisible = await this.CheckElementVisible(nodeId);
+                if (isVisible === true) {
+                    OutputLogToFile(`[WaitInstruction] Element "${element.GetName()}" is visible`, { level: LogLevel.INFO });
+                    return {
+                        tabId: this.tabId,
+                        instructionID: this.instructionID,
+                        success: true,
+                        data: { elementName: element.GetName() },
+                        duration: Date.now() - startTime
+                    };
                 }
             } catch (error) {
                 OutputLogToFile(`[WaitInstruction] Error checking element visibility: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
@@ -444,4 +465,3 @@ export class WaitInstructionClass extends BaseInstructionClass {
         return undefined;
     }
 }
-
