@@ -1,5 +1,5 @@
 import type { NodeProfile } from '../types';
-import { GenerateUUID, OutputLogToFile, LogLevel } from '../utils';
+import { GenerateUUID, LogLevel, OutputLogToFile } from '../utils';
 
 /**
  * 节点配置对象
@@ -47,7 +47,7 @@ export class NodeConfig {
       if (stored.node_name) {
         this.nodeProfile.node_name = stored.node_name as string;
       } else {
-        this.nodeProfile.node_name = 'node';
+        this.nodeProfile.node_name = `node-${GenerateUUID().substring(0, 8)}`;
         await browser.storage.local.set({ node_name: this.nodeProfile.node_name });
       }
     }
