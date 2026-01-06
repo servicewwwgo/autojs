@@ -1,4 +1,5 @@
-import type { CdpCloseConsoleLogsMessage, CdpCloseConsoleLogsResult, CdpCloseNetworkLogsMessage, CdpCloseNetworkLogsResult, CdpConnectMessage, CdpConnectResult, CdpCreateTabAndNavigateMessage, CdpCreateTabAndNavigateResult, CdpDisconnectMessage, CdpDisconnectResult, CdpExecuteJavaScriptMessage, CdpExecuteJavaScriptResult, CdpGetConsoleLogsMessage, CdpGetConsoleLogsResult, CdpGetNetworkLogsMessage, CdpGetNetworkLogsResult, CdpGrepSourceMessage, CdpGrepSourceResult, CdpInitConsoleLogsMessage, CdpInitConsoleLogsResult, CdpInitNetworkLogsMessage, CdpInitNetworkLogsResult, CdpListTargetsMessage, CdpListTargetsResult, CdpMessage, CdpResult, CdpSendCommandMessage, CdpSendCommandResult, CdpTakeElementScreenshotMessage, CdpTakeElementScreenshotResult } from '../types';
+import { nodeConfig } from '../managers';
+import type { CdpCloseConsoleLogsMessage, CdpCloseConsoleLogsResult, CdpCloseNetworkLogsMessage, CdpCloseNetworkLogsResult, CdpConnectMessage, CdpConnectResult, CdpCreateTabAndNavigateMessage, CdpCreateTabAndNavigateResult, CdpDisconnectMessage, CdpDisconnectResult, CdpExecuteJavaScriptMessage, CdpExecuteJavaScriptResult, CdpGetConsoleLogsMessage, CdpGetConsoleLogsResult, CdpGetNetworkLogsMessage, CdpGetNetworkLogsResult, CdpGrepSourceMessage, CdpGrepSourceResult, CdpInitConsoleLogsMessage, CdpInitConsoleLogsResult, CdpInitNetworkLogsMessage, CdpInitNetworkLogsResult, CdpListTargetsMessage, CdpListTargetsResult, CdpMessage, CdpResult, CdpSendCommandMessage, CdpSendCommandResult, CdpTakeElementScreenshotMessage, CdpTakeElementScreenshotResult, CdpUpdateNodeNameMessage, CdpUpdateNodeNameResult } from '../types';
 import { DisconnectCDP, EnsureCDPConnected, ExecuteCDPCommand, LogLevel, OutputLogToFile } from '../utils';
 
 /**
@@ -31,6 +32,7 @@ export class CdpExecutor {
             'close_network_logs': (data: any) => this.handleCloseNetworkLogs(data),
             'close_console_logs': (data: any) => this.handleCloseConsoleLogs(data),
             'create_tab_and_navigate': (data: any) => this.handleCreateTabAndNavigate(data),
+            'update_node_name': (data: any) => this.handleUpdateNodeName(data),
         };
     }
 
@@ -922,5 +924,26 @@ export class CdpExecutor {
 
         // 转换为数组并按时间排序
         return Array.from(grouped.values()).sort((a, b) => a.startTime - b.startTime);
+    }
+
+    // 更新节点名称
+    private async handleUpdateNodeName(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpUpdateNodeNameMessage = cdpMessage as CdpUpdateNodeNameMessage;
+        let defaultResult: CdpUpdateNodeNameResult | undefined;
+
+        if (msg.data === undefined) {
+            throw new Error('data is undefined in update_node_name');
+        }
+
+        if (!msg.data.node_name || typeof msg.data.node_name !== 'string') {
+            throw new Error('node_name is required and must be a string in update_node_name');
+        }
+
+        // 更新节点名称
+        await nodeConfig.UpdateNodeProfile({ node_name: msg.data.node_name });
+
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: { node_name: msg.data.node_name } } as CdpUpdateNodeNameResult;
+        OutputLogToFile(`[CdpExecutor] Node name updated successfully, node_name: ${msg.data.node_name}`, { level: LogLevel.INFO });
+        this.sendResult?.(defaultResult as CdpUpdateNodeNameResult);
     }
 }

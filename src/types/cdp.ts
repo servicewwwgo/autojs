@@ -2,7 +2,7 @@
  * CDP 消息数据映射类型
  */
 export interface CdpMessage {
-    type: 'cdp_connect' | 'cdp_disconnect' | 'list_targets' | 'take_element_screenshot' | 'send_command' | 'grep_source' | 'get_network_logs' | 'get_console_logs' | 'execute_javascript' | 'init_network_logs' | 'init_console_logs' | 'close_network_logs' | 'close_console_logs' | 'create_tab_and_navigate';
+    type: 'cdp_connect' | 'cdp_disconnect' | 'list_targets' | 'take_element_screenshot' | 'send_command' | 'grep_source' | 'get_network_logs' | 'get_console_logs' | 'execute_javascript' | 'init_network_logs' | 'init_console_logs' | 'close_network_logs' | 'close_console_logs' | 'create_tab_and_navigate' | 'update_node_name';
     id: string;
     data?: any;
 }
@@ -315,5 +315,24 @@ export interface CdpCreateTabAndNavigateResult extends CdpResult {
         tabId: number;
         tabIndex: number;
         url: string;
+    };
+}
+
+/**
+ * CDP update_node_name 消息数据映射类型
+ */
+export interface CdpUpdateNodeNameMessage extends CdpMessage {
+    type: 'update_node_name';
+    data?: {
+        node_name: string;
+    };
+}
+
+/**
+ * CDP update_node_name 结果数据映射类型
+ */
+export interface CdpUpdateNodeNameResult extends CdpResult {
+    data?: {
+        node_name: string;
     };
 }
