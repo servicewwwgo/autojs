@@ -454,36 +454,6 @@ export default defineBackground(() => {
         await ws_check();
     });
 
-    // 监听标签页激活
-    browser.tabs.onActivated.addListener(async (activeInfo) => {
-        const tab = await browser.tabs.get(activeInfo.tabId);
-        // 发送标签页激活消息到服务器
-        const message: WSMessage = { type: "tabs", data: { tabId: activeInfo.tabId as number, tabIndex: tab.index, url: tab.url as string } as TabInfo };
-        wsConnector.sendMessage(message);
-    });
-
-    // 监听标签页更新
-    browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-        if (changeInfo.status === 'complete' && tab && tab.url) {
-            OutputLogToFile(`[Background] Tab updated, tabId: ${tabId}, URL: ${tab.url}`, { level: LogLevel.INFO });
-        }
-        // 发送标签页更新消息到服务器
-        const message: WSMessage = { type: "tabs", data: { tabId: tabId as number, tabIndex: tab.index, url: tab.url as string } as TabInfo };
-        wsConnector.sendMessage(message);
-    });
-
-    // 监听标签页关闭
-    browser.tabs.onRemoved.addListener((tabId) => {
-        instructionExecutor.GetInstructionManager().DeleteInstructionsByTabId(tabId);
-        // 清理该标签页的日志
-        cdpExecutor.clearConsoleLogs(tabId);
-        cdpExecutor.clearNetworkLogs(tabId);
-        OutputLogToFile(`[Background] Tab closed, tabId: ${tabId}`, { level: LogLevel.INFO });
-        // 发送标签页关闭消息到服务器
-        const message: WSMessage = { type: "tabs", data: { tabId: tabId as number, tabIndex: -1, url: '' } as TabInfo };
-        wsConnector.sendMessage(message);
-    });
-
     // alarms定时任务
     browser.alarms.onAlarm.addListener(async (alarm) => {
         OutputLogToFile(`[Background] Alarm triggered: ${alarm.name}`, { level: LogLevel.INFO });

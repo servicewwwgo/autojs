@@ -52,7 +52,9 @@ export class HttpExecutor {
             OutputLogToFile(`[HttpExecutor] handler not found: ${errorMessage}`, { level: LogLevel.ERROR });
         }
 
-        this.sendResult?.(defaultResult as HttpResult);
+        if (defaultResult) {
+            this.sendResult?.(defaultResult as HttpResult);
+        }
     }
 
     // 执行 HTTP 请求
@@ -177,7 +179,9 @@ export class HttpExecutor {
             } as HttpRequestResult;
 
             OutputLogToFile(`[HttpExecutor] HTTP request failed, method: ${method}, url: ${url}, error: ${errorMessage}`, { level: LogLevel.ERROR });
-            this.sendResult?.(defaultResult as HttpRequestResult);
+            if (defaultResult) {
+                this.sendResult?.(defaultResult as HttpRequestResult);
+            }
         }
     }
 }

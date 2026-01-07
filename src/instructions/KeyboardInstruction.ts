@@ -1,5 +1,5 @@
 import { elementManager } from '../managers';
-import type { InstructionResult, KeyboardInstruction } from '../types';
+import type { KeyboardInstruction, KeyboardInstructionResult } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
 
 /**
@@ -181,25 +181,25 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
      * 执行键盘操作指令
      * @returns 指令执行结果
      */
-    public async Execute(): Promise<InstructionResult> {
+    public async Execute(): Promise<KeyboardInstructionResult> {
         const result = await this.Retry(async () => {
-            let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+            let defaultResult: KeyboardInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
             if (this.params.elementName) {
                 // 从 elementManager 获取元素
                 const element = elementManager.GetElementByName(this.tabId, this.params.elementName);
 
                 if (!element) {
-                    return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` };
+                    return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` } as KeyboardInstructionResult;
                 }
 
                 if (!await element.LocateElement()) {
-                    return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` };
+                    return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` } as KeyboardInstructionResult;
                 }
 
                 const nodeId = await element.GetNodeId();
                 if (!nodeId) {
-                    return { ...defaultResult, error: `Failed to get nodeId for element "${this.params.elementName}"` };
+                    return { ...defaultResult, error: `Failed to get nodeId for element "${this.params.elementName}"` } as KeyboardInstructionResult;
                 }
 
                 // 滚动到元素位置
@@ -223,13 +223,13 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
                     await this.executeKeyUp();
                     break;
                 default:
-                    return { ...defaultResult, error: `Unknown keyboard action: ${this.params.action}` };
+                    return { ...defaultResult, error: `Unknown keyboard action: ${this.params.action}` } as KeyboardInstructionResult;
             }
 
-            return { ...defaultResult, success: true, data: { key: this.params.key, action: this.params.action } };
+            return { ...defaultResult, success: true, data: { key: this.params.key, action: this.params.action } } as KeyboardInstructionResult;
         });
 
-        return result;
+        return result as KeyboardInstructionResult;
     }
 }
 

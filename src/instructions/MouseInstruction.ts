@@ -1,5 +1,5 @@
 import { elementManager } from '../managers';
-import type { InstructionResult, MouseInstruction } from '../types';
+import type { MouseInstruction, MouseInstructionResult } from '../types';
 import { LogLevel, OutputLogToFile } from '../utils';
 import { BaseInstructionClass } from './BaseInstruction';
 
@@ -343,9 +343,9 @@ export class MouseInstructionClass extends BaseInstructionClass {
      * 執行鼠標操作指令
      * @returns 指令結果
      */
-    public async Execute(): Promise<InstructionResult> {
+    public async Execute(): Promise<MouseInstructionResult> {
         const result = await this.Retry(async () => {
-            let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+            let defaultResult: MouseInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
             let x = this.params.x || 0;
             let y = this.params.y || 0;
@@ -356,17 +356,17 @@ export class MouseInstructionClass extends BaseInstructionClass {
                 const element = elementManager.GetElementByName(this.tabId, this.params.elementName);
 
                 if (!element) {
-                    return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` };
+                    return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` } as MouseInstructionResult;
                 }
 
                 if (!await element.LocateElement()) {
-                    return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` };
+                    return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` } as MouseInstructionResult;
                 }
 
                 // 获取 nodeId
                 const nodeId = await element.GetNodeId();
                 if (!nodeId) {
-                    return { ...defaultResult, error: `Failed to get nodeId for element "${this.params.elementName}"` };
+                    return { ...defaultResult, error: `Failed to get nodeId for element "${this.params.elementName}"` } as MouseInstructionResult;
                 }
 
                 // 滚动到元素位置
@@ -527,10 +527,10 @@ export class MouseInstructionClass extends BaseInstructionClass {
                     break;
             }
 
-            return { ...defaultResult, success: true, data: { x, y, action: this.params.action } };
+            return { ...defaultResult, success: true, data: { x, y, action: this.params.action } } as MouseInstructionResult;
         });
 
-        return result;
+        return result as MouseInstructionResult;
     }
 }
 

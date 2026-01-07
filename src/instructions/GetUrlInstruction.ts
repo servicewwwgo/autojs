@@ -1,4 +1,4 @@
-import type { GetUrlInstruction, InstructionResult } from '../types';
+import type { GetUrlInstruction, GetUrlInstructionResult } from '../types';
 import { LogLevel, OutputLogToFile } from '../utils';
 import { BaseInstructionClass } from './BaseInstruction';
 
@@ -22,36 +22,36 @@ export class GetUrlInstructionClass extends BaseInstructionClass {
    * 使用 browser.tabs.get API 获取标签页信息，从中提取 URL
    * 如果设置了 delay，会在执行前等待指定时间
    */
-  public async Execute(): Promise<InstructionResult> {
+  public async Execute(): Promise<GetUrlInstructionResult> {
     const result = await this.Retry(async () => {
-      let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+      let defaultResult: GetUrlInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
       // 如果设置了延迟，先等待
       await this.Delay(this.delay);
 
       // 使用 browser.tabs.get API 获取标签页信息
       const tab = await browser.tabs.get(this.tabId);
-      
+
       // 获取URL，优先使用 url，如果不存在则使用 pendingUrl
       const url = tab.url || tab.pendingUrl || '';
 
       if (!url) {
-        return { ...defaultResult, error: 'Failed to get URL from tab' };
+        return { ...defaultResult, error: 'Failed to get URL from tab' } as GetUrlInstructionResult;
       }
 
       OutputLogToFile(`[GetUrlInstruction] Current tab URL: ${url}`, { level: LogLevel.INFO });
 
-      return { 
-        ...defaultResult, 
-        success: true, 
-        data: { 
-          usage: this.params.usage || "data", 
-          url: url 
-        } 
-      };
+      return {
+        ...defaultResult,
+        success: true,
+        data: {
+          usage: this.params.usage || "data",
+          url: url
+        }
+      } as GetUrlInstructionResult;
     });
 
-    return result;
+    return result as GetUrlInstructionResult;
   }
 }
 

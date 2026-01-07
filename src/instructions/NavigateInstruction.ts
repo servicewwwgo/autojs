@@ -1,4 +1,4 @@
-import type { InstructionResult, NavigateInstruction } from '../types';
+import type { NavigateInstruction, NavigateInstructionResult } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
 
 /**
@@ -22,9 +22,9 @@ export class NavigateInstructionClass extends BaseInstructionClass {
      * 导航后会等待页面加载完成，确保 content script 已准备好
      * 如果设置了 delay，会在导航前等待指定时间
      */
-    public async Execute(): Promise<InstructionResult> {
+    public async Execute(): Promise<NavigateInstructionResult> {
         const result = await this.Retry(async () => {
-            let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+            let defaultResult: NavigateInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
             // 如果设置了延迟，先等待
             await this.Delay(this.delay);
@@ -35,10 +35,10 @@ export class NavigateInstructionClass extends BaseInstructionClass {
             // 等待页面加载完成
             await this.WaitForPageLoad();
 
-            return { ...defaultResult, success: true, data: { url: this.params.url } };
+            return { ...defaultResult, success: true, data: { url: this.params.url } } as NavigateInstructionResult;
         });
 
-        return result;
+        return result as NavigateInstructionResult;
     }
 
     /**

@@ -5,7 +5,7 @@ export { WSErrorMessage, WSHeartbeatMessage, WSHeartbeatResponse, WSLoginMessage
 
 export { ExecutorStatus } from './executor';
 
-export { ActivateTabInstruction, BaseInstruction, ElementData, ExecuteScriptInstruction, FindElementInstruction, GetAttributeInstruction, GetUrlInstruction, InputInstruction, Instruction, InstructionResult, InstructionResults, KeyboardInstruction, MouseInstruction, NavigateInstruction, ScreenshotInstruction, SetAttributeInstruction, WaitInstruction } from './instruction';
+export { ActivateTabInstruction, ActivateTabInstructionResult, BaseInstruction, ElementData, ExecuteScriptInstruction, ExecuteScriptInstructionResult, FindElementInstruction, FindElementInstructionResult, GetAttributeInstruction, GetAttributeInstructionResult, GetUrlInstruction, GetUrlInstructionResult, InputInstruction, InputInstructionResult, Instruction, InstructionResult, InstructionResults, KeyboardInstruction, KeyboardInstructionResult, MouseInstruction, MouseInstructionResult, NavigateInstruction, NavigateInstructionResult, ScreenshotInstruction, ScreenshotInstructionResult, SetAttributeInstruction, SetAttributeInstructionResult, WaitAttributeContainsResult, WaitElementExistsResult, WaitElementVisibleResult, WaitInstruction, WaitInstructionResult, WaitTitleContainsResult } from './instruction';
 
 export { BackgroundScriptMessageType } from './background';
 export { ContentScriptMessageType } from './content';

@@ -70,7 +70,9 @@ export class CdpExecutor {
             OutputLogToFile(`[CdpExecutor] handler not found: ${errorMessage}`, { level: LogLevel.ERROR });
         }
 
-        this.sendResult?.(defaultResult as CdpResult);
+        if (defaultResult) {
+            this.sendResult?.(defaultResult as CdpResult);
+        }
     }
 
     // 连接 CDP

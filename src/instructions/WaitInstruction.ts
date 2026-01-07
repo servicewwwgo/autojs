@@ -1,6 +1,6 @@
 import { ElementTag } from '../consts';
 import { ElementClass, elementManager, IElement } from '../managers';
-import { ElementData, InstructionResult, WaitInstruction } from '../types';
+import { ElementData, WaitAttributeContainsResult, WaitElementExistsResult, WaitElementVisibleResult, WaitInstruction, WaitInstructionResult, WaitTitleContainsResult } from '../types';
 import { LogLevel, OutputLogToFile } from '../utils';
 import { BaseInstructionClass } from './BaseInstruction';
 
@@ -26,9 +26,9 @@ export class WaitInstructionClass extends BaseInstructionClass {
      * 执行等待指令
      * @returns 指令执行结果
      */
-    public async Execute(): Promise<InstructionResult> {
+    public async Execute(): Promise<WaitInstructionResult> {
         const result = await this.Retry(async () => {
-            let defaultResult: InstructionResult = {
+            let defaultResult: WaitInstructionResult = {
                 tabId: this.tabId,
                 instructionID: this.instructionID,
                 success: false,
@@ -53,13 +53,13 @@ export class WaitInstructionClass extends BaseInstructionClass {
                         return {
                             ...defaultResult,
                             error: `Unknown wait type: ${this.params.waitType}`
-                        };
+                        } as WaitInstructionResult;
                 }
             } catch (error) {
                 return {
                     ...defaultResult,
                     error: error instanceof Error ? error.message : String(error)
-                };
+                } as WaitInstructionResult;
             }
         });
 
@@ -72,7 +72,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
      * @param startTime - 开始时间
      * @returns 指令执行结果
      */
-    private async WaitForTitleContains(timeoutMs: number, startTime: number): Promise<InstructionResult> {
+    private async WaitForTitleContains(timeoutMs: number, startTime: number): Promise<WaitTitleContainsResult> {
         if (!this.params.titleText) {
             return {
                 tabId: this.tabId,
@@ -80,7 +80,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
                 success: false,
                 error: 'titleText parameter is required for wait_title_contains',
                 duration: Date.now() - startTime
-            };
+            } as WaitTitleContainsResult;
         }
 
         const checkInterval = 500; // 每 500ms 检查一次
@@ -103,7 +103,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
                         success: true,
                         data: { title: currentTitle },
                         duration: Date.now() - startTime
-                    };
+                    } as WaitTitleContainsResult;
                 }
             } catch (error) {
                 OutputLogToFile(`[WaitInstruction] Error checking title: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
@@ -119,7 +119,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
             success: false,
             error: `Timeout waiting for title to contain "${this.params.titleText}"`,
             duration: Date.now() - startTime
-        };
+        } as WaitTitleContainsResult;
     }
 
     /**
@@ -128,7 +128,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
      * @param startTime - 开始时间
      * @returns 指令执行结果
      */
-    private async WaitForElementExists(timeoutMs: number, startTime: number): Promise<InstructionResult> {
+    private async WaitForElementExists(timeoutMs: number, startTime: number): Promise<WaitElementExistsResult> {
         const element = await this.GetElement();
         if (!element) {
             return {
@@ -137,7 +137,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
                 success: false,
                 error: 'Element not found in element manager and element data not provided',
                 duration: Date.now() - startTime
-            };
+            } as WaitElementExistsResult;
         }
 
         const checkInterval = 500; // 每 500ms 检查一次
@@ -168,7 +168,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
                     success: true,
                     data: { elementName: element.GetName() },
                     duration: Date.now() - startTime
-                };
+                } as WaitElementExistsResult;
             } catch (error) {
                 OutputLogToFile(`[WaitInstruction] Error checking element existence: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
             }
@@ -183,7 +183,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
             success: false,
             error: `Timeout waiting for element "${element.GetName()}" to exist in DOM`,
             duration: Date.now() - startTime
-        };
+        } as WaitElementExistsResult;
     }
 
     /**
@@ -192,7 +192,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
      * @param startTime - 开始时间
      * @returns 指令执行结果
      */
-    private async WaitForElementVisible(timeoutMs: number, startTime: number): Promise<InstructionResult> {
+    private async WaitForElementVisible(timeoutMs: number, startTime: number): Promise<WaitElementVisibleResult> {
         const element = await this.GetElement();
         if (!element) {
             return {
@@ -201,7 +201,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
                 success: false,
                 error: 'Element not found in element manager and element data not provided',
                 duration: Date.now() - startTime
-            };
+            } as WaitElementVisibleResult;
         }
 
         const checkInterval = 500; // 每 500ms 检查一次
@@ -234,7 +234,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
                         success: true,
                         data: { elementName: element.GetName() },
                         duration: Date.now() - startTime
-                    };
+                    } as WaitElementVisibleResult;
                 }
             } catch (error) {
                 OutputLogToFile(`[WaitInstruction] Error checking element visibility: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
@@ -250,7 +250,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
             success: false,
             error: `Timeout waiting for element "${element.GetName()}" to be visible`,
             duration: Date.now() - startTime
-        };
+        } as WaitElementVisibleResult;
     }
 
     /**
@@ -259,7 +259,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
      * @param startTime - 开始时间
      * @returns 指令执行结果
      */
-    private async WaitForAttributeContains(timeoutMs: number, startTime: number): Promise<InstructionResult> {
+    private async WaitForAttributeContains(timeoutMs: number, startTime: number): Promise<WaitAttributeContainsResult> {
         if (!this.params.attribute || !this.params.attributeText) {
             return {
                 tabId: this.tabId,
@@ -267,7 +267,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
                 success: false,
                 error: 'attribute and attributeText parameters are required for wait_attribute_contains',
                 duration: Date.now() - startTime
-            };
+            } as WaitAttributeContainsResult;
         }
 
         const element = await this.GetElement();
@@ -278,7 +278,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
                 success: false,
                 error: 'Element not found in element manager and element data not provided',
                 duration: Date.now() - startTime
-            };
+            } as WaitAttributeContainsResult;
         }
 
         const checkInterval = 500; // 每 500ms 检查一次
@@ -326,7 +326,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
                                     return null;
                                   })()`,
                                 returnByValue: true,
-                                timeout: this.timeout
+                                timeout: this.timeout ? this.timeout * 1000 : undefined // 将秒转换为毫秒
                             });
 
                             attributeValue = attrResult?.result?.value ?? undefined;
@@ -348,7 +348,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
                                 attributeValue: attributeValue
                             },
                             duration: Date.now() - startTime
-                        };
+                        } as WaitAttributeContainsResult;
                     }
                 }
             } catch (error) {
@@ -365,7 +365,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
             success: false,
             error: `Timeout waiting for attribute "${this.params.attribute}" to contain "${this.params.attributeText}"`,
             duration: Date.now() - startTime
-        };
+        } as WaitAttributeContainsResult;
     }
 
     /**

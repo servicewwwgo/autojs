@@ -1,4 +1,4 @@
-import type { ActivateTabInstruction, InstructionResult } from '../types';
+import type { ActivateTabInstruction, ActivateTabInstructionResult } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
 
 /**
@@ -19,9 +19,9 @@ export class ActivateTabInstructionClass extends BaseInstructionClass {
      * 使用 browser.tabs.update API 激活指定标签页
      * 如果设置了 delay，会在激活前等待指定时间
      */
-    public async Execute(): Promise<InstructionResult> {
+    public async Execute(): Promise<ActivateTabInstructionResult> {
         const result = await this.Retry(async () => {
-            let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+            let defaultResult: ActivateTabInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
             // 如果设置了延迟，先等待
             await this.Delay(this.delay);
@@ -29,10 +29,10 @@ export class ActivateTabInstructionClass extends BaseInstructionClass {
             // 使用 browser.tabs.update API 激活指定标签页
             await browser.tabs.update(this.tabId, { active: true });
 
-            return { ...defaultResult, success: true, data: { tabId: this.tabId } };
+            return { ...defaultResult, success: true, data: { tabId: this.tabId } } as ActivateTabInstructionResult;
         });
 
-        return result;
+        return result as ActivateTabInstructionResult;
     }
 }
 

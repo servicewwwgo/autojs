@@ -1,5 +1,5 @@
 import { elementManager } from '../managers';
-import type { InputInstruction, InstructionResult } from '../types';
+import type { InputInstruction, InputInstructionResult } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
 
 /**
@@ -18,27 +18,27 @@ export class InputInstructionClass extends BaseInstructionClass {
         this.params = instruction.params;
     }
 
-    public async Execute(): Promise<InstructionResult> {
+    public async Execute(): Promise<InputInstructionResult> {
         const result = await this.Retry(async () => {
-            let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+            let defaultResult: InputInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
             // 从 elementManager 获取元素
             const element = elementManager.GetElementByName(this.tabId, this.params.elementName);
 
             if (!element) {
-                return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` };
+                return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` } as InputInstructionResult;
             }
 
             // 定位元素
             if (!await element.LocateElement()) {
-                return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` };
+                return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` } as InputInstructionResult;
             }
 
             // 获取 nodeId
             const nodeId = await element.GetNodeId();
 
             if (!nodeId) {
-                return { ...defaultResult, error: `Failed to get nodeId for element "${this.params.elementName}"` };
+                return { ...defaultResult, error: `Failed to get nodeId for element "${this.params.elementName}"` } as InputInstructionResult;
             }
 
             // 滚动到元素位置
@@ -164,9 +164,9 @@ export class InputInstructionClass extends BaseInstructionClass {
                 });
             }
 
-            return { ...defaultResult, success: true, data: { text: this.params.text } };
+            return { ...defaultResult, success: true, data: { text: this.params.text } } as InputInstructionResult;
         });
 
-        return result;
+        return result as InputInstructionResult;
     }
 }

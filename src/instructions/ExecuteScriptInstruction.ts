@@ -1,4 +1,4 @@
-import type { ExecuteScriptInstruction, InstructionResult } from '../types';
+import type { ExecuteScriptInstruction, ExecuteScriptInstructionResult } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
 
 /**
@@ -10,16 +10,16 @@ export class ExecuteScriptInstructionClass extends BaseInstructionClass {
     super(instruction);
   }
 
-  public async Execute(): Promise<InstructionResult> {
+  public async Execute(): Promise<ExecuteScriptInstructionResult> {
     const result = await this.Retry(async () => {
-      let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+      let defaultResult: ExecuteScriptInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
       // 执行JavaScript代码
       let results: any = await this.ExecuteCDPCommand('Runtime.evaluate', this.params);
 
-      return { ...defaultResult, success: true, data: { results } };
+      return { ...defaultResult, success: true, data: { results } } as ExecuteScriptInstructionResult;
     });
 
-    return result;
+    return result as ExecuteScriptInstructionResult;
   }
 }

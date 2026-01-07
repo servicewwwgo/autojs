@@ -1,6 +1,6 @@
 import { ElementTag } from '../consts';
 import { elementManager } from '../managers';
-import type { GetAttributeInstruction, InstructionResult } from '../types';
+import type { GetAttributeInstruction, GetAttributeInstructionResult } from '../types';
 import { LogLevel, OutputLogToFile } from '../utils';
 import { BaseInstructionClass } from './BaseInstruction';
 
@@ -19,19 +19,19 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
     this.params = instruction.params;
   }
 
-  public async Execute(): Promise<InstructionResult> {
+  public async Execute(): Promise<GetAttributeInstructionResult> {
     const result = await this.Retry(async () => {
-      let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+      let defaultResult: GetAttributeInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
       // 从 elementManager 获取元素
       const element = elementManager.GetElementByName(this.tabId, this.params.elementName);
 
       if (!element) {
-        return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` };
+        return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` } as GetAttributeInstructionResult;
       }
 
       if (!await element.LocateElement()) {
-        return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` };
+        return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` } as GetAttributeInstructionResult;
       }
 
       // 使用 CDP 协议获取元素属性
@@ -39,7 +39,7 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
       const nodeId = await element.GetNodeId();
 
       if (!nodeId) {
-        return { ...defaultResult, error: `Failed to get nodeId for element "${this.params.elementName}"` };
+        return { ...defaultResult, error: `Failed to get nodeId for element "${this.params.elementName}"` } as GetAttributeInstructionResult;
       }
 
       const attributesResult = await this.ExecuteCDPCommand('DOM.getAttributes', {
@@ -79,7 +79,7 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
                 return null;
               })()`,
             returnByValue: true,
-            timeout: this.timeout
+            timeout: this.timeout ? this.timeout * 1000 : undefined // 将秒转换为毫秒
           });
 
           attributeValue = attrResult?.result?.value ?? undefined;
@@ -88,9 +88,9 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
         }
       }
 
-      return { ...defaultResult, success: true, data: { usage: this.params.usage, value: attributeValue } };
+      return { ...defaultResult, success: true, data: { usage: this.params.usage, value: attributeValue } } as GetAttributeInstructionResult;
     });
 
-    return result;
+    return result as GetAttributeInstructionResult;
   }
 }

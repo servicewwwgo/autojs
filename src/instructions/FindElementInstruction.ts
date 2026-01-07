@@ -1,5 +1,5 @@
 import { ElementClass } from '../managers';
-import { ElementData, FindElementInstruction, InstructionResult } from '../types';
+import { ElementData, FindElementInstruction, FindElementInstructionResult } from '../types';
 import { BaseInstructionClass } from './BaseInstruction';
 
 /**
@@ -19,10 +19,10 @@ export class FindElementInstructionClass extends BaseInstructionClass {
      * 執行元素查找指令(並獲取元素nodeId及設置元素節點的tag)
      * @returns 指令執行結果
      */
-    public async Execute(): Promise<InstructionResult> {
+    public async Execute(): Promise<FindElementInstructionResult> {
         const result = await this.Retry(async () => {
 
-            let defaultResult: InstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+            let defaultResult: FindElementInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
             const element = new ElementClass({
                 ...this.params.element,
@@ -31,12 +31,12 @@ export class FindElementInstructionClass extends BaseInstructionClass {
 
             // 定位元素
             if (!await element.LocateElement()) {
-                return { ...defaultResult, error: `Element "${this.params.element.name}" not found with selector: ${this.params.element.selector}` };
+                return { ...defaultResult, error: `Element "${this.params.element.name}" not found with selector: ${this.params.element.selector}` } as FindElementInstructionResult;
             }
 
-            return { ...defaultResult, success: true, data: element };
+            return { ...defaultResult, success: true, data: element.ToObject() as ElementData } as FindElementInstructionResult;
         });
 
-        return result;
+        return result as FindElementInstructionResult;
     }
 }

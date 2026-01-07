@@ -31,6 +31,176 @@ export interface InstructionResult {
 }
 
 /**
+ * 页面导航指令结果
+ */
+export interface NavigateInstructionResult extends InstructionResult {
+  data?: {
+    url: string;
+  };
+}
+
+/**
+ * 元素查找指令结果
+ */
+export interface FindElementInstructionResult extends InstructionResult {
+  data?: ElementData;
+}
+
+/**
+ * 文本输入指令结果
+ */
+export interface InputInstructionResult extends InstructionResult {
+  data?: {
+    text: string;
+  };
+}
+
+/**
+ * 键盘操作指令结果
+ */
+export interface KeyboardInstructionResult extends InstructionResult {
+  data?: {
+    key: string;
+    action: 'press' | 'type' | 'keydown' | 'keyup';
+  };
+}
+
+/**
+ * 鼠标操作指令结果
+ */
+export interface MouseInstructionResult extends InstructionResult {
+  data?: {
+    x: number;
+    y: number;
+    action: 'click' | 'dblclick' | 'rightclick' | 'hover' | 'left_mousedown' | 'left_mouseup' | 'right_mousedown' | 'right_mouseup' | 'move_to';
+  };
+}
+
+/**
+ * 获取元素属性指令结果
+ */
+export interface GetAttributeInstructionResult extends InstructionResult {
+  data?: {
+    usage?: "variable" | "data" | "none";
+    value?: string;
+  };
+}
+
+/**
+ * 设置元素属性指令结果
+ */
+export interface SetAttributeInstructionResult extends InstructionResult {
+  data?: {
+    elementName: string;
+    attribute: string;
+    value: string;
+  };
+}
+
+/**
+ * 页面截图指令结果
+ */
+export interface ScreenshotInstructionResult extends InstructionResult {
+  data?: {
+    dataUrl: string;
+    format: 'png' | 'jpeg';
+    quality: number;
+  };
+}
+
+/**
+ * 等待指令结果 - 等待标题包含
+ */
+export interface WaitTitleContainsResult extends InstructionResult {
+  data?: {
+    title: string;
+  };
+}
+
+/**
+ * 等待指令结果 - 等待元素存在
+ */
+export interface WaitElementExistsResult extends InstructionResult {
+  data?: {
+    elementName: string;
+  };
+}
+
+/**
+ * 等待指令结果 - 等待元素可见
+ */
+export interface WaitElementVisibleResult extends InstructionResult {
+  data?: {
+    elementName: string;
+  };
+}
+
+/**
+ * 等待指令结果 - 等待属性包含
+ */
+export interface WaitAttributeContainsResult extends InstructionResult {
+  data?: {
+    elementName: string;
+    attribute: string;
+    attributeValue: string;
+  };
+}
+
+/**
+ * 等待指令结果联合类型
+ */
+export type WaitInstructionResult =
+  | WaitTitleContainsResult
+  | WaitElementExistsResult
+  | WaitElementVisibleResult
+  | WaitAttributeContainsResult;
+
+/**
+ * 获取当前标签页URL指令结果
+ */
+export interface GetUrlInstructionResult extends InstructionResult {
+  data?: {
+    usage?: "variable" | "data" | "none";
+    url: string;
+  };
+}
+
+/**
+ * 激活标签页指令结果
+ */
+export interface ActivateTabInstructionResult extends InstructionResult {
+  data?: {
+    tabId: number;
+  };
+}
+
+/**
+ * 页面JavaScript执行指令结果
+ */
+export interface ExecuteScriptInstructionResult extends InstructionResult {
+  data?: {
+    results: any;
+  };
+}
+
+/**
+ * 指令结果联合类型
+ */
+export type TypedInstructionResult =
+  | NavigateInstructionResult
+  | FindElementInstructionResult
+  | InputInstructionResult
+  | KeyboardInstructionResult
+  | MouseInstructionResult
+  | GetAttributeInstructionResult
+  | SetAttributeInstructionResult
+  | ScreenshotInstructionResult
+  | WaitInstructionResult
+  | GetUrlInstructionResult
+  | ActivateTabInstructionResult
+  | ExecuteScriptInstructionResult;
+
+/**
  * 指令结果列表类型
  */
 export interface InstructionResults {

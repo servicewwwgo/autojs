@@ -128,7 +128,9 @@ export class WebSocketConnector {
             this.connected = false;
             this.isLoggedIn = false;
             this.isDisconnecting = false; // 重置断开标记，允许后续重连
-            throw error;
+
+            // 首次连接失败时，安排重连
+            this.scheduleReconnect();
         }
     }
 
