@@ -1,6 +1,5 @@
 import { defineBackground } from 'wxt/utils/define-background';
 import { WEBSOCKET_CONN_URL } from '../consts';
-import { example } from '../example';
 import { CdpExecutor, HttpExecutor, InstructionExecutor, WebSocketConnector } from '../executor';
 import { BaseInstructionClass, InstructionFactory } from '../instructions';
 import { nodeConfig } from '../managers';
@@ -21,36 +20,6 @@ export default defineBackground(() => {
 
     // 立即设置回调，确保消息处理器在任何 WebSocket 连接建立之前就已经注册
     // 注意：set_callbacks 函数在后面定义，但这里先声明，稍后调用
-
-    async function add_example_instructions(tabId: number) {
-        const now = Date.now();
-
-        const processedInstructions: BaseInstructionClass[] = example.map((inst, index) => {
-            const instruction: Instruction = { ...inst } as Instruction;
-
-            // 如果指令没有指定 tabId，使用传入的 tabId
-            if (!instruction.tabId) {
-                instruction.tabId = tabId;
-            }
-
-            // 如果指令没有 instructionID，生成一个唯一的 ID
-            // 格式：inst_时间戳_索引
-            if (!instruction.instructionID) {
-                instruction.instructionID = `inst_${now}_${index}`;
-            }
-
-            // 如果指令没有 created_at，使用当前时间 + 索引（确保顺序）
-            // 每个指令间隔 1 毫秒，保证排序正确
-            if (!instruction.created_at) {
-                instruction.created_at = now + index;
-            }
-
-            // 使用工厂方法创建指令实例
-            return InstructionFactory.create(instruction);
-        });
-
-        instructionExecutor.GetInstructionManager().AddUnfilteredInstructions(processedInstructions);
-    }
 
     async function get_tabs(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
         // 获取所有标签页
@@ -409,7 +378,9 @@ export default defineBackground(() => {
         try {
             // 检查定时任务是否已存在
             const existingAlarm = await browser.alarms.get('connect_websocket');
+
             if (!existingAlarm) {
+                await new Promise(resolve => setTimeout(resolve, 5000));
                 // 如果不存在，创建定时任务
                 browser.alarms.create('connect_websocket', { periodInMinutes: 1, delayInMinutes: 0 });
                 OutputLogToFile('[Background] Created connect_websocket alarm', { level: LogLevel.INFO });
