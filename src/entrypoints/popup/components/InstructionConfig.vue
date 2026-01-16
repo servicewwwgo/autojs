@@ -49,11 +49,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { BackgroundScriptMessageType, TabInfo } from '../../../types';
 import { SendMessageToBackgroundScript } from '../../../utils';
-
-import { example } from '../../../example';
 
 const selectedTabId = ref<number | ''>('');
 const instructionsJson = ref('');
@@ -150,10 +148,7 @@ const loadExample = () => {
         }
     };
 
-    setTabId(example);
-
-    instructionsJson.value = JSON.stringify(example, null, 2);
-    showMessage(`已加载 ${example.length} 个测试用例，包含所有指令类型`, 'success');
+    showMessage(`已加载 ${0} 个测试用例，包含所有指令类型`, 'success');
 };
 
 onMounted(() => {
