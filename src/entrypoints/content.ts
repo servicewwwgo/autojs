@@ -1,7 +1,7 @@
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import { ElementTag } from '../consts';
 import { BackgroundScriptMessageType, ContentScriptMessageType } from '../types';
-import { SendMessageToBackgroundScript, EscapeCSSSelector, OutputLogToFile, LogLevel } from '../utils';
+import { EscapeCSSSelector, LogLevel, OutputLogToFile, SendMessageToBackgroundScript } from '../utils';
 
 /**
  * 隐藏 navigator.webdriver 属性
@@ -443,6 +443,10 @@ export default defineContentScript({
 
     // 立即隐藏 navigator.webdriver 属性（在页面脚本运行之前）
     hideWebdriver();
+
+    SendMessageToBackgroundScript({ type: 'content_script_loaded' } as BackgroundScriptMessageType).catch(error => {
+      OutputLogToFile(`[Content] Failed to send content script loaded message: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+    });
 
     let mapTypeToFunction: { [key: string]: (message: ContentScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) => Promise<void> } = {
       'scroll_into_view': ScrollIntoView,

@@ -9,7 +9,7 @@ export default defineConfig({
   browser: 'chrome',
   // 配置manifest版本
   manifest: {
-    version: '1.1.8',
+    version: '1.2.6',
     name: '自动化网页',
     description: '基于WXT+Vue的Chrome浏览器自动化系统',
     permissions: [
@@ -21,7 +21,8 @@ export default defineConfig({
       'debugger',
       'nativeMessaging',
       'sidePanel',
-      'cookies'
+      'cookies',
+      'background'
     ],
     host_permissions: [
       '<all_urls>'
@@ -31,6 +32,10 @@ export default defineConfig({
     },
     action: {
       default_title: '打开SemiAutoJs侧边栏'
+    },
+    background: {
+      persistent: true,  // 保持后台页面常驻
+      type: 'module'
     }
   },
   dev: {

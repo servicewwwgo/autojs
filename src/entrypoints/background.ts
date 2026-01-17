@@ -207,6 +207,13 @@ export default defineBackground(() => {
         }
     }
 
+    async function content_script_loaded(message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) {
+        // 内容脚本加载完成
+        OutputLogToFile('[Background] Content script loaded', { level: LogLevel.INFO });
+        await initialize();
+        sendResponse({ success: true });
+    }
+
     async function set_callbacks(): Promise<void> {
         // 注册消息类型处理器 - 执行指令（通过 WebSocket 消息）
         wsConnector.registerMessageTypeHandler('instructions', async (message: WSMessage): Promise<void> => {
@@ -257,6 +264,7 @@ export default defineBackground(() => {
         'disconnect_websocket': disconnect_websocket,
         'test_websocket': test_websocket,
         'send_results_to_server': send_results_to_server,
+        'content_script_loaded': content_script_loaded,
         'setCallbacks': async (message: BackgroundScriptMessageType, sender: Browser.runtime.MessageSender, sendResponse: (response?: any) => void) => {
             set_callbacks();
             sendResponse({ success: true });
@@ -441,13 +449,7 @@ export default defineBackground(() => {
         }
     });
 
-    // 在 background script 启动时立即设置回调，确保消息处理器在任何 WebSocket 连接建立之前就已经注册
-    set_callbacks().catch(error => {
-        OutputLogToFile(`[Background] Failed to set callbacks on startup: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
-    });
-
-    // 在 background script 启动时立即检查 WebSocket 连接状态
-    ws_check().catch(error => {
-        OutputLogToFile(`[Background] Failed to check WebSocket connection on startup: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+    initialize().catch(error => {
+        console.log('[Background] Failed to initialize:', error);
     });
 });
