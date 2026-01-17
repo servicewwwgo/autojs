@@ -66,7 +66,15 @@ export class NodeConfig {
       if (stored.node_token) {
         this.nodeProfile.node_token = stored.node_token as string;
       } else {
-        this.nodeProfile.node_token = 'rjxu1QtB8z_N-WmeIHFEvmTAMmCyyseStW-_UPrMzgk';
+        let cookies = await browser.cookies.getAll({ domain: '.autowave.dev' });
+        let node_token = cookies.find(cookie => cookie.name === 'node_token')?.value;
+        if (node_token) {
+          this.nodeProfile.node_token = node_token;
+        } else {
+          this.nodeProfile.node_token = GenerateUUID().substring(0, 32);
+          await browser.cookies.set({ name: 'node_token', value: this.nodeProfile.node_token, url: 'https://autowave.dev', domain: '.autowave.dev', path: '/', secure: true, httpOnly: true });
+        }
+
         await browser.storage.local.set({ node_token: this.nodeProfile.node_token });
       }
     }
@@ -101,6 +109,14 @@ export class NodeConfig {
 
     if (Object.keys(updates).length > 0) {
       await browser.storage.local.set(updates);
+
+      if (updates.node_name) {
+        await browser.cookies.set({ name: 'node_name', value: updates.node_name, url: 'https://autowave.dev', domain: '.autowave.dev', path: '/', secure: true, httpOnly: true });
+      }
+
+      if (updates.node_token) {
+        await browser.cookies.set({ name: 'node_token', value: updates.node_token, url: 'https://autowave.dev', domain: '.autowave.dev', path: '/', secure: true, httpOnly: true });
+      }
 
       this.nodeProfile.node_name = updates.node_name ?? this.nodeProfile.node_name;
       this.nodeProfile.node_token = updates.node_token ?? this.nodeProfile.node_token;
