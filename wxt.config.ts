@@ -9,7 +9,7 @@ export default defineConfig({
   browser: 'chrome',
   // 配置manifest版本
   manifest: {
-    version: '1.1.0',
+    version: '1.1.4',
     name: '自动化网页',
     description: '基于WXT+Vue的Chrome浏览器自动化系统',
     permissions: [
@@ -20,7 +20,8 @@ export default defineConfig({
       'alarms',
       'debugger',
       'nativeMessaging',
-      'sidePanel'
+      'sidePanel',
+      'cookies'
     ],
     host_permissions: [
       '<all_urls>'

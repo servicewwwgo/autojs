@@ -380,9 +380,6 @@ export default defineBackground(() => {
             const existingAlarm = await browser.alarms.get('connect_websocket');
 
             if (!existingAlarm) {
-                // 等待10秒后创建定时任务
-                await new Promise(resolve => setTimeout(resolve, 10 * 1000));
-
                 // 如果不存在，创建定时任务
                 browser.alarms.create('connect_websocket', { periodInMinutes: 1, delayInMinutes: 0 });
                 OutputLogToFile('[Background] Created connect_websocket alarm', { level: LogLevel.INFO });
@@ -423,8 +420,8 @@ export default defineBackground(() => {
         // 初始化
         await initialize();
 
-        // 检查WebSocket连接
-        await ws_check();
+        // // 检查WebSocket连接
+        // await ws_check();
     });
 
     // alarms定时任务
@@ -447,5 +444,10 @@ export default defineBackground(() => {
     // 在 background script 启动时立即设置回调，确保消息处理器在任何 WebSocket 连接建立之前就已经注册
     set_callbacks().catch(error => {
         OutputLogToFile(`[Background] Failed to set callbacks on startup: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+    });
+
+    // 在 background script 启动时立即检查 WebSocket 连接状态
+    ws_check().catch(error => {
+        OutputLogToFile(`[Background] Failed to check WebSocket connection on startup: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
     });
 });

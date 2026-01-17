@@ -47,7 +47,15 @@ export class NodeConfig {
       if (stored.node_name) {
         this.nodeProfile.node_name = stored.node_name as string;
       } else {
-        this.nodeProfile.node_name = `node-${GenerateUUID().substring(0, 8)}`;
+        // 从 cookies 中获取 node_name
+        let cookies = await browser.cookies.getAll({ domain: '.autowave.dev' });
+        let node_name = cookies.find(cookie => cookie.name === 'node_name')?.value;
+        if (node_name) {
+          this.nodeProfile.node_name = node_name;
+        } else {
+          this.nodeProfile.node_name = `node-${GenerateUUID().substring(0, 8)}`;
+          await browser.cookies.set({ name: 'node_name', value: this.nodeProfile.node_name, url: 'https://autowave.dev', domain: '.autowave.dev', path: '/', secure: true, httpOnly: false });
+        }
         await browser.storage.local.set({ node_name: this.nodeProfile.node_name });
       }
     }
