@@ -55,7 +55,7 @@ export class WebSocketConnector {
         }
 
         // 如果已经连接且已登录，直接返回
-        if (this.isWebSocketOpen() && this.isConnected()) {
+        if (this.isConnected()) {
             OutputLogToFile('[WebSocket] Already connected and logged in, returning', { level: LogLevel.INFO });
             return;
         }

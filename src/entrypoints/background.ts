@@ -380,7 +380,9 @@ export default defineBackground(() => {
             const existingAlarm = await browser.alarms.get('connect_websocket');
 
             if (!existingAlarm) {
-                await new Promise(resolve => setTimeout(resolve, 5000));
+                // 等待10秒后创建定时任务
+                await new Promise(resolve => setTimeout(resolve, 10 * 1000));
+
                 // 如果不存在，创建定时任务
                 browser.alarms.create('connect_websocket', { periodInMinutes: 1, delayInMinutes: 0 });
                 OutputLogToFile('[Background] Created connect_websocket alarm', { level: LogLevel.INFO });

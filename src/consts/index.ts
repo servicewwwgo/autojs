@@ -22,3 +22,10 @@ export const DEBUG_MODE: boolean =
     import.meta.env.VITE_DEBUG_MODE === undefined ||
     import.meta.env.VITE_DEBUG_MODE === '' ||
     import.meta.env.VITE_DEBUG_MODE === 'true';
+
+/**
+ * 应用版本号 从环境变量读取，如果没有设置则使用默认值
+ * 环境变量名: VITE_APP_VERSION
+ */
+export const APP_VERSION: string =
+    import.meta.env.VITE_APP_VERSION || '1.0.0';

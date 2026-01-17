@@ -141,6 +141,8 @@ export class InputInstructionClass extends BaseInstructionClass {
                     // 等待删除操作完成
                     await this.Delay(0.2);
                 }
+
+                await this.Delay(1);
             }
 
             // 输入文本 - 支持中文字符和 Unicode 字符输入

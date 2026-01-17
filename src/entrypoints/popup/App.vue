@@ -3,6 +3,7 @@
     <header class="header">
       <h1>SemiAutoJs</h1>
       <p class="subtitle">Web自动化爬虫扩展</p>
+      <p class="version">v{{ version }}</p>
     </header>
 
     <nav class="tabs">
@@ -23,12 +24,14 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import NodeConfig from './components/NodeConfig.vue';
-import InstructionConfig from './components/InstructionConfig.vue';
+import { APP_VERSION } from '../../consts';
 import ExecutionControl from './components/ExecutionControl.vue';
 import ExecutionLog from './components/ExecutionLog.vue';
+import InstructionConfig from './components/InstructionConfig.vue';
+import NodeConfig from './components/NodeConfig.vue';
 
 const activeTab = ref('node');
+const version = APP_VERSION;
 
 const tabs = [
   { id: 'node', label: '节点配置' },
@@ -67,6 +70,13 @@ const tabs = [
   margin: 5px 0 0 0;
   font-size: 12px;
   opacity: 0.9;
+}
+
+.version {
+  margin: 8px 0 0 0;
+  font-size: 11px;
+  opacity: 0.8;
+  font-weight: 500;
 }
 
 .tabs {
