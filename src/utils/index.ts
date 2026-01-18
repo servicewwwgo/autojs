@@ -427,11 +427,23 @@ export function CloseLogConnection(): void {
 * 返回浏览器序号列表
 */
 export async function GetBitBrowserTabSequence(): Promise<string | undefined> {
-    const tabs = await browser.tabs.query({});
-    const browserTabs = tabs.filter((tab) => tab.url?.includes('console.bitbrowser.net'));
+    let tabs = await browser.tabs.query({});
+    let browserTabs = tabs.filter((tab) => tab.url?.includes('console.bitbrowser.net'));
+
     if (browserTabs.length === 0) {
         return undefined;
     }
+
+    // 等待10秒后再次查询
+    await new Promise(resolve => setTimeout(resolve, 10 * 1000));
+
+    tabs = await browser.tabs.query({});
+    browserTabs = tabs.filter((tab) => tab.url?.includes('console.bitbrowser.net'));
+
+    if (browserTabs.length === 0) {
+        return undefined;
+    }
+
     const browserTab = browserTabs[0];
     const browserTabTitle = browserTab.title;
     const browserTabSeq = browserTabTitle?.match(/\d+/)?.[0] ?? undefined;

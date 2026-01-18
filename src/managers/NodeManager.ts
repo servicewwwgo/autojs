@@ -64,6 +64,7 @@ export class NodeConfig {
 
           await browser.cookies.set({ name: 'node_name', value: this.nodeProfile.node_name, url: 'https://autowave.dev', domain: '.autowave.dev', path: '/', secure: true, httpOnly: false });
         }
+
         await browser.storage.local.set({ node_name: this.nodeProfile.node_name });
       }
     }
