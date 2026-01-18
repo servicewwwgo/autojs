@@ -1,6 +1,6 @@
 import { ElementTag } from '../consts';
 import { ElementClass, elementManager, IElement } from '../managers';
-import { ElementData, WaitAttributeContainsResult, WaitElementExistsResult, WaitElementVisibleResult, WaitInstruction, WaitInstructionResult, WaitTitleContainsResult } from '../types';
+import { ElementData, WaitAttributeContainsResult, WaitElementExistsResult, WaitElementVisibleResult, WaitInstruction, WaitInstructionResult, WaitPageLoadResult, WaitTitleContainsResult } from '../types';
 import { LogLevel, OutputLogToFile } from '../utils';
 import { BaseInstructionClass } from './BaseInstruction';
 
@@ -9,7 +9,7 @@ import { BaseInstructionClass } from './BaseInstruction';
  */
 export class WaitInstructionClass extends BaseInstructionClass {
     public params: {
-        waitType: 'wait_title_contains' | 'wait_element_exists' | 'wait_element_visible' | 'wait_attribute_contains';
+        waitType: 'wait_title_contains' | 'wait_element_exists' | 'wait_element_visible' | 'wait_attribute_contains' | 'wait_page_load';
         titleText?: string;
         element?: ElementData;
         elementName?: string;
@@ -49,6 +49,8 @@ export class WaitInstructionClass extends BaseInstructionClass {
                         return await this.WaitForElementVisible(timeoutMs, startTime);
                     case 'wait_attribute_contains':
                         return await this.WaitForAttributeContains(timeoutMs, startTime);
+                    case 'wait_page_load':
+                        return await this.WaitForPageLoad(timeoutMs, startTime);
                     default:
                         return {
                             ...defaultResult,
@@ -439,6 +441,51 @@ export class WaitInstructionClass extends BaseInstructionClass {
         } catch (error) {
             return undefined;
         }
+    }
+
+    /**
+     * 等待页面加载完成
+     * @param timeoutMs - 超时时间（毫秒）
+     * @param startTime - 开始时间
+     * @returns 指令执行结果
+     */
+    private async WaitForPageLoad(timeoutMs: number, startTime: number): Promise<WaitPageLoadResult> {
+        const checkInterval = 500; // 每 500ms 检查一次
+
+        while (Date.now() - startTime < timeoutMs) {
+            try {
+                // 使用 CDP 检查页面加载状态
+                const result = await this.ExecuteCDPCommand('Runtime.evaluate', {
+                    expression: 'document.readyState',
+                    returnByValue: true
+                });
+
+                const readyState = result?.result?.value || '';
+                if (typeof readyState === 'string' && readyState === 'complete') {
+                    OutputLogToFile(`[WaitInstruction] Page load completed`, { level: LogLevel.INFO });
+                    return {
+                        tabId: this.tabId,
+                        instructionID: this.instructionID,
+                        success: true,
+                        data: { readyState: readyState },
+                        duration: Date.now() - startTime
+                    } as WaitPageLoadResult;
+                }
+            } catch (error) {
+                OutputLogToFile(`[WaitInstruction] Error checking page load state: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
+            }
+
+            // 等待一段时间后再次检查
+            await new Promise(resolve => setTimeout(resolve, checkInterval));
+        }
+
+        return {
+            tabId: this.tabId,
+            instructionID: this.instructionID,
+            success: false,
+            error: 'Timeout waiting for page to load',
+            duration: Date.now() - startTime
+        } as WaitPageLoadResult;
     }
 
     /**

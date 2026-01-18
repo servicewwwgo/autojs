@@ -147,13 +147,23 @@ export interface WaitAttributeContainsResult extends InstructionResult {
 }
 
 /**
+ * 等待指令结果 - 等待页面加载完成
+ */
+export interface WaitPageLoadResult extends InstructionResult {
+  data?: {
+    readyState: string;
+  };
+}
+
+/**
  * 等待指令结果联合类型
  */
 export type WaitInstructionResult =
   | WaitTitleContainsResult
   | WaitElementExistsResult
   | WaitElementVisibleResult
-  | WaitAttributeContainsResult;
+  | WaitAttributeContainsResult
+  | WaitPageLoadResult;
 
 /**
  * 获取当前标签页URL指令结果
@@ -331,7 +341,7 @@ export interface ScreenshotInstruction extends BaseInstruction {
 export interface WaitInstruction extends BaseInstruction {
   type: 'wait';
   params: {
-    waitType: 'wait_title_contains' | 'wait_element_exists' | 'wait_element_visible' | 'wait_attribute_contains';
+    waitType: 'wait_title_contains' | 'wait_element_exists' | 'wait_element_visible' | 'wait_attribute_contains' | 'wait_page_load';
     // wait_title_contains 参数
     titleText?: string;
     // wait_element_exists 和 wait_element_visible 参数
