@@ -1,5 +1,5 @@
 import type { NodeProfile } from '../types';
-import { GenerateUUID, LogLevel, OutputLogToFile } from '../utils';
+import { GenerateUUID, GetBitBrowserTabSequence, LogLevel, OutputLogToFile } from '../utils';
 
 /**
  * 节点配置对象
@@ -30,6 +30,7 @@ export class NodeConfig {
    * - node_token: 如果不存在，保持为空字符串，需要用户手动设置（安全考虑）
    */
   public async GetNodeProfile(): Promise<NodeProfile> {
+
     if (this.nodeProfile.node_id === '') {
       let stored = await browser.storage.local.get(['node_id']);
 
@@ -53,7 +54,14 @@ export class NodeConfig {
         if (node_name) {
           this.nodeProfile.node_name = node_name;
         } else {
-          this.nodeProfile.node_name = `node-${GenerateUUID().substring(0, 8)}`;
+          const bitBrowserTabSequence = await GetBitBrowserTabSequence();
+
+          if (bitBrowserTabSequence) {
+            this.nodeProfile.node_name = bitBrowserTabSequence;
+          } else {
+            this.nodeProfile.node_name = `node-${GenerateUUID().substring(0, 8)}`;
+          }
+
           await browser.cookies.set({ name: 'node_name', value: this.nodeProfile.node_name, url: 'https://autowave.dev', domain: '.autowave.dev', path: '/', secure: true, httpOnly: false });
         }
         await browser.storage.local.set({ node_name: this.nodeProfile.node_name });

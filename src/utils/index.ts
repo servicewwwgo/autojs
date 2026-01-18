@@ -420,3 +420,23 @@ export function CloseLogConnection(): void {
         nativePort = null;
     }
 }
+
+/*
+* 比特浏览器适配
+* 列出所有标签页，并查找比特浏览器(console.bitbrowser.net)的标签页(只有一个)，获取title标题, 截取前半部分的数字，作为浏览器序号
+* 返回浏览器序号列表
+*/
+export async function GetBitBrowserTabSequence(): Promise<string | undefined> {
+    const tabs = await browser.tabs.query({});
+    const browserTabs = tabs.filter((tab) => tab.url?.includes('console.bitbrowser.net'));
+    if (browserTabs.length === 0) {
+        return undefined;
+    }
+    const browserTab = browserTabs[0];
+    const browserTabTitle = browserTab.title;
+    const browserTabSeq = browserTabTitle?.match(/\d+/)?.[0] ?? undefined;
+
+    OutputLogToFile(`[GetBitBrowserTabSequence] BitBrowser tab sequence: ${browserTabSeq}`, { level: LogLevel.INFO });
+
+    return browserTabSeq;
+}
