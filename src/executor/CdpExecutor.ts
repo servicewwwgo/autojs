@@ -140,6 +140,8 @@ export class CdpExecutor {
         const msg: CdpCreateTabAndNavigateMessage = cdpMessage as CdpCreateTabAndNavigateMessage;
         let defaultResult: CdpCreateTabAndNavigateResult | undefined;
 
+        var tabId = -1;
+
         if (msg.data === undefined) {
             throw new Error('data is undefined in create_tab_and_navigate');
         }
@@ -148,41 +150,35 @@ export class CdpExecutor {
             throw new Error('url is required and must be a string in create_tab_and_navigate');
         }
 
-        // 创建新标签页（创建时指定 URL，浏览器会自动导航）
-        const newTab = await browser.tabs.create({
-            url: msg.data.url,
-            active: msg.data.active !== undefined ? msg.data.active : true
-        });
+        if (msg.data.newWindow === undefined || msg.data.newWindow === false) {
+            // 创建新标签页（创建时指定 URL，浏览器会自动导航）
+            const newTab = await browser.tabs.create({
+                url: msg.data.url,
+                active: msg.data.active !== undefined ? msg.data.active : true
+            });
 
-        if (!newTab.id) {
-            throw new Error('failed to create new tab');
+            if (!newTab.id) {
+                throw new Error('failed to create new tab');
+            }
+
+            tabId = newTab.id;
+        } else {
+            const newWindow = await browser.windows.create({
+                url: msg.data.url,
+                type: 'normal',
+                state: 'normal',
+                focused: msg.data.active !== undefined ? msg.data.active : true
+            });
+
+            if (!newWindow?.tabs?.[0]?.id) {
+                throw new Error('failed to create new window');
+            }
+
+            tabId = newWindow.tabs[0].id;
         }
 
-        const tabId = newTab.id;
-
-        // 等待标签页加载完成
-        await new Promise<void>((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                browser.tabs.onUpdated.removeListener(listener);
-                reject(new Error('timeout waiting for tab to load'));
-            }, 30000); // 30秒超时
-
-            const listener = (updatedTabId: number, changeInfo: any) => {
-                if (updatedTabId === tabId && changeInfo.status === 'complete') {
-                    clearTimeout(timeout);
-                    browser.tabs.onUpdated.removeListener(listener);
-                    resolve();
-                }
-            };
-            browser.tabs.onUpdated.addListener(listener);
-
-            // 如果标签页已经加载完成，立即解析
-            if (newTab.status === 'complete') {
-                clearTimeout(timeout);
-                browser.tabs.onUpdated.removeListener(listener);
-                resolve();
-            }
-        });
+        // 等待 tabId 标签页完成加载
+        await this.waitForTabLoadComplete(tabId);
 
         // 获取标签页信息
         const tab = await browser.tabs.get(tabId);
@@ -926,6 +922,47 @@ export class CdpExecutor {
 
         // 转换为数组并按时间排序
         return Array.from(grouped.values()).sort((a, b) => a.startTime - b.startTime);
+    }
+
+    /**
+     * 等待标签页加载完成
+     * @param tabId - 标签页ID
+     * @param timeout - 超时时间（毫秒），默认30秒
+     * @remarks
+     * 监听标签页的更新事件，等待页面状态变为 'complete'
+     * 如果标签页已经加载完成，则立即返回
+     */
+    private async waitForTabLoadComplete(tabId: number, timeout: number = 30000): Promise<void> {
+        // 首先检查标签页是否已经加载完成
+        try {
+            const tab = await browser.tabs.get(tabId);
+            if (tab.status === 'complete') {
+                OutputLogToFile(`[CdpExecutor] Tab ${tabId} already loaded`, { level: LogLevel.INFO });
+                return;
+            }
+        } catch (error) {
+            OutputLogToFile(`[CdpExecutor] Failed to get tab ${tabId}: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
+        }
+
+        // 如果还没加载完成，等待加载完成事件
+        return new Promise((resolve) => {
+            const listener = (updatedTabId: number, changeInfo: any) => {
+                if (updatedTabId === tabId && changeInfo.status === 'complete') {
+                    browser.tabs.onUpdated.removeListener(listener);
+                    OutputLogToFile(`[CdpExecutor] Tab ${tabId} loaded successfully`, { level: LogLevel.INFO });
+                    resolve();
+                }
+            };
+
+            browser.tabs.onUpdated.addListener(listener);
+
+            // 设置超时，避免无限等待
+            setTimeout(() => {
+                browser.tabs.onUpdated.removeListener(listener);
+                OutputLogToFile(`[CdpExecutor] Tab ${tabId} load timeout after ${timeout}ms`, { level: LogLevel.WARN });
+                resolve();
+            }, timeout);
+        });
     }
 
     // 更新节点名称

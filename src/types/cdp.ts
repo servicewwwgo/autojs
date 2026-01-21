@@ -304,6 +304,7 @@ export interface CdpCreateTabAndNavigateMessage extends CdpMessage {
     data?: {
         url: string;
         active?: boolean;
+        newWindow?: boolean; // 是否在新窗口中打开
     };
 }
 
