@@ -2,7 +2,7 @@
  * CDP 消息数据映射类型
  */
 export interface CdpMessage {
-    type: 'cdp_connect' | 'cdp_disconnect' | 'list_targets' | 'take_element_screenshot' | 'send_command' | 'grep_source' | 'get_network_logs' | 'get_console_logs' | 'execute_javascript' | 'init_network_logs' | 'init_console_logs' | 'close_network_logs' | 'close_console_logs' | 'create_tab_and_navigate' | 'update_node_name';
+    type: 'cdp_connect' | 'cdp_disconnect' | 'list_targets' | 'take_element_screenshot' | 'send_command' | 'grep_source' | 'get_network_logs' | 'get_console_logs' | 'execute_javascript' | 'init_network_logs' | 'init_console_logs' | 'close_network_logs' | 'close_console_logs' | 'create_tab_and_navigate' | 'update_node_name' | 'close_tab';
     id: string;
     data?: any;
 }
@@ -335,5 +335,24 @@ export interface CdpUpdateNodeNameMessage extends CdpMessage {
 export interface CdpUpdateNodeNameResult extends CdpResult {
     data?: {
         node_name: string;
+    };
+}
+
+/**
+ * CDP close_tab 消息数据映射类型
+ */
+export interface CdpCloseTabMessage extends CdpMessage {
+    type: 'close_tab';
+    data?: {
+        tabId: number;
+    };
+}
+
+/**
+ * CDP close_tab 结果数据映射类型
+ */
+export interface CdpCloseTabResult extends CdpResult {
+    data?: {
+        tabId: number;
     };
 }

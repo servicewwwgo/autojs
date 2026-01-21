@@ -1,5 +1,5 @@
 import { nodeConfig } from '../managers';
-import type { CdpCloseConsoleLogsMessage, CdpCloseConsoleLogsResult, CdpCloseNetworkLogsMessage, CdpCloseNetworkLogsResult, CdpConnectMessage, CdpConnectResult, CdpCreateTabAndNavigateMessage, CdpCreateTabAndNavigateResult, CdpDisconnectMessage, CdpDisconnectResult, CdpExecuteJavaScriptMessage, CdpExecuteJavaScriptResult, CdpGetConsoleLogsMessage, CdpGetConsoleLogsResult, CdpGetNetworkLogsMessage, CdpGetNetworkLogsResult, CdpGrepSourceMessage, CdpGrepSourceResult, CdpInitConsoleLogsMessage, CdpInitConsoleLogsResult, CdpInitNetworkLogsMessage, CdpInitNetworkLogsResult, CdpListTargetsMessage, CdpListTargetsResult, CdpMessage, CdpResult, CdpSendCommandMessage, CdpSendCommandResult, CdpTakeElementScreenshotMessage, CdpTakeElementScreenshotResult, CdpUpdateNodeNameMessage, CdpUpdateNodeNameResult } from '../types';
+import type { CdpCloseConsoleLogsMessage, CdpCloseConsoleLogsResult, CdpCloseNetworkLogsMessage, CdpCloseNetworkLogsResult, CdpCloseTabMessage, CdpCloseTabResult, CdpConnectMessage, CdpConnectResult, CdpCreateTabAndNavigateMessage, CdpCreateTabAndNavigateResult, CdpDisconnectMessage, CdpDisconnectResult, CdpExecuteJavaScriptMessage, CdpExecuteJavaScriptResult, CdpGetConsoleLogsMessage, CdpGetConsoleLogsResult, CdpGetNetworkLogsMessage, CdpGetNetworkLogsResult, CdpGrepSourceMessage, CdpGrepSourceResult, CdpInitConsoleLogsMessage, CdpInitConsoleLogsResult, CdpInitNetworkLogsMessage, CdpInitNetworkLogsResult, CdpListTargetsMessage, CdpListTargetsResult, CdpMessage, CdpResult, CdpSendCommandMessage, CdpSendCommandResult, CdpTakeElementScreenshotMessage, CdpTakeElementScreenshotResult, CdpUpdateNodeNameMessage, CdpUpdateNodeNameResult } from '../types';
 import { DisconnectCDP, EnsureCDPConnected, ExecuteCDPCommand, LogLevel, OutputLogToFile } from '../utils';
 
 /**
@@ -33,6 +33,7 @@ export class CdpExecutor {
             'close_console_logs': (data: any) => this.handleCloseConsoleLogs(data),
             'create_tab_and_navigate': (data: any) => this.handleCreateTabAndNavigate(data),
             'update_node_name': (data: any) => this.handleUpdateNodeName(data),
+            'close_tab': (data: any) => this.handleCloseTab(data),
         };
     }
 
@@ -984,5 +985,38 @@ export class CdpExecutor {
         defaultResult = { type: msg.type, id: msg.id, success: true, data: { node_name: msg.data.node_name } } as CdpUpdateNodeNameResult;
         OutputLogToFile(`[CdpExecutor] Node name updated successfully, node_name: ${msg.data.node_name}`, { level: LogLevel.INFO });
         this.sendResult?.(defaultResult as CdpUpdateNodeNameResult);
+    }
+
+    // 关闭标签页
+    private async handleCloseTab(cdpMessage: CdpMessage): Promise<void> {
+        const msg: CdpCloseTabMessage = cdpMessage as CdpCloseTabMessage;
+        let defaultResult: CdpCloseTabResult | undefined;
+
+        if (msg.data === undefined) {
+            throw new Error('data is undefined in close_tab');
+        }
+
+        if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
+            throw new Error('tabId is required and must be a number in close_tab');
+        }
+
+        // 关闭标签页前，先断开 CDP 连接（如果已连接）
+        try {
+            await DisconnectCDP(msg.data.tabId);
+        } catch (error) {
+            // 如果 CDP 未连接，忽略错误
+            OutputLogToFile(`[CdpExecutor] CDP not connected for tab ${msg.data.tabId}, skipping disconnect`, { level: LogLevel.WARN });
+        }
+
+        // 关闭标签页
+        await browser.tabs.remove(msg.data.tabId);
+
+        // 清理该标签页的日志
+        this.clearConsoleLogs(msg.data.tabId);
+        this.clearNetworkLogs(msg.data.tabId);
+
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId } } as CdpCloseTabResult;
+        OutputLogToFile(`[CdpExecutor] Tab closed successfully, tabId: ${msg.data.tabId}`, { level: LogLevel.INFO });
+        this.sendResult?.(defaultResult as CdpCloseTabResult);
     }
 }
