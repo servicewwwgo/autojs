@@ -9,7 +9,8 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
     public params: {
         elementName?: string;
         action: 'press' | 'type' | 'keydown' | 'keyup';
-        key: string;
+        key?: string;
+        text?: string;
     };
 
     // 特殊按键列表（不需要 char 事件的按键）
@@ -80,7 +81,10 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
      * @returns 是否为特殊按键
      */
     private isSpecialKey(key: string): boolean {
-        return KeyboardInstructionClass.SPECIAL_KEYS.includes(key as any);
+        if (!key || key.length === 0) {
+            return false;
+        }
+        return (KeyboardInstructionClass.SPECIAL_KEYS as readonly string[]).includes(key);
     }
 
     /**
@@ -89,6 +93,9 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
      * @returns Windows 虚拟键码（Virtual Key Code）
      */
     private getVirtualKeyCode(key: string): number {
+        if (!key || key.length === 0) {
+            throw new Error('Key cannot be empty');
+        }
         return KeyboardInstructionClass.VIRTUAL_KEY_CODES[key] || key.toUpperCase().charCodeAt(0);
     }
 
@@ -98,6 +105,9 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
      * @returns 按键的 code 名称
      */
     private getKeyCodeName(key: string): string {
+        if (!key || key.length === 0) {
+            throw new Error('Key cannot be empty');
+        }
         return KeyboardInstructionClass.KEY_CODE_NAMES[key] || `Key${key.toUpperCase()}`;
     }
 
@@ -134,21 +144,21 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
      * 对于普通字符：keyDown → char → keyUp
      * 对于特殊按键：keyDown → keyUp
      */
-    private async executePress(): Promise<void> {
-        const isSpecial = this.isSpecialKey(this.params.key);
+    private async executePress(key: string): Promise<void> {
+        const isSpecial = this.isSpecialKey(key);
 
         if (isSpecial) {
             // 特殊按键：keyDown → keyUp
-            await this.dispatchKeyEvent('keyDown', this.params.key);
+            await this.dispatchKeyEvent('keyDown', key);
             await this.Delay(this.delay);
-            await this.dispatchKeyEvent('keyUp', this.params.key);
+            await this.dispatchKeyEvent('keyUp', key);
         } else {
             // 普通字符：keyDown → char → keyUp（完整事件序列）
-            await this.dispatchKeyEvent('keyDown', this.params.key);
+            await this.dispatchKeyEvent('keyDown', key);
             await this.Delay(this.delay);
-            await this.dispatchKeyEvent('char', this.params.key, this.params.key);
+            await this.dispatchKeyEvent('char', key, key);
             await this.Delay(this.delay);
-            await this.dispatchKeyEvent('keyUp', this.params.key);
+            await this.dispatchKeyEvent('keyUp', key);
         }
     }
 
@@ -156,8 +166,8 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
      * 执行输入操作（type）
      * 逐个字符输入，每个字符使用 char 事件
      */
-    private async executeType(): Promise<void> {
-        for (const char of Array.from(this.params.key)) {
+    private async executeType(key: string): Promise<void> {
+        for (const char of Array.from(key)) {
             await this.Delay(this.delay);
             await this.dispatchKeyEvent('char', char, char);
         }
@@ -166,15 +176,15 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
     /**
      * 执行按键按下操作（keydown）
      */
-    private async executeKeyDown(): Promise<void> {
-        await this.dispatchKeyEvent('keyDown', this.params.key);
+    private async executeKeyDown(key: string): Promise<void> {
+        await this.dispatchKeyEvent('keyDown', key);
     }
 
     /**
      * 执行按键释放操作（keyup）
      */
-    private async executeKeyUp(): Promise<void> {
-        await this.dispatchKeyEvent('keyUp', this.params.key);
+    private async executeKeyUp(key: string): Promise<void> {
+        await this.dispatchKeyEvent('keyUp', key);
     }
 
     /**
@@ -193,10 +203,6 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
                     return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` } as KeyboardInstructionResult;
                 }
 
-                if (!await element.LocateElement()) {
-                    return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` } as KeyboardInstructionResult;
-                }
-
                 const nodeId = await element.GetNodeId();
                 if (!nodeId) {
                     return { ...defaultResult, error: `Failed to get nodeId for element "${this.params.elementName}"` } as KeyboardInstructionResult;
@@ -208,25 +214,60 @@ export class KeyboardInstructionClass extends BaseInstructionClass {
                 await this.ExecuteCDPCommand('DOM.focus', { nodeId: nodeId });
             }
 
-            // 根据操作类型执行相应的键盘操作
-            switch (this.params.action) {
-                case 'press':
-                    await this.executePress();
-                    break;
-                case 'type':
-                    await this.executeType();
-                    break;
-                case 'keydown':
-                    await this.executeKeyDown();
-                    break;
-                case 'keyup':
-                    await this.executeKeyUp();
-                    break;
-                default:
-                    return { ...defaultResult, error: `Unknown keyboard action: ${this.params.action}` } as KeyboardInstructionResult;
+            if (this.params.key !== undefined && this.params.key !== null && this.params.key !== '') {
+                // 根据操作类型执行相应的键盘操作
+                switch (this.params.action) {
+                    case 'press':
+                        await this.executePress(this.params.key);
+                        break;
+                    case 'type':
+                        await this.executeType(this.params.key);
+                        break;
+                    case 'keydown':
+                        await this.executeKeyDown(this.params.key);
+                        break;
+                    case 'keyup':
+                        await this.executeKeyUp(this.params.key);
+                        break;
+                    default:
+                        return { ...defaultResult, error: `Unknown keyboard action: ${this.params.action}` } as KeyboardInstructionResult;
+                }
+
+                return { ...defaultResult, success: true, data: { key: this.params.key, action: this.params.action } } as KeyboardInstructionResult;
             }
 
-            return { ...defaultResult, success: true, data: { key: this.params.key, action: this.params.action } } as KeyboardInstructionResult;
+            if (this.params.text !== undefined && this.params.text !== null && this.params.text !== '') {
+                // 根据操作类型执行相应的键盘操作
+                switch (this.params.action) {
+                    case 'press':
+                        for (const char of Array.from(this.params.text)) {
+                            await this.executePress(char);
+                        }
+                        break;
+                    case 'type':
+                        for (const char of Array.from(this.params.text)) {
+                            await this.executeType(char);
+                        }
+                        break;
+                    case 'keydown':
+                        for (const char of Array.from(this.params.text)) {
+                            await this.executeKeyDown(char);
+                        }
+                        break;
+                    case 'keyup':
+                        for (const char of Array.from(this.params.text)) {
+                            await this.executeKeyUp(char);
+                        }
+                        break;
+                    default:
+                        return { ...defaultResult, error: `Unknown keyboard action: ${this.params.action}` } as KeyboardInstructionResult;
+                }
+
+                return { ...defaultResult, success: true, data: { text: this.params.text, action: this.params.action } } as KeyboardInstructionResult;
+            }
+
+            // 如果 key 和 text 都不存在，返回错误
+            return { ...defaultResult, error: 'Either "key" or "text" parameter must be provided' } as KeyboardInstructionResult;
         });
 
         return result as KeyboardInstructionResult;

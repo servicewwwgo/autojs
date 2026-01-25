@@ -60,7 +60,8 @@ export interface InputInstructionResult extends InstructionResult {
  */
 export interface KeyboardInstructionResult extends InstructionResult {
   data?: {
-    key: string;
+    key?: string;
+    text?: string;
     action: 'press' | 'type' | 'keydown' | 'keyup';
   };
 }
@@ -281,7 +282,8 @@ export interface KeyboardInstruction extends BaseInstruction {
   params: {
     elementName?: string;
     action: 'press' | 'type' | 'keydown' | 'keyup';
-    key: string;
+    key?: string; // 单字符输入按键(主要是用于特殊按键, 如 Enter, Tab, Escape 等)
+    text?: string; // 多字符输入文本
   };
 }
 
