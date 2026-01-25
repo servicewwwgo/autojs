@@ -365,16 +365,12 @@ export class ElementClass implements IElement {
     public async LocateElement(): Promise<boolean> {
         // 如果元素已经定位过（有 nodeId 和 tag），先验证元素是否仍然存在且有效
         if (this.elementData.nodeId && this.elementData.tag) {
-            try {
-                // 通过 tag 验证元素是否仍然存在
-                const currentNodeId = await this.GetNodeId();
-                if (currentNodeId && currentNodeId === this.elementData.nodeId) {
-                    // 元素仍然存在且 nodeId 匹配，直接返回成功，不需要重新定位
-                    return true;
-                }
-                // 如果 nodeId 不匹配或元素不存在，继续重新定位
-            } catch (error) {
-                // 验证失败，继续重新定位
+            // 直接使用tag选择器重新定位元素, 并设置 nodeId
+            const newNodeId = await this.GetNodeId();
+
+            if (newNodeId) {
+                this.elementData.nodeId = newNodeId;
+                return true;
             }
         }
 
