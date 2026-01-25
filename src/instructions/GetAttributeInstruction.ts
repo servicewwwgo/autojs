@@ -30,10 +30,6 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
         return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` } as GetAttributeInstructionResult;
       }
 
-      if (!await element.LocateElement()) {
-        return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` } as GetAttributeInstructionResult;
-      }
-
       // 使用 CDP 协议获取元素属性
       // DOM.getAttributes 返回格式: { attributes: ["attr1", "value1", "attr2", "value2", ...] }
       const nodeId = await element.GetNodeId();

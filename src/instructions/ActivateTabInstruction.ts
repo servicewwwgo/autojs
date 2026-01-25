@@ -1,4 +1,5 @@
 import type { ActivateTabInstruction, ActivateTabInstructionResult } from '../types';
+import { LogLevel, OutputLogToFile } from '../utils';
 import { BaseInstructionClass } from './BaseInstruction';
 
 /**
@@ -26,8 +27,34 @@ export class ActivateTabInstructionClass extends BaseInstructionClass {
             // 如果设置了延迟，先等待
             await this.Delay(this.delay);
 
+            // 首先检查标签页是否存在
+            try {
+                const tab = await browser.tabs.get(this.tabId);
+                if (!tab) {
+                    return { ...defaultResult, error: `Failed to get tab ${this.tabId}` } as ActivateTabInstructionResult;
+                }
+            } catch (error) {
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                if (errorMsg.includes('No tab with id') || errorMsg.includes('No tab with given id')) {
+                    return { ...defaultResult, error: `Tab ${this.tabId} does not exist` } as ActivateTabInstructionResult;
+                }
+                throw error; // 重新抛出其他错误，让 Retry 处理
+            }
+
             // 使用 browser.tabs.update API 激活指定标签页
-            await browser.tabs.update(this.tabId, { active: true });
+            let updatedTab;
+            try {
+                updatedTab = await browser.tabs.update(this.tabId, { active: true });
+            } catch (error) {
+                const errorMsg = error instanceof Error ? error.message : String(error);
+                return { ...defaultResult, error: `Failed to activate tab ${this.tabId}: ${errorMsg}` } as ActivateTabInstructionResult;
+            }
+
+            if (!updatedTab) {
+                return { ...defaultResult, error: `Failed to activate tab ${this.tabId}: update returned no result` } as ActivateTabInstructionResult;
+            }
+
+            OutputLogToFile(`[ActivateTabInstruction] Tab ${this.tabId} activated successfully`, { level: LogLevel.INFO });
 
             return { ...defaultResult, success: true, data: { tabId: this.tabId } } as ActivateTabInstructionResult;
         });

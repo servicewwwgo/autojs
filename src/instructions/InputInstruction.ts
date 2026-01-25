@@ -29,11 +29,6 @@ export class InputInstructionClass extends BaseInstructionClass {
                 return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` } as InputInstructionResult;
             }
 
-            // 定位元素
-            if (!await element.LocateElement()) {
-                return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` } as InputInstructionResult;
-            }
-
             // 获取 nodeId
             const nodeId = await element.GetNodeId();
 

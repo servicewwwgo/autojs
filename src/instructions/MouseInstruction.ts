@@ -347,8 +347,8 @@ export class MouseInstructionClass extends BaseInstructionClass {
         const result = await this.Retry(async () => {
             let defaultResult: MouseInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
-            let x = this.params.x || 0;
-            let y = this.params.y || 0;
+            let x: number | undefined = this.params.x;
+            let y: number | undefined = this.params.y;
 
             // 如果指定了元素，获取元素位置
             if (this.params.elementName) {
@@ -359,10 +359,6 @@ export class MouseInstructionClass extends BaseInstructionClass {
                     return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` } as MouseInstructionResult;
                 }
 
-                if (!await element.LocateElement()) {
-                    return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` } as MouseInstructionResult;
-                }
-
                 // 获取 nodeId
                 const nodeId = await element.GetNodeId();
                 if (!nodeId) {
@@ -371,8 +367,6 @@ export class MouseInstructionClass extends BaseInstructionClass {
 
                 // 滚动到元素位置
                 await this.ExecuteCDPCommand('DOM.scrollIntoViewIfNeeded', { nodeId: nodeId });
-                // // 聚焦元素
-                // await this.ExecuteCDPCommand('DOM.focus', { nodeId: nodeId });
 
                 // 使用 CDP 获取元素的边界框
                 const boxModel = await this.ExecuteCDPCommand('DOM.getBoxModel', {
@@ -389,7 +383,14 @@ export class MouseInstructionClass extends BaseInstructionClass {
 
                     x = left + (right - left) / 2;
                     y = top + (bottom - top) / 2;
+                } else {
+                    return { ...defaultResult, error: `Failed to get box model for element "${this.params.elementName}"` } as MouseInstructionResult;
                 }
+            }
+
+            // 验证坐标是否有效
+            if (x === undefined || y === undefined || isNaN(x) || isNaN(y)) {
+                return { ...defaultResult, error: 'Either elementName or valid x/y coordinates must be provided' } as MouseInstructionResult;
             }
 
             // 执行鼠标操作
@@ -482,6 +483,9 @@ export class MouseInstructionClass extends BaseInstructionClass {
                     break;
 
                 case 'left_mousedown':
+                    // 先移动鼠标到目标位置，确保事件正确触发
+                    await this.MoveMouseTo(x, y);
+                    await this.Delay(this.delay);
                     await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
                         type: 'mousePressed',
                         x,
@@ -492,6 +496,9 @@ export class MouseInstructionClass extends BaseInstructionClass {
                     break;
 
                 case 'left_mouseup':
+                    // 先移动鼠标到目标位置，确保事件正确触发
+                    await this.MoveMouseTo(x, y);
+                    await this.Delay(this.delay);
                     await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
                         type: 'mouseReleased',
                         x,
@@ -502,6 +509,9 @@ export class MouseInstructionClass extends BaseInstructionClass {
                     break;
 
                 case 'right_mousedown':
+                    // 先移动鼠标到目标位置，确保事件正确触发
+                    await this.MoveMouseTo(x, y);
+                    await this.Delay(this.delay);
                     await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
                         type: 'mousePressed',
                         x,
@@ -512,6 +522,9 @@ export class MouseInstructionClass extends BaseInstructionClass {
                     break;
 
                 case 'right_mouseup':
+                    // 先移动鼠标到目标位置，确保事件正确触发
+                    await this.MoveMouseTo(x, y);
+                    await this.Delay(this.delay);
                     await this.ExecuteCDPCommand('Input.dispatchMouseEvent', {
                         type: 'mouseReleased',
                         x,
@@ -525,6 +538,9 @@ export class MouseInstructionClass extends BaseInstructionClass {
                     // 使用模拟鼠标轨迹移动到目标位置
                     await this.MoveMouseTo(x, y);
                     break;
+
+                default:
+                    return { ...defaultResult, error: `Unknown mouse action: ${this.params.action}` } as MouseInstructionResult;
             }
 
             return { ...defaultResult, success: true, data: { x, y, action: this.params.action } } as MouseInstructionResult;

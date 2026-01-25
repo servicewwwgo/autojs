@@ -22,19 +22,15 @@ export class SetAttributeInstructionClass extends BaseInstructionClass {
         const result = await this.Retry(async () => {
             let defaultResult: SetAttributeInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
 
+            // 如果设置了延迟，先等待
+            await this.Delay(this.delay);
+
             // 从 elementManager 获取元素
             const element = elementManager.GetElementByName(this.tabId, this.params.elementName);
 
             if (!element) {
                 return { ...defaultResult, error: `Element "${this.params.elementName}" not found in element manager` } as SetAttributeInstructionResult;
             }
-
-            if (!await element.LocateElement()) {
-                return { ...defaultResult, error: `Element "${this.params.elementName}" not found with selector: ${element.GetSelector()}` } as SetAttributeInstructionResult;
-            }
-
-            // 如果设置了延迟，先等待
-            await this.Delay(this.delay);
 
             // 获取 nodeId
             const nodeId = await element.GetNodeId();
