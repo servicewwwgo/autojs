@@ -1,5 +1,10 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'wxt';
+import { readFileSync } from 'node:fs';
+
+// 从 package.json 读取版本号作为单一数据源
+const packageJson = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
+const appVersion = packageJson.version;
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -9,7 +14,7 @@ export default defineConfig({
   browser: 'chrome',
   // 配置manifest版本
   manifest: {
-    version: '1.2.20',
+    version: appVersion,
     name: '自动化网页',
     description: '基于WXT+Vue的Chrome浏览器自动化系统',
     permissions: [
