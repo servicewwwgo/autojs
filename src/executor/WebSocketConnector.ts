@@ -1,4 +1,4 @@
-import { nodeConfig } from '../managers';
+import { nodeManager } from '../managers';
 import type { WSErrorMessage, WSHeartbeatMessage, WSHeartbeatResponse, WSLoginMessage, WSLoginResponse, WSMessage } from '../types';
 import { LogLevel, OutputLogToFile } from '../utils';
 
@@ -397,7 +397,7 @@ export class WebSocketConnector {
      * 业务逻辑：向服务器发送登录消息，使用节点配置信息进行身份验证，建立会话
      *
      * 实现方式：
-     * 1. 从 nodeConfig 获取节点配置（节点名称、ID 等）
+     * 1. 从 nodeManager 获取节点配置（节点名称、ID 等）
      * 2. 创建登录消息对象，包含节点配置信息
      * 3. 将消息序列化为 JSON 字符串
      * 4. 通过 WebSocket 发送消息
@@ -408,10 +408,10 @@ export class WebSocketConnector {
      * - 发送失败不会抛出异常，但会记录错误日志
      * - 登录结果通过 handleLoginResponse() 处理
      *
-     * 相关代码：src/managers/NodeManager.ts - nodeConfig 对象（节点配置管理器），src/executor/WebSocketConnector.ts - handleLoginResponse() 方法（处理登录响应），src/types/websocket_message.ts - WSLoginMessage 接口（登录消息类型定义）
+     * 相关代码：src/managers/NodeManager.ts - nodeManager 对象（节点配置管理器），src/executor/WebSocketConnector.ts - handleLoginResponse() 方法（处理登录响应），src/types/websocket_message.ts - WSLoginMessage 接口（登录消息类型定义）
      */
     private async sendLoginMessage(): Promise<boolean> {
-        const profile = await nodeConfig.GetNodeProfile();
+        const profile = await nodeManager.GetNodeProfile();
         const message: WSLoginMessage = { type: 'login', data: profile } as WSLoginMessage;
 
         const jsonString = JSON.stringify(message);

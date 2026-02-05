@@ -1,5 +1,5 @@
 import { BackgroundScriptMessageType } from '../../../types';
-import { nodeConfig } from '../../../managers';
+import { nodeManager } from '../../../managers';
 import { LogLevel, OutputLogToFile } from '../../../utils';
 
 /**
@@ -10,7 +10,7 @@ export async function getNodeProfile(
     sender: Browser.runtime.MessageSender,
     sendResponse: (response?: any) => void
 ): Promise<void> {
-    const profile = await nodeConfig.GetNodeProfile();
+    const profile = await nodeManager.GetNodeProfile();
     OutputLogToFile(`[Background] Retrieved node profile successfully`, { level: LogLevel.INFO });
     sendResponse({ success: true, data: profile });
 }
@@ -23,7 +23,7 @@ export async function updateNodeProfile(
     sender: Browser.runtime.MessageSender,
     sendResponse: (response?: any) => void
 ): Promise<void> {
-    await nodeConfig.UpdateNodeProfile(message.params as { node_name?: string; node_token?: string });
+    await nodeManager.UpdateNodeProfile(message.params as { node_name?: string; node_token?: string });
     OutputLogToFile(`[Background] Updated node profile successfully`, { level: LogLevel.INFO });
     sendResponse({ success: true });
 }

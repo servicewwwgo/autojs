@@ -5,10 +5,10 @@
  *
  * 注意事项：此文件作为管理器模块的统一入口，其他模块应从此文件导入管理器
  *
- * 相关代码：src/executor/InstructionExecutor.ts - 导入 InstructionManager 和 ResultManager，src/entrypoints/background.ts - 导入 nodeConfig
+ * 相关代码：src/executor/InstructionExecutor.ts - 导入 InstructionManager 和 ResultManager，src/entrypoints/background.ts - 导入 nodeManager
  */
 // export { TabManager, tabManager } from './TabManager';
-export { NodeConfig, nodeConfig } from './NodeManager';
+export { NodeManager, nodeManager } from './NodeManager';
 export { InstructionManager } from './InstructionManager';
 export { ResultManager } from './InstructionResultManager';
 export { ElementClass, ElementManager, elementManager, IElement } from './ElementManager';

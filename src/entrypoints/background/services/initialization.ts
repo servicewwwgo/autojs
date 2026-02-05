@@ -36,7 +36,7 @@ export class InitializationService {
     /**
      * 处理定时任务
      */
-    async handleAlarm(alarm: browser.alarms.Alarm): Promise<void> {
+    async handleAlarm(alarm: Browser.alarms.Alarm): Promise<void> {
         OutputLogToFile(`[Background] Alarm triggered: ${alarm.name}`, { level: LogLevel.INFO });
 
         switch (alarm.name) {

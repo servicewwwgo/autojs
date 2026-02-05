@@ -15,7 +15,7 @@ import { GenerateUUID, GetBitBrowserTabSequence, LogLevel, OutputLogToFile } fro
  *
  * 相关代码：src/types/node.ts - NodeProfile 接口（配置类型定义），src/types/websocket_message.ts - WSLoginMessage 接口（登录消息使用此配置），src/entrypoints/popup/components/NodeConfig.vue - 节点配置 UI
  */
-export class NodeConfig {
+export class NodeManager {
   private nodeProfile: NodeProfile;
 
   /**
@@ -167,7 +167,7 @@ export class NodeConfig {
       this.nodeProfile.node_token = updates.node_token ?? this.nodeProfile.node_token;
     }
 
-    OutputLogToFile(`[NodeConfig] Node profile updated: ${JSON.stringify(updates)}`, { level: LogLevel.INFO });
+    OutputLogToFile(`[NodeManager] Node profile updated: ${JSON.stringify(updates)}`, { level: LogLevel.INFO });
   }
 
 };
@@ -175,10 +175,10 @@ export class NodeConfig {
 /**
  * 业务逻辑：导出全局单例节点配置对象，确保整个应用使用同一个配置实例，避免配置不一致
  *
- * 实现方式：创建 NodeConfig 实例并导出为全局变量
+ * 实现方式：创建 NodeManager 实例并导出为全局变量
  *
  * 注意事项：使用单例模式，所有模块共享同一个配置对象
  *
  * 相关代码：src/entrypoints/background.ts - WebSocket 连接时使用此配置登录
  */
-export let nodeConfig: NodeConfig = new NodeConfig();
+export let nodeManager: NodeManager = new NodeManager();

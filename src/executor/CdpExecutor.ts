@@ -1,4 +1,4 @@
-import { nodeConfig } from '../managers';
+import { nodeManager } from '../managers';
 import type { CdpCloseConsoleLogsMessage, CdpCloseConsoleLogsResult, CdpCloseNetworkLogsMessage, CdpCloseNetworkLogsResult, CdpCloseTabMessage, CdpCloseTabResult, CdpConnectMessage, CdpConnectResult, CdpCreateTabAndNavigateMessage, CdpCreateTabAndNavigateResult, CdpDisconnectMessage, CdpDisconnectResult, CdpExecuteJavaScriptMessage, CdpExecuteJavaScriptResult, CdpGetConsoleLogsMessage, CdpGetConsoleLogsResult, CdpGetNetworkLogsMessage, CdpGetNetworkLogsResult, CdpGrepSourceMessage, CdpGrepSourceResult, CdpInitConsoleLogsMessage, CdpInitConsoleLogsResult, CdpInitNetworkLogsMessage, CdpInitNetworkLogsResult, CdpListTargetsMessage, CdpListTargetsResult, CdpMessage, CdpResult, CdpSendCommandMessage, CdpSendCommandResult, CdpTakeElementScreenshotMessage, CdpTakeElementScreenshotResult, CdpUpdateNodeNameMessage, CdpUpdateNodeNameResult } from '../types';
 import { DisconnectCDP, EnsureCDPConnected, ExecuteCDPCommand, LogLevel, OutputLogToFile } from '../utils';
 
@@ -1324,14 +1324,14 @@ export class CdpExecutor {
     /**
      * 业务逻辑：更新节点配置中的节点名称，用于标识和管理不同的自动化节点实例
      *
-     * 实现方式：调用 nodeConfig.UpdateNodeProfile() 方法更新节点配置中的 node_name 字段
+     * 实现方式：调用 nodeManager.UpdateNodeProfile() 方法更新节点配置中的 node_name 字段
      *
      * 注意事项：
      * - node_name 必须存在且为字符串类型，否则抛出异常
      * - 节点名称用于在服务器端标识不同的节点实例
      * - 更新后的名称会在下次登录时发送给服务器
      *
-     * 相关代码：src/managers/NodeManager.ts - nodeConfig 对象（节点配置管理器）
+     * 相关代码：src/managers/NodeManager.ts - nodeManager 对象（节点配置管理器）
      */
     private async handleUpdateNodeName(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpUpdateNodeNameMessage = cdpMessage as CdpUpdateNodeNameMessage;
@@ -1346,7 +1346,7 @@ export class CdpExecutor {
         }
 
         // 更新节点名称
-        await nodeConfig.UpdateNodeProfile({ node_name: msg.data.node_name });
+        await nodeManager.UpdateNodeProfile({ node_name: msg.data.node_name });
 
         defaultResult = { type: msg.type, id: msg.id, success: true, data: { node_name: msg.data.node_name } } as CdpUpdateNodeNameResult;
         OutputLogToFile(`[CdpExecutor] Node name updated successfully, node_name: ${msg.data.node_name}`, { level: LogLevel.INFO });

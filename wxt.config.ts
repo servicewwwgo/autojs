@@ -45,8 +45,16 @@ export default defineConfig({
     },
   },
   vite: () => ({
+    base: '', // 使用空字符串作为 base，生成相对路径
     build: {
       sourcemap: true,
+      rollupOptions: {
+        output: {
+          // 确保资源路径是相对路径
+          assetFileNames: 'assets/[name].[hash][extname]',
+          chunkFileNames: 'chunks/[name].[hash].js',
+        },
+      },
     },
   }),
   webExt: {
