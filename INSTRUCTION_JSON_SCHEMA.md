@@ -2,6 +2,27 @@
 
 本文档描述了 `src/instructions` 目录下所有指令所需的 JSON 数据结构。
 
+## 指令类型汇总
+
+本系统支持以下 12 种指令类型：
+
+| 序号 | 指令类型                 | type 值          | 说明                    |
+| ---- | ------------------------ | ---------------- | ----------------------- |
+| 1    | NavigateInstruction      | `navigate`       | 页面导航指令            |
+| 2    | ExecuteScriptInstruction | `execute_script` | 执行脚本指令            |
+| 3    | FindElementInstruction   | `find_element`   | 查找元素指令            |
+| 4    | InputInstruction         | `input`          | 文本输入指令            |
+| 5    | KeyboardInstruction      | `keyboard`       | 键盘操作指令            |
+| 6    | MouseInstruction         | `mouse`          | 鼠标操作指令            |
+| 7    | GetAttributeInstruction  | `get_attribute`  | 获取元素属性指令        |
+| 8    | SetAttributeInstruction  | `set_attribute`  | 设置元素属性指令        |
+| 9    | ScreenshotInstruction    | `screenshot`     | 页面截图指令            |
+| 10   | WaitInstruction          | `wait`           | 等待指令                |
+| 11   | GetUrlInstruction        | `get_url`        | 获取当前标签页 URL 指令 |
+| 12   | ActivateTabInstruction   | `activate_tab`   | 激活标签页指令          |
+
+---
+
 ## 基础字段（所有指令共有）
 
 所有指令都继承自 `BaseInstruction`，包含以下基础字段：
@@ -15,7 +36,7 @@
   "retry": 3, // 可选 - 重试次数（number）
   "timeout": 30, // 可选 - 超时时间，单位：秒（number）
   "ignoreError": false, // 可选 - 是否忽略错误（boolean）
-  "created_at": 1234567890 // 必需 - 创建时间戳（number）
+  "created_at": 1234567890 // 可选 - 创建时间戳（number）
 }
 ```
 
@@ -316,9 +337,10 @@
   - `"type"`: 逐个字符输入
   - `"keydown"`: 按下按键
   - `"keyup"`: 释放按键
-- **params.key** (必需): 按键名称或字符（string）
+- **params.key** (可选): 按键名称或字符（string），与 `text` 至少提供一个
   - 特殊按键：`Enter`, `Escape`, `Tab`, `Backspace`, `Delete`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `Home`, `End`, `PageUp`, `PageDown`, `F1`-`F12`, `Control`, `Alt`, `Shift`, `Meta`
   - 普通字符：直接使用字符，如 `"a"`, `"1"`, `"A"` 等
+- **params.text** (可选): 多字符文本（string），与 `key` 至少提供一个，用于 `type` 操作时输入多字符文本
 
 ### 示例
 
@@ -353,7 +375,24 @@
 }
 ```
 
-#### 输入文本
+#### 输入文本（使用 key 参数）
+
+```json
+{
+  "tabId": 1,
+  "type": "keyboard",
+  "instructionID": "type-text-key",
+  "params": {
+    "elementName": "inputField",
+    "action": "type",
+    "key": "Hello"
+  },
+  "delay": 0.05,
+  "created_at": 1703123456789
+}
+```
+
+#### 输入文本（使用 text 参数）
 
 ```json
 {
@@ -363,7 +402,7 @@
   "params": {
     "elementName": "inputField",
     "action": "type",
-    "key": "Hello"
+    "text": "Hello World"
   },
   "delay": 0.05,
   "created_at": 1703123456789
@@ -685,6 +724,7 @@
   - `"wait_element_exists"`: 等待元素存在于 DOM 中
   - `"wait_element_visible"`: 等待元素可见
   - `"wait_attribute_contains"`: 等待元素的某个属性值包含指定文本
+  - `"wait_page_load"`: 等待页面加载完成（document.readyState 为 'complete'）
 - **params.titleText** (可选): 等待标题包含的文本，仅用于 `wait_title_contains`（string）
 - **params.elementName** (可选): 元素名称，用于 `wait_element_exists`、`wait_element_visible`、`wait_attribute_contains`（string）
 - **params.element** (可选): 元素数据对象，当 `elementName` 不存在时使用，用于 `wait_element_exists`、`wait_element_visible`、`wait_attribute_contains`（ElementData）
@@ -753,6 +793,21 @@
     "elementName": "statusElement",
     "attribute": "class",
     "attributeText": "loaded"
+  },
+  "timeout": 30,
+  "created_at": 1703123456789
+}
+```
+
+#### 等待页面加载完成
+
+```json
+{
+  "tabId": 1,
+  "type": "wait",
+  "instructionID": "wait-page-load",
+  "params": {
+    "waitType": "wait_page_load"
   },
   "timeout": 30,
   "created_at": 1703123456789

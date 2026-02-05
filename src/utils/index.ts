@@ -54,6 +54,47 @@ export function EscapeCSSSelector(value: string): string {
 }
 
 /**
+ * 业务逻辑：获取比特浏览器（BitBrowser）的浏览器序号，用于自动识别和设置节点名称，适配比特浏览器多实例环境
+ *
+ * 实现方式：查询所有标签页，筛选包含 'console.bitbrowser.net' 的标签页，等待 10 秒后再次查询以确保页面加载完成，从标题中提取数字序号
+ *
+ * 注意事项：
+ * - 比特浏览器控制台页面 URL 必须包含 'console.bitbrowser.net'
+ * - 标题格式应为包含数字的字符串，函数会提取第一个连续数字作为序号
+ * - 如果未找到比特浏览器标签页，返回 undefined
+ * - 等待 10 秒是为了确保页面标题已加载完成，避免获取到空标题
+ * - 如果标题中不包含数字，返回 undefined
+ *
+ * 相关代码：src/managers/NodeManager.ts - GetNodeProfile() 函数（自动设置节点名称）
+ */
+export async function GetBitBrowserTabSequence(): Promise<string | undefined> {
+    let tabs = await browser.tabs.query({});
+    let browserTabs = tabs.filter((tab) => tab.url?.includes('console.bitbrowser.net'));
+
+    if (browserTabs.length === 0) {
+        return undefined;
+    }
+
+    // 等待10秒后再次查询
+    await new Promise(resolve => setTimeout(resolve, 10 * 1000));
+
+    tabs = await browser.tabs.query({});
+    browserTabs = tabs.filter((tab) => tab.url?.includes('console.bitbrowser.net'));
+
+    if (browserTabs.length === 0) {
+        return undefined;
+    }
+
+    const browserTab = browserTabs[0];
+    const browserTabTitle = browserTab.title;
+    const browserTabSeq = browserTabTitle?.match(/\d+/)?.[0] ?? undefined;
+
+    OutputLogToFile(`[GetBitBrowserTabSequence] BitBrowser tab sequence: ${browserTabSeq}`, { level: LogLevel.INFO });
+
+    return browserTabSeq;
+}
+
+/**
  * 业务逻辑：从 background script 或 popup 向指定标签页的 content script 发送消息，用于执行 DOM 操作、获取元素信息等页面级操作
  *
  * 实现方式：使用 browser.tabs.sendMessage API 发送消息，通过 Promise 包装以支持异步/await 语法，检查 runtime.lastError 处理发送失败的情况
@@ -542,43 +583,3 @@ export function CloseLogConnection(): void {
     }
 }
 
-/**
- * 业务逻辑：获取比特浏览器（BitBrowser）的浏览器序号，用于自动识别和设置节点名称，适配比特浏览器多实例环境
- *
- * 实现方式：查询所有标签页，筛选包含 'console.bitbrowser.net' 的标签页，等待 10 秒后再次查询以确保页面加载完成，从标题中提取数字序号
- *
- * 注意事项：
- * - 比特浏览器控制台页面 URL 必须包含 'console.bitbrowser.net'
- * - 标题格式应为包含数字的字符串，函数会提取第一个连续数字作为序号
- * - 如果未找到比特浏览器标签页，返回 undefined
- * - 等待 10 秒是为了确保页面标题已加载完成，避免获取到空标题
- * - 如果标题中不包含数字，返回 undefined
- *
- * 相关代码：src/managers/NodeManager.ts - GetNodeProfile() 函数（自动设置节点名称）
- */
-export async function GetBitBrowserTabSequence(): Promise<string | undefined> {
-    let tabs = await browser.tabs.query({});
-    let browserTabs = tabs.filter((tab) => tab.url?.includes('console.bitbrowser.net'));
-
-    if (browserTabs.length === 0) {
-        return undefined;
-    }
-
-    // 等待10秒后再次查询
-    await new Promise(resolve => setTimeout(resolve, 10 * 1000));
-
-    tabs = await browser.tabs.query({});
-    browserTabs = tabs.filter((tab) => tab.url?.includes('console.bitbrowser.net'));
-
-    if (browserTabs.length === 0) {
-        return undefined;
-    }
-
-    const browserTab = browserTabs[0];
-    const browserTabTitle = browserTab.title;
-    const browserTabSeq = browserTabTitle?.match(/\d+/)?.[0] ?? undefined;
-
-    OutputLogToFile(`[GetBitBrowserTabSequence] BitBrowser tab sequence: ${browserTabSeq}`, { level: LogLevel.INFO });
-
-    return browserTabSeq;
-}
