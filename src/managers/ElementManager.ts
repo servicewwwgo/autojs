@@ -618,7 +618,7 @@ export class ElementClass implements IElement {
      *
      * 注意事项：
      * - name、selector、selectorType、tabId 为必需字段，缺失任一字段返回 false
-     * - selectorType 必须是 'css'、'xpath'、'id'、'tag' 之一
+     * - selectorType 必须是 'css'、'xpath'、'id'、'tag'、'text'、'ledby' 之一
      * - nodeId 必须存在，表示元素已成功定位，否则返回 false 并记录错误日志
      * - 验证失败时会记录详细的错误日志，便于问题排查
      *

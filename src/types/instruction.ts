@@ -11,7 +11,7 @@
  * - name：元素名称，必需字段，用于在 ElementManager 中标识和管理元素
  * - description：元素描述，必需字段，用于说明元素的用途
  * - selector：元素选择器，必需字段，根据 selectorType 使用不同的选择器语法
- * - selectorType：选择器类型，支持 'css'、'id'、'tag'、'text'、'ledby' 五种类型
+ * - selectorType：选择器类型，支持 'css'、'id'、'tag'、'text'、'ledby' 五种类型（注意：代码中实际支持六种，包括 'xpath'，但 xpath 在 ElementManager 中未实现）
  * - 相对关系字段（parentName、childrenName、siblingName、siblingOffset）：当存在多个元素匹配时，用于进一步筛选和定位
  * - 系统自动生成的字段（dom、nodeId、tag）用户不可手动设置
  *

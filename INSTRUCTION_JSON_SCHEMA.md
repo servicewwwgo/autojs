@@ -185,7 +185,7 @@
   - **description** (必需): 元素描述（string）
   - **backup** (可选): 备用选择器或备注（string）
   - **selector** (必需): 元素选择器（string）
-  - **selectorType** (必需): 选择器类型，可选值：`"css"` | `"id"` | `"tag"` | `"text"`（string）
+  - **selectorType** (必需): 选择器类型，可选值：`"css"` | `"id"` | `"tag"` | `"text"` | `"ledby"`（string）
   - **parentName** (可选): 父元素名称，用于区分多个匹配元素（string）
   - **childrenName** (可选): 子元素名称，用于区分多个匹配元素（string）
   - **siblingName** (可选): 兄弟元素名称，用于区分多个匹配元素（string）
@@ -230,6 +230,57 @@
   "created_at": 1703123456789
 }
 ```
+
+#### Text 选择器示例
+
+```json
+{
+  "tabId": 1,
+  "type": "find_element",
+  "instructionID": "find-text-element",
+  "params": {
+    "element": {
+      "name": "submitButton",
+      "description": "提交按钮",
+      "selector": "button",
+      "selectorType": "text",
+      "text": "提交"
+    }
+  },
+  "created_at": 1703123456789
+}
+```
+
+#### Ledby 选择器示例
+
+```json
+{
+  "tabId": 1,
+  "type": "find_element",
+  "instructionID": "find-ledby-element",
+  "params": {
+    "element": {
+      "name": "inputField",
+      "description": "输入框",
+      "selector": "input",
+      "selectorType": "ledby",
+      "text": "用户名"
+    }
+  },
+  "created_at": 1703123456789
+}
+```
+
+**Ledby 选择器说明**：
+
+- **selector**: 用于筛选候选元素的 CSS 选择器（如 `"input"`、`"button"` 等）
+- **text**: 用于匹配 label 元素文本内容的字符串（必需）
+- **工作原理**：
+  1. 首先通过 `selector` 找到所有匹配的元素
+  2. 筛选出包含 `aria-labelledby` 属性的元素
+  3. 通过 `aria-labelledby` 的值找到对应的 label 元素（通过 id）
+  4. 检查 label 元素的文本内容是否包含 `text` 参数
+  5. 如果匹配且元素可见，则返回该元素
 
 #### 带相对关系的示例
 
@@ -996,4 +1047,4 @@
 
 7. **标签页 ID**：确保 `tabId` 对应的标签页存在且已连接 CDP。
 
-8. **选择器类型**：`selectorType` 支持的值是 `"css"` | `"id"` | `"tag"` | `"text"`，不支持 `"xpath"`。
+8. **选择器类型**：`selectorType` 支持的值是 `"css"` | `"id"` | `"tag"` | `"text"` | `"ledby"`，不支持 `"xpath"`。
