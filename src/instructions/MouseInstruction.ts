@@ -4,7 +4,19 @@ import { LogLevel, OutputLogToFile } from '../utils';
 import { BaseInstructionClass } from './BaseInstruction';
 
 /**
- * 鼠标操作指令
+ * 业务逻辑：模拟鼠标操作（点击、双击、右键、悬停、移动等），支持多种鼠标动作和轨迹模拟，用于页面交互和元素操作
+ *
+ * 实现方式：继承自 BaseInstructionClass，使用 CDP 的 Input.dispatchMouseEvent 发送鼠标事件，支持三种轨迹模拟方式（none、calculated、simulated）
+ *
+ * 注意事项：
+ * - action 参数指定操作类型（click、dblclick、rightclick、hover、move_to 等）
+ * - simulate 参数指定轨迹模拟方式（none 不模拟、calculated 计算轨迹、simulated 模拟轨迹），默认 calculated
+ * - elementName 参数为可选，如果指定则计算元素中心坐标作为目标位置
+ * - x、y 参数为可选坐标，如果未指定则使用元素中心坐标
+ * - 轨迹模拟使用贝塞尔曲线和随机抖动，模拟真实鼠标移动
+ * - 点击操作会先移动鼠标到目标位置，然后发送 mousePressed 和 mouseReleased 事件
+ *
+ * 相关代码：src/types/instruction.ts - MouseInstruction 接口（指令数据结构），src/instructions/index.ts - InstructionFactory 类（创建此指令实例）
  */
 export class MouseInstructionClass extends BaseInstructionClass {
     public params: {
@@ -21,10 +33,17 @@ export class MouseInstructionClass extends BaseInstructionClass {
     }
 
     /**
-     * 鼠標軌跡仿真 - 不模擬鼠標軌跡
-     * 直接移動到目標位置，不進行任何模擬
-     * @param targetX - 目標 X 坐標
-     * @param targetY - 目標 Y 坐標
+     * 业务逻辑：不模拟鼠标轨迹，直接移动到目标位置，用于快速移动场景，不进行任何轨迹计算
+     *
+     * 实现方式：直接发送 mouseMoved 事件到目标坐标，不计算中间路径
+     *
+     * 注意事项：
+     * - CDP 的 mouseMoved 事件不会更新浏览器窗口中实际的鼠标指针位置（Chrome 安全特性）
+     * - 但事件会正确触发，页面上的 hover 等事件会正常工作
+     * - 移动后会等待 50 毫秒，确保浏览器处理鼠标移动事件
+     * - 适用于不需要模拟真实轨迹的场景，移动速度最快
+     *
+     * 相关代码：CalculatedMouseTrajectory() 方法（计算轨迹），SimulatedMouseTrajectory() 方法（模拟轨迹），MoveMouseTo() 方法（统一移动方法）
      */
     private async NoneMouseTrajectory(targetX: number, targetY: number): Promise<void> {
         try {
@@ -48,10 +67,19 @@ export class MouseInstructionClass extends BaseInstructionClass {
     }
 
     /**
-     * 鼠標軌跡仿真 - 真人鼠標軌跡模擬
-     * 使用貝塞爾曲線和隨機抖動來模擬真實的鼠標移動軌跡
-     * @param targetX - 目標 X 坐標
-     * @param targetY - 目標 Y 坐標
+     * 业务逻辑：使用贝塞尔曲线和随机抖动模拟真实鼠标轨迹，用于模拟人类鼠标移动，避免被检测为自动化操作
+     *
+     * 实现方式：使用三次贝塞尔曲线计算轨迹点，添加随机抖动和速度曲线（ease-in-out），根据距离动态调整步数和速度
+     *
+     * 注意事项：
+     * - 使用视口中心作为起点（CDP 无法获取当前鼠标位置）
+     * - 根据距离动态调整总时间和步数，短距离至少 200ms，长距离最多 800ms
+     * - 使用三次贝塞尔曲线生成平滑轨迹，添加随机抖动模拟手部微颤
+     * - 速度曲线为 ease-in-out（中间快，两端慢），更接近真实移动
+     * - 每步延迟有随机性（平均值的 0.7-1.3 倍），增加真实感
+     * - CDP 的 mouseMoved 事件不会更新浏览器窗口中实际的鼠标指针位置，但事件会正确触发
+     *
+     * 相关代码：SimulatedMouseTrajectory() 方法（更复杂的轨迹模拟），MoveMouseTo() 方法（统一移动方法）
      */
     private async CalculatedMouseTrajectory(targetX: number, targetY: number): Promise<void> {
         try {
@@ -172,11 +200,19 @@ export class MouseInstructionClass extends BaseInstructionClass {
     }
 
     /**
-     * 鼠標軌跡仿真 - 開源鼠標軌跡模擬
-     * 使用更複雜的算法來模擬真實的鼠標移動軌跡
-     * 基於 humanize 算法，使用多段貝塞爾曲線和更真實的速度曲線
-     * @param targetX - 目標 X 坐標
-     * @param targetY - 目標 Y 坐標
+     * 业务逻辑：使用更复杂的算法模拟真实鼠标轨迹，基于 humanize 算法，使用多段贝塞尔曲线和更真实的速度曲线，提供最高级别的轨迹模拟
+     *
+     * 实现方式：将路径分成多段，每段使用不同的贝塞尔曲线控制点，使用对数函数计算步数，添加更多随机性
+     *
+     * 注意事项：
+     * - 使用多段贝塞尔曲线（最多3段），每段使用不同的控制点，轨迹更复杂真实
+     * - 使用对数函数计算步数，使短距离和长距离的步数更合理
+     * - 总时间更长（短距离至少 250ms，长距离最多 1000ms），移动更慢更真实
+     * - 随机抖动更大（±2.5 像素），模拟更明显的手部微颤
+     * - 延迟随机性更大（平均值的 0.6-1.4 倍），速度变化更明显
+     * - 适用于需要最高级别轨迹模拟的场景，但移动速度较慢
+     *
+     * 相关代码：CalculatedMouseTrajectory() 方法（简单轨迹模拟），MoveMouseTo() 方法（统一移动方法）
      */
     private async SimulatedMouseTrajectory(targetX: number, targetY: number): Promise<void> {
         try {
@@ -315,9 +351,18 @@ export class MouseInstructionClass extends BaseInstructionClass {
     }
 
     /**
-     * 統一的鼠標移動方法，根據 simulate 參數選擇不同的軌跡模擬方式
-     * @param targetX - 目標 X 坐標
-     * @param targetY - 目標 Y 坐標
+     * 业务逻辑：统一的鼠标移动方法，根据 simulate 参数选择不同的轨迹模拟方式，提供灵活的轨迹模拟选项
+     *
+     * 实现方式：根据 simulate 参数（none、calculated、simulated）调用对应的轨迹模拟方法，默认使用 calculated
+     *
+     * 注意事项：
+     * - simulate 参数可选，默认值为 'calculated'
+     * - 'none' 表示不模拟轨迹，直接移动到目标位置
+     * - 'calculated' 表示使用简单轨迹模拟（贝塞尔曲线）
+     * - 'simulated' 表示使用复杂轨迹模拟（多段贝塞尔曲线）
+     * - 如果 simulate 值未知，默认使用 calculated
+     *
+     * 相关代码：NoneMouseTrajectory()、CalculatedMouseTrajectory()、SimulatedMouseTrajectory() 方法（轨迹模拟实现），Execute() 方法（调用此方法移动鼠标）
      */
     private async MoveMouseTo(targetX: number, targetY: number): Promise<void> {
         const simulateType = this.params.simulate || 'calculated'; // 默認使用 calculated
@@ -340,8 +385,21 @@ export class MouseInstructionClass extends BaseInstructionClass {
     }
 
     /**
-     * 執行鼠標操作指令
-     * @returns 指令結果
+     * 业务逻辑：执行鼠标操作指令，根据 action 参数执行相应的鼠标操作（点击、双击、右键、悬停、移动等），支持元素定位和坐标指定
+     *
+     * 实现方式：如果指定了 elementName，获取元素中心坐标，否则使用 x、y 坐标，然后根据 action 执行相应的鼠标操作
+     *
+     * 注意事项：
+     * - 执行前会先调用 Delay() 方法处理延迟
+     * - 如果指定了 elementName，会先滚动到元素位置，然后获取元素边界框计算中心坐标
+     * - 如果未指定 elementName 和坐标，会返回错误
+     * - 点击操作会先移动鼠标到目标位置，然后发送 mousePressed 和 mouseReleased 事件
+     * - 双击操作会发送两次点击，间隔 150ms，第二次点击的 clickCount 为 2
+     * - hover 操作只移动鼠标，不发送点击事件
+     * - move_to 操作只移动鼠标到目标位置
+     * - 返回结果包含操作坐标和动作类型，用于确认操作成功
+     *
+     * 相关代码：src/types/instruction.ts - MouseInstructionResult 接口（结果数据结构），MoveMouseTo() 方法（移动鼠标），src/instructions/BaseInstruction.ts - Retry() 方法（重试机制）
      */
     public async Execute(): Promise<MouseInstructionResult> {
         const result = await this.Retry(async () => {

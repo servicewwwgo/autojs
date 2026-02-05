@@ -3,8 +3,18 @@ import type { CdpCloseConsoleLogsMessage, CdpCloseConsoleLogsResult, CdpCloseNet
 import { DisconnectCDP, EnsureCDPConnected, ExecuteCDPCommand, LogLevel, OutputLogToFile } from '../utils';
 
 /**
- * CDP (Chrome DevTools Protocol) 执行器
- * 提供通过 CDP 协议执行相关功能
+ * 业务逻辑：通过 Chrome DevTools Protocol (CDP) 执行浏览器操作，包括标签页管理、JavaScript 执行、元素截图、网络/控制台日志收集等功能，响应来自 WebSocket 的 CDP 命令请求
+ *
+ * 实现方式：使用消息类型到处理函数的映射表（mapTypeToFunction），根据消息类型分发到对应的处理方法，通过 ExecuteCDPCommand 工具函数执行 CDP 命令，使用 Map 存储每个标签页的网络和控制台日志
+ *
+ * 注意事项：
+ * - 每个标签页的日志存储在独立的 Map 中，键格式为 "network_{tabId}" 或 "console_{tabId}"
+ * - 日志数量限制为 MAX_LOG_ENTRIES（10000 条），超过限制会自动删除最旧的日志
+ * - CDP 连接需要在执行命令前通过 EnsureCDPConnected() 确保已建立
+ * - 某些操作需要先启用相应的 CDP 域（如 DOM.enable、Network.enable 等）
+ * - 日志收集是持续性的，需要调用 close 方法才能停止收集
+ *
+ * 相关代码：src/utils/index.ts - ExecuteCDPCommand() 和 EnsureCDPConnected() 函数（CDP 操作工具），src/types/cdp.ts - CDP 消息和结果类型定义，src/entrypoints/background.ts - 注册 CDP 消息处理器
  */
 export class CdpExecutor {
     private consoleLogs: Map<string, any> = new Map();
@@ -38,18 +48,36 @@ export class CdpExecutor {
     }
 
     /**
-     * 设置发送 CDP 结果的函数
-     * @param sendResult - 发送结果的函数
+     * 业务逻辑：设置 CDP 执行结果的回调函数，用于将 CDP 命令的执行结果发送到外部（如 WebSocket 服务器）
+     *
+     * 实现方式：将回调函数保存到私有属性 sendResult 中，在各个处理方法中通过此回调发送结果
+     *
+     * 注意事项：
+     * - 必须在处理 CDP 消息前设置此回调，否则结果无法发送
+     * - 每个处理方法执行完成后会通过此回调发送结果
+     * - 如果未设置回调，结果仍会生成但不会发送
+     *
+     * @param sendResult - 发送 CDP 结果的函数，接收 CdpResult 类型参数
+     *
+     * 相关代码：src/executor/CdpExecutor.ts - handleMessage() 方法（调用此回调），src/entrypoints/background.ts - 设置 WebSocket 发送回调
      */
     public setSendResult(sendResult: (result: CdpResult) => void): void {
         this.sendResult = sendResult;
     }
 
     /**
-     * 统一的 WebSocket 消息处理接口
-     * 根据消息类型分发到相应的处理函数
-     * @param message - WebSocket 消息
-     * @returns void
+     * 业务逻辑：统一处理来自 WebSocket 的 CDP 消息，根据消息类型分发到对应的处理方法，实现 CDP 命令的统一入口
+     *
+     * 实现方式：使用 mapTypeToFunction 映射表查找对应的处理方法，如果找到则调用处理，如果未找到或处理出错则返回错误结果
+     *
+     * 注意事项：
+     * - 消息类型必须在 mapTypeToFunction 中注册，否则返回 "handler not found" 错误
+     * - 处理方法中的异常会被捕获并转换为错误结果返回
+     * - 所有结果都会通过 sendResult 回调发送
+     *
+     * @param cdpMessage - WebSocket CDP 消息，必须包含 type 和 id 字段
+     *
+     * 相关代码：src/executor/CdpExecutor.ts - constructor() 方法（初始化映射表），src/types/cdp.ts - CdpMessage 接口（消息类型定义）
      */
     public async handleMessage(cdpMessage: CdpMessage): Promise<void> {
         let defaultResult: CdpResult | undefined;
@@ -76,7 +104,18 @@ export class CdpExecutor {
         }
     }
 
-    // 连接 CDP
+    /**
+     * 业务逻辑：建立与指定标签页的 CDP 连接，为后续的 CDP 命令执行做准备
+     *
+     * 实现方式：调用 EnsureCDPConnected() 工具函数建立 CDP 连接，连接成功后返回标签页 ID
+     *
+     * 注意事项：
+     * - tabId 必须存在且为数字类型，否则抛出异常
+     * - CDP 连接是后续所有 CDP 操作的前提条件
+     * - 如果标签页不存在或无法连接，会抛出异常
+     *
+     * 相关代码：src/utils/index.ts - EnsureCDPConnected() 函数（建立 CDP 连接）
+     */
     private async handleCdpConnect(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpConnectMessage = cdpMessage as CdpConnectMessage;
         let defaultResult: CdpConnectResult | undefined;
@@ -96,7 +135,18 @@ export class CdpExecutor {
         this.sendResult?.(defaultResult as CdpConnectResult);
     }
 
-    // 断开 CDP
+    /**
+     * 业务逻辑：断开与指定标签页的 CDP 连接，释放资源并停止 CDP 事件监听
+     *
+     * 实现方式：调用 DisconnectCDP() 工具函数断开 CDP 连接
+     *
+     * 注意事项：
+     * - tabId 必须存在且为数字类型，否则抛出异常
+     * - 断开连接后无法再执行 CDP 命令，需要重新连接
+     * - 如果 CDP 未连接，断开操作不会抛出异常
+     *
+     * 相关代码：src/utils/index.ts - DisconnectCDP() 函数（断开 CDP 连接）
+     */
     private async handleCdpDisconnect(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpDisconnectMessage = cdpMessage as CdpDisconnectMessage;
         let defaultResult: CdpDisconnectResult | undefined;
@@ -116,7 +166,18 @@ export class CdpExecutor {
         this.sendResult?.(defaultResult as CdpDisconnectResult);
     }
 
-    // 列出所有标签页
+    /**
+     * 业务逻辑：列出浏览器中所有打开的标签页，返回标签页的基本信息（ID、索引、URL），用于查询和管理标签页
+     *
+     * 实现方式：使用 browser.tabs.query() API 获取所有标签页，转换为统一的 TabInfo 格式返回
+     *
+     * 注意事项：
+     * - 返回的标签页信息包括 tabId、tabIndex 和 url
+     * - 如果标签页 URL 未加载完成，会使用 pendingUrl 或 'about:blank' 作为默认值
+     * - 标签页索引从 0 开始
+     *
+     * 相关代码：src/types/cdp.ts - CdpListTargetsResult 接口（返回类型定义）
+     */
     private async handleListTargets(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpListTargetsMessage = cdpMessage as CdpListTargetsMessage;
         let defaultResult: CdpListTargetsResult | undefined;
@@ -136,7 +197,23 @@ export class CdpExecutor {
         this.sendResult?.(defaultResult as CdpListTargetsResult);
     }
 
-    // 创建新标签页并导航到指定URL
+    /**
+     * 业务逻辑：创建新标签页或新窗口并导航到指定 URL，等待页面加载完成后返回标签页信息，用于自动化任务中的页面导航
+     *
+     * 实现方式：
+     * 1. 根据 newWindow 参数决定创建标签页（browser.tabs.create）或新窗口（browser.windows.create）
+     * 2. 创建时指定 URL，浏览器会自动导航
+     * 3. 等待标签页加载完成（通过 waitForTabLoadComplete）
+     * 4. 返回标签页信息（tabId、tabIndex、url）
+     *
+     * 注意事项：
+     * - url 必须存在且为字符串类型，否则抛出异常
+     * - newWindow 为 true 时创建新窗口，false 时创建新标签页
+     * - active 参数控制是否激活新标签页/窗口，默认为 true
+     * - 会等待页面加载完成（最多 30 秒），超时后仍会返回但页面可能未完全加载
+     *
+     * 相关代码：src/executor/CdpExecutor.ts - waitForTabLoadComplete() 方法（等待加载完成）
+     */
     private async handleCreateTabAndNavigate(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpCreateTabAndNavigateMessage = cdpMessage as CdpCreateTabAndNavigateMessage;
         let defaultResult: CdpCreateTabAndNavigateResult | undefined;
@@ -199,7 +276,22 @@ export class CdpExecutor {
         this.sendResult?.(defaultResult as CdpCreateTabAndNavigateResult);
     }
 
-    // 执行 JavaScript 代码
+    /**
+     * 业务逻辑：在指定标签页中执行 JavaScript 代码，返回执行结果或异常信息，用于动态操作页面或获取页面数据
+     *
+     * 实现方式：
+     * 1. 启用 Runtime 域（Runtime.enable）
+     * 2. 调用 Runtime.evaluate CDP 命令执行 JavaScript 代码
+     * 3. 返回执行结果（result）和异常信息（exceptionDetails）
+     *
+     * 注意事项：
+     * - tabId 必须存在且为数字类型，否则抛出异常
+     * - params 必须为对象类型，包含 expression（代码字符串）等参数
+     * - 执行结果可能包含返回值、异常信息或 undefined
+     * - JavaScript 代码在页面上下文中执行，可以访问页面的全局对象和 DOM
+     *
+     * 相关代码：src/types/cdp.ts - CdpExecuteJavaScriptResult 接口（返回类型定义），CDP Runtime.evaluate 文档
+     */
     private async handleExecuteJavaScript(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpExecuteJavaScriptMessage = cdpMessage as CdpExecuteJavaScriptMessage;
         let defaultResult: CdpExecuteJavaScriptResult | undefined;
@@ -227,7 +319,29 @@ export class CdpExecutor {
         this.sendResult?.(defaultResult as CdpExecuteJavaScriptResult);
     }
 
-    // 截取元素截图
+    /**
+     * 业务逻辑：截取页面中指定元素的截图，返回 base64 编码的 PNG 图片，用于元素可视化验证或文档生成
+     *
+     * 实现方式：
+     * 1. 启用 DOM 域和 Page 域
+     * 2. 获取文档根节点
+     * 3. 根据选择器类型（CSS、ID、XPath）查找元素节点
+     * 4. 滚动元素到可视区
+     * 5. 获取元素的盒模型（位置和尺寸）
+     * 6. 计算元素在文档中的绝对坐标
+     * 7. 使用 Page.captureScreenshot 截取元素区域
+     * 8. 返回 base64 编码的图片和元素位置信息
+     *
+     * 注意事项：
+     * - tabId 必须存在且为数字类型，否则抛出异常
+     * - selector 必须存在且为字符串类型，否则抛出异常
+     * - selectorType 支持 'css'、'id'、'xpath' 三种类型，默认为 'css'
+     * - 如果元素未找到，会抛出异常
+     * - 截图格式固定为 PNG，返回 base64 编码字符串
+     * - 元素必须可见才能截图，隐藏元素可能无法正确截图
+     *
+     * 相关代码：src/types/cdp.ts - CdpTakeElementScreenshotResult 接口（返回类型定义），CDP DOM 和 Page 域文档
+     */
     private async handleTakeElementScreenshot(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpTakeElementScreenshotMessage = cdpMessage as CdpTakeElementScreenshotMessage;
         let defaultResult: CdpTakeElementScreenshotResult | undefined;
@@ -344,7 +458,20 @@ export class CdpExecutor {
         this.sendResult?.(defaultResult as CdpTakeElementScreenshotResult);
     }
 
-    // 执行 CDP 命令
+    /**
+     * 业务逻辑：执行自定义 CDP 命令，提供通用的 CDP 命令执行接口，支持所有 CDP 域的命令
+     *
+     * 实现方式：调用 ExecuteCDPCommand() 工具函数执行指定的 CDP 方法和参数，返回原始 CDP 响应
+     *
+     * 注意事项：
+     * - tabId 必须存在且为数字类型，否则抛出异常
+     * - method 必须存在且为字符串类型，格式为 "Domain.method"（如 "DOM.querySelector"）
+     * - params 为可选参数对象，某些 CDP 命令不需要参数
+     * - 返回的是 CDP 的原始响应，结构取决于具体的 CDP 命令
+     * - 执行前会确保 CDP 连接已建立
+     *
+     * 相关代码：src/utils/index.ts - ExecuteCDPCommand() 函数（执行 CDP 命令），CDP 协议文档
+     */
     private async handleSendCommand(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpSendCommandMessage = cdpMessage as CdpSendCommandMessage;
         let defaultResult: CdpSendCommandResult | undefined;
@@ -372,7 +499,26 @@ export class CdpExecutor {
         this.sendResult?.(defaultResult as CdpSendCommandResult);
     }
 
-    // 源码搜索
+    /**
+     * 业务逻辑：在页面资源中搜索匹配指定模式的内容，返回匹配的行号和内容，用于页面源码分析和调试
+     *
+     * 实现方式：
+     * 1. 启用 Page 域并获取页面资源树
+     * 2. 递归遍历所有资源（包括子框架）
+     * 3. 获取每个资源的内容（支持 base64 解码）
+     * 4. 使用正则表达式在每行中搜索匹配模式
+     * 5. 收集匹配的行号、URL 和内容片段
+     *
+     * 注意事项：
+     * - tabId 必须存在且为数字类型，否则抛出异常
+     * - pattern 必须存在且为字符串类型，作为正则表达式使用
+     * - caseSensitive 控制是否区分大小写，默认为 false
+     * - 某些资源可能无法获取内容（如跨域资源），会跳过并记录警告
+     * - 匹配的内容片段限制为 200 字符
+     * - base64 编码的资源会自动解码
+     *
+     * 相关代码：src/types/cdp.ts - CdpGrepSourceResult 接口（返回类型定义），CDP Page.getResourceContent 文档
+     */
     private async handleGrepSource(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpGrepSourceMessage = cdpMessage as CdpGrepSourceMessage;
         let defaultResult: CdpGrepSourceResult | undefined;
@@ -476,7 +622,26 @@ export class CdpExecutor {
         this.sendResult?.(defaultResult as CdpGrepSourceResult);
     }
 
-    // 获取网络日志
+    /**
+     * 业务逻辑：获取指定标签页的网络请求日志，支持过滤、分页、分组等功能，用于网络请求分析和调试
+     *
+     * 实现方式：
+     * 1. 从 networkLogs Map 中获取该标签页的日志
+     * 2. 根据 requestId 或 filter 条件过滤日志
+     * 3. 可选按请求 ID 分组（groupByRequest）
+     * 4. 应用分页（limit 和 offset）
+     * 5. 如果 clear 为 true，清空日志后返回
+     *
+     * 注意事项：
+     * - tabId 必须存在且为数字类型，否则抛出异常
+     * - 如果 clear 为 true，返回当前日志后清空，total 返回 0
+     * - requestId 和 filter 不能同时使用，requestId 优先级更高
+     * - groupByRequest 会将同一请求的所有事件合并为一个对象
+     * - 分页仅在未分组时生效
+     * - total 表示清空前或当前存储的日志总数
+     *
+     * 相关代码：src/executor/CdpExecutor.ts - addNetworkLog() 方法（添加日志），src/executor/CdpExecutor.ts - filterNetworkLogs() 方法（过滤日志），src/types/cdp.ts - CdpGetNetworkLogsResult 接口（返回类型定义）
+     */
     private async handleGetNetworkLogs(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpGetNetworkLogsMessage = cdpMessage as CdpGetNetworkLogsMessage;
         let defaultResult: CdpGetNetworkLogsResult | undefined;
@@ -524,7 +689,24 @@ export class CdpExecutor {
         this.sendResult?.(defaultResult as CdpGetNetworkLogsResult);
     }
 
-    // 获取控制台日志
+    /**
+     * 业务逻辑：获取指定标签页的控制台日志，支持过滤和分页，用于页面 JavaScript 错误和日志分析
+     *
+     * 实现方式：
+     * 1. 从 consoleLogs Map 中获取该标签页的日志
+     * 2. 根据 filter 条件过滤日志（类型、级别、文本、时间范围）
+     * 3. 应用分页（limit 和 offset）
+     * 4. 如果 clear 为 true，清空日志后返回
+     *
+     * 注意事项：
+     * - tabId 必须存在且为数字类型，否则抛出异常
+     * - 如果 clear 为 true，返回当前日志后清空，total 返回 0
+     * - filter 支持按类型（type）、级别（level）、文本（text）、时间范围（startTime、endTime）过滤
+     * - 文本过滤会搜索日志参数（args）的 JSON 字符串表示
+     * - total 表示清空前或当前存储的日志总数
+     *
+     * 相关代码：src/executor/CdpExecutor.ts - addConsoleLog() 方法（添加日志），src/executor/CdpExecutor.ts - filterConsoleLogs() 方法（过滤日志），src/types/cdp.ts - CdpGetConsoleLogsResult 接口（返回类型定义）
+     */
     private async handleGetConsoleLogs(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpGetConsoleLogsMessage = cdpMessage as CdpGetConsoleLogsMessage;
         let defaultResult: CdpGetConsoleLogsResult | undefined;
@@ -564,7 +746,23 @@ export class CdpExecutor {
         this.sendResult?.(defaultResult as CdpGetConsoleLogsResult);
     }
 
-    // 初始化网络日志收集
+    /**
+     * 业务逻辑：初始化网络日志收集，启用 Network 域开始监听网络请求事件，用于持续监控页面的网络活动
+     *
+     * 实现方式：
+     * 1. 确保 CDP 连接已建立
+     * 2. 启用 Network 域（Network.enable），开始接收网络事件
+     * 3. 如果 clear 为 true，清空该标签页的现有网络日志
+     *
+     * 注意事项：
+     * - tabId 必须存在且为数字类型，否则抛出异常
+     * - 启用后会持续收集网络日志，直到调用 close_network_logs
+     * - 网络日志通过 CDP 事件监听器自动添加到 networkLogs Map 中
+     * - 如果 clear 为 true，会先清空现有日志再开始收集
+     * - CDP 连接会保持打开状态以持续接收事件
+     *
+     * 相关代码：src/executor/CdpExecutor.ts - addNetworkLog() 方法（添加日志），src/executor/CdpExecutor.ts - handleCloseNetworkLogs() 方法（停止收集），CDP Network 域文档
+     */
     private async handleInitNetworkLogs(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpInitNetworkLogsMessage = cdpMessage as CdpInitNetworkLogsMessage;
         let defaultResult: CdpInitNetworkLogsResult | undefined;
@@ -595,7 +793,23 @@ export class CdpExecutor {
         // 注意：不断开连接，以便持续收集日志
     }
 
-    // 初始化控制台日志收集
+    /**
+     * 业务逻辑：初始化控制台日志收集，启用 Runtime 域开始监听控制台 API 调用事件，用于持续监控页面的 JavaScript 日志和错误
+     *
+     * 实现方式：
+     * 1. 确保 CDP 连接已建立
+     * 2. 启用 Runtime 域（Runtime.enable），开始接收控制台事件（通过 Runtime.consoleAPICalled 事件）
+     * 3. 如果 clear 为 true，清空该标签页的现有控制台日志
+     *
+     * 注意事项：
+     * - tabId 必须存在且为数字类型，否则抛出异常
+     * - 启用后会持续收集控制台日志，直到调用 close_console_logs
+     * - 控制台日志通过 CDP 事件监听器自动添加到 consoleLogs Map 中
+     * - 如果 clear 为 true，会先清空现有日志再开始收集
+     * - CDP 连接会保持打开状态以持续接收事件
+     *
+     * 相关代码：src/executor/CdpExecutor.ts - addConsoleLog() 方法（添加日志），src/executor/CdpExecutor.ts - handleCloseConsoleLogs() 方法（停止收集），CDP Runtime 域文档
+     */
     private async handleInitConsoleLogs(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpInitConsoleLogsMessage = cdpMessage as CdpInitConsoleLogsMessage;
         let defaultResult: CdpInitConsoleLogsResult | undefined;
@@ -626,7 +840,22 @@ export class CdpExecutor {
         // 注意：不断开连接，以便持续收集日志
     }
 
-    // 关闭网络日志收集
+    /**
+     * 业务逻辑：停止网络日志收集，禁用 Network 域停止监听网络请求事件，释放资源并停止日志收集
+     *
+     * 实现方式：
+     * 1. 确保 CDP 连接已建立
+     * 2. 禁用 Network 域（Network.disable），停止接收网络事件
+     * 3. 如果 clear 为 true，清空该标签页的网络日志
+     *
+     * 注意事项：
+     * - tabId 必须存在且为数字类型，否则抛出异常
+     * - 禁用后会停止收集新的网络日志，但已收集的日志会保留（除非 clear 为 true）
+     * - 如果 clear 为 true，会清空所有已收集的网络日志
+     * - 停止收集后可以重新调用 init_network_logs 恢复收集
+     *
+     * 相关代码：src/executor/CdpExecutor.ts - handleInitNetworkLogs() 方法（开始收集），src/executor/CdpExecutor.ts - clearNetworkLogs() 方法（清空日志）
+     */
     private async handleCloseNetworkLogs(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpCloseNetworkLogsMessage = cdpMessage as CdpCloseNetworkLogsMessage;
         let defaultResult: CdpCloseNetworkLogsResult | undefined;
@@ -655,7 +884,22 @@ export class CdpExecutor {
         this.sendResult?.(defaultResult as CdpCloseNetworkLogsResult);
     }
 
-    // 关闭控制台日志收集
+    /**
+     * 业务逻辑：停止控制台日志收集，禁用 Runtime 域停止监听控制台 API 调用事件，释放资源并停止日志收集
+     *
+     * 实现方式：
+     * 1. 确保 CDP 连接已建立
+     * 2. 禁用 Runtime 域（Runtime.disable），停止接收控制台事件
+     * 3. 如果 clear 为 true，清空该标签页的控制台日志
+     *
+     * 注意事项：
+     * - tabId 必须存在且为数字类型，否则抛出异常
+     * - 禁用后会停止收集新的控制台日志，但已收集的日志会保留（除非 clear 为 true）
+     * - 如果 clear 为 true，会清空所有已收集的控制台日志
+     * - 停止收集后可以重新调用 init_console_logs 恢复收集
+     *
+     * 相关代码：src/executor/CdpExecutor.ts - handleInitConsoleLogs() 方法（开始收集），src/executor/CdpExecutor.ts - clearConsoleLogs() 方法（清空日志）
+     */
     private async handleCloseConsoleLogs(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpCloseConsoleLogsMessage = cdpMessage as CdpCloseConsoleLogsMessage;
         let defaultResult: CdpCloseConsoleLogsResult | undefined;
@@ -685,9 +929,26 @@ export class CdpExecutor {
     }
 
     /**
-     * 添加控制台日志
-     * @param tabId - 标签页ID
-     * @param logEntry - 日志条目
+     * 业务逻辑：添加控制台日志到指定标签页的日志集合中，由 CDP 事件监听器调用，用于收集页面的 JavaScript 日志和错误
+     *
+     * 实现方式：
+     * 1. 使用 "console_{tabId}" 作为键从 consoleLogs Map 中获取或创建日志数组
+     * 2. 处理时间戳（CDP 时间戳转换为毫秒时间戳）
+     * 3. 添加收集时间（collectedAt）
+     * 4. 将日志条目添加到数组末尾
+     * 5. 如果日志数量超过 MAX_LOG_ENTRIES，删除最旧的日志
+     *
+     * 注意事项：
+     * - tabId 用于标识日志所属的标签页
+     * - logEntry 应包含 CDP Runtime.consoleAPICalled 事件的数据
+     * - 时间戳会自动处理：CDP 时间戳（秒）转换为毫秒时间戳，或使用当前时间
+     * - 日志数量限制为 MAX_LOG_ENTRIES（10000 条），超过会自动删除最旧的
+     * - 此方法由 CDP 事件监听器调用，不应手动调用
+     *
+     * @param tabId - 标签页 ID
+     * @param logEntry - 日志条目，包含日志类型、参数、时间戳等信息
+     *
+     * 相关代码：src/entrypoints/background.ts - CDP 事件监听器（调用此方法），src/executor/CdpExecutor.ts - handleGetConsoleLogs() 方法（获取日志）
      */
     public addConsoleLog(tabId: number, logEntry: any): void {
         const logKey = `console_${tabId}`;
@@ -721,9 +982,26 @@ export class CdpExecutor {
     }
 
     /**
-     * 添加网络日志
-     * @param tabId - 标签页ID
-     * @param logEntry - 日志条目
+     * 业务逻辑：添加网络日志到指定标签页的日志集合中，由 CDP 事件监听器调用，用于收集页面的网络请求和响应信息
+     *
+     * 实现方式：
+     * 1. 使用 "network_{tabId}" 作为键从 networkLogs Map 中获取或创建日志数组
+     * 2. 处理时间戳（CDP 时间戳转换为毫秒时间戳）
+     * 3. 添加收集时间（collectedAt）
+     * 4. 将日志条目添加到数组末尾
+     * 5. 如果日志数量超过 MAX_LOG_ENTRIES，删除最旧的日志
+     *
+     * 注意事项：
+     * - tabId 用于标识日志所属的标签页
+     * - logEntry 应包含 CDP Network 域事件的数据（如 requestWillBeSent、responseReceived 等）
+     * - 时间戳会自动处理：CDP 时间戳（秒）转换为毫秒时间戳，或使用当前时间
+     * - 日志数量限制为 MAX_LOG_ENTRIES（10000 条），超过会自动删除最旧的
+     * - 此方法由 CDP 事件监听器调用，不应手动调用
+     *
+     * @param tabId - 标签页 ID
+     * @param logEntry - 日志条目，包含请求/响应信息、事件类型、时间戳等
+     *
+     * 相关代码：src/entrypoints/background.ts - CDP 事件监听器（调用此方法），src/executor/CdpExecutor.ts - handleGetNetworkLogs() 方法（获取日志）
      */
     public addNetworkLog(tabId: number, logEntry: any): void {
         const logKey = `network_${tabId}`;
@@ -758,8 +1036,18 @@ export class CdpExecutor {
     }
 
     /**
-     * 清空指定标签页的控制台日志
-     * @param tabId - 标签页ID
+     * 业务逻辑：清空指定标签页的所有控制台日志，释放内存并重置日志状态
+     *
+     * 实现方式：从 consoleLogs Map 中删除该标签页的日志条目
+     *
+     * 注意事项：
+     * - 清空后无法恢复日志，操作不可逆
+     * - 如果标签页没有日志，操作不会报错
+     * - 清空后新的日志仍会正常收集
+     *
+     * @param tabId - 标签页 ID
+     *
+     * 相关代码：src/executor/CdpExecutor.ts - handleCloseConsoleLogs() 方法（停止收集时调用），src/executor/CdpExecutor.ts - handleInitConsoleLogs() 方法（初始化时可选清空）
      */
     public clearConsoleLogs(tabId: number): void {
         const logKey = `console_${tabId}`;
@@ -767,8 +1055,18 @@ export class CdpExecutor {
     }
 
     /**
-     * 清空指定标签页的网络日志
-     * @param tabId - 标签页ID
+     * 业务逻辑：清空指定标签页的所有网络日志，释放内存并重置日志状态
+     *
+     * 实现方式：从 networkLogs Map 中删除该标签页的日志条目
+     *
+     * 注意事项：
+     * - 清空后无法恢复日志，操作不可逆
+     * - 如果标签页没有日志，操作不会报错
+     * - 清空后新的日志仍会正常收集
+     *
+     * @param tabId - 标签页 ID
+     *
+     * 相关代码：src/executor/CdpExecutor.ts - handleCloseNetworkLogs() 方法（停止收集时调用），src/executor/CdpExecutor.ts - handleInitNetworkLogs() 方法（初始化时可选清空）
      */
     public clearNetworkLogs(tabId: number): void {
         const logKey = `network_${tabId}`;
@@ -776,10 +1074,24 @@ export class CdpExecutor {
     }
 
     /**
-     * 过滤网络日志
-     * @param logs - 日志数组
-     * @param filter - 过滤条件
+     * 业务逻辑：根据过滤条件筛选网络日志，支持按事件类型、URL、请求方法、状态码、时间范围等条件过滤，用于精确查找特定的网络请求
+     *
+     * 实现方式：使用 Array.filter() 方法，根据 filter 对象的各个字段逐一检查日志条目，只有满足所有条件的日志才会被保留
+     *
+     * 注意事项：
+     * - filter.event：按事件类型过滤（如 'requestWillBeSent'、'responseReceived'）
+     * - filter.url：URL 包含指定字符串的日志会被保留（不区分大小写）
+     * - filter.method：按 HTTP 请求方法过滤（不区分大小写）
+     * - filter.statusCode：按 HTTP 状态码过滤（精确匹配）
+     * - filter.startTime 和 filter.endTime：按时间范围过滤（时间戳，毫秒）
+     * - 所有过滤条件都是可选的，未指定的条件不会应用过滤
+     * - 多个条件之间是 AND 关系，必须全部满足
+     *
+     * @param logs - 要过滤的日志数组
+     * @param filter - 过滤条件对象，包含 event、url、method、statusCode、startTime、endTime 等字段
      * @returns 过滤后的日志数组
+     *
+     * 相关代码：src/executor/CdpExecutor.ts - handleGetNetworkLogs() 方法（使用此方法过滤日志）
      */
     private filterNetworkLogs(logs: any[], filter: any): any[] {
         return logs.filter(log => {
@@ -825,10 +1137,23 @@ export class CdpExecutor {
     }
 
     /**
-     * 过滤控制台日志
-     * @param logs - 日志数组
-     * @param filter - 过滤条件
+     * 业务逻辑：根据过滤条件筛选控制台日志，支持按日志类型、级别、文本内容、时间范围等条件过滤，用于精确查找特定的控制台输出
+     *
+     * 实现方式：使用 Array.filter() 方法，根据 filter 对象的各个字段逐一检查日志条目，只有满足所有条件的日志才会被保留
+     *
+     * 注意事项：
+     * - filter.type：按日志类型过滤（如 'log'、'error'、'warn'）
+     * - filter.level：按日志级别过滤（不区分大小写），会与 log.type 比较
+     * - filter.text：文本内容包含指定字符串的日志会被保留（不区分大小写），会搜索日志参数（args）的 JSON 字符串
+     * - filter.startTime 和 filter.endTime：按时间范围过滤（时间戳，毫秒）
+     * - 所有过滤条件都是可选的，未指定的条件不会应用过滤
+     * - 多个条件之间是 AND 关系，必须全部满足
+     *
+     * @param logs - 要过滤的日志数组
+     * @param filter - 过滤条件对象，包含 type、level、text、startTime、endTime 等字段
      * @returns 过滤后的日志数组
+     *
+     * 相关代码：src/executor/CdpExecutor.ts - handleGetConsoleLogs() 方法（使用此方法过滤日志）
      */
     private filterConsoleLogs(logs: any[], filter: any): any[] {
         return logs.filter(log => {
@@ -866,9 +1191,26 @@ export class CdpExecutor {
     }
 
     /**
-     * 按请求ID分组网络日志
-     * @param logs - 日志数组
-     * @returns 分组后的日志数组，每个请求包含完整的生命周期
+     * 业务逻辑：将网络日志按请求 ID 分组，将同一请求的所有事件（requestWillBeSent、responseReceived、loadingFinished 等）合并为一个对象，用于查看请求的完整生命周期
+     *
+     * 实现方式：
+     * 1. 使用 Map 按 requestId 分组日志
+     * 2. 为每个请求创建包含完整生命周期的对象结构
+     * 3. 根据事件类型填充相应的字段（request、response、loadingFinished、loadingFailed 等）
+     * 4. 将所有事件保存到 events 数组中
+     * 5. 按开始时间排序后返回
+     *
+     * 注意事项：
+     * - 没有 requestId 的日志会被忽略
+     * - 每个分组对象包含：requestId、request、response、loadingFinished、loadingFailed、events、startTime、endTime 等字段
+     * - events 数组包含该请求的所有原始事件日志
+     * - 返回的数组按请求开始时间（startTime）排序
+     * - 分组后的对象结构更便于分析请求的完整流程
+     *
+     * @param logs - 要分组的日志数组
+     * @returns 分组后的日志数组，每个元素代表一个完整的网络请求
+     *
+     * 相关代码：src/executor/CdpExecutor.ts - handleGetNetworkLogs() 方法（使用此方法分组日志）
      */
     private groupNetworkLogsByRequest(logs: any[]): any[] {
         const grouped = new Map<string, any>();
@@ -926,12 +1268,25 @@ export class CdpExecutor {
     }
 
     /**
-     * 等待标签页加载完成
-     * @param tabId - 标签页ID
-     * @param timeout - 超时时间（毫秒），默认30秒
-     * @remarks
-     * 监听标签页的更新事件，等待页面状态变为 'complete'
-     * 如果标签页已经加载完成，则立即返回
+     * 业务逻辑：等待指定标签页加载完成，确保页面完全加载后再继续操作，用于页面导航后的等待
+     *
+     * 实现方式：
+     * 1. 首先检查标签页状态，如果已经是 'complete' 则立即返回
+     * 2. 如果未完成，监听 browser.tabs.onUpdated 事件
+     * 3. 当标签页状态变为 'complete' 时，移除监听器并返回
+     * 4. 如果超时，移除监听器并返回（不抛出异常）
+     *
+     * 注意事项：
+     * - tabId 必须存在且为有效的标签页 ID
+     * - timeout 默认 30 秒，超时后仍会返回但页面可能未完全加载
+     * - 如果标签页已经加载完成，会立即返回，不会等待
+     * - 超时不会抛出异常，只会记录警告日志
+     * - 监听器会在返回或超时后自动移除，避免内存泄漏
+     *
+     * @param tabId - 标签页 ID
+     * @param timeout - 超时时间（毫秒），默认 30 秒
+     *
+     * 相关代码：src/executor/CdpExecutor.ts - handleCreateTabAndNavigate() 方法（创建标签页后调用）
      */
     private async waitForTabLoadComplete(tabId: number, timeout: number = 30000): Promise<void> {
         // 首先检查标签页是否已经加载完成
@@ -966,7 +1321,18 @@ export class CdpExecutor {
         });
     }
 
-    // 更新节点名称
+    /**
+     * 业务逻辑：更新节点配置中的节点名称，用于标识和管理不同的自动化节点实例
+     *
+     * 实现方式：调用 nodeConfig.UpdateNodeProfile() 方法更新节点配置中的 node_name 字段
+     *
+     * 注意事项：
+     * - node_name 必须存在且为字符串类型，否则抛出异常
+     * - 节点名称用于在服务器端标识不同的节点实例
+     * - 更新后的名称会在下次登录时发送给服务器
+     *
+     * 相关代码：src/managers/NodeManager.ts - nodeConfig 对象（节点配置管理器）
+     */
     private async handleUpdateNodeName(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpUpdateNodeNameMessage = cdpMessage as CdpUpdateNodeNameMessage;
         let defaultResult: CdpUpdateNodeNameResult | undefined;
@@ -987,7 +1353,22 @@ export class CdpExecutor {
         this.sendResult?.(defaultResult as CdpUpdateNodeNameResult);
     }
 
-    // 关闭标签页
+    /**
+     * 业务逻辑：关闭指定标签页，断开 CDP 连接并清理相关日志，用于清理不再需要的标签页和释放资源
+     *
+     * 实现方式：
+     * 1. 尝试断开 CDP 连接（如果已连接）
+     * 2. 使用 browser.tabs.remove() 关闭标签页
+     * 3. 清空该标签页的控制台和网络日志
+     *
+     * 注意事项：
+     * - tabId 必须存在且为数字类型，否则抛出异常
+     * - CDP 断开操作失败不会阻止标签页关闭（仅记录警告）
+     * - 关闭标签页会自动清理该标签页的所有日志
+     * - 如果标签页不存在，会抛出异常
+     *
+     * 相关代码：src/utils/index.ts - DisconnectCDP() 函数（断开 CDP 连接），src/executor/CdpExecutor.ts - clearConsoleLogs() 和 clearNetworkLogs() 方法（清理日志）
+     */
     private async handleCloseTab(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpCloseTabMessage = cdpMessage as CdpCloseTabMessage;
         let defaultResult: CdpCloseTabResult | undefined;

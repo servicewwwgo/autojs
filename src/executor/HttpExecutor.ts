@@ -2,8 +2,18 @@ import type { HttpMessage, HttpRequestMessage, HttpRequestResult, HttpResult } f
 import { LogLevel, OutputLogToFile } from '../utils';
 
 /**
- * HTTP 执行器
- * 提供通过 HTTP 协议执行相关功能
+ * 业务逻辑：通过 HTTP 协议执行网络请求，支持 GET、POST、PUT、DELETE 等常用 HTTP 方法，响应来自 WebSocket 的 HTTP 请求命令
+ *
+ * 实现方式：使用浏览器原生的 fetch API 执行 HTTP 请求，支持自定义请求头、请求体、超时设置，自动处理 JSON 响应解析
+ *
+ * 注意事项：
+ * - 支持所有标准 HTTP 方法，但 GET、HEAD、DELETE、OPTIONS 方法不应包含请求体
+ * - 请求体支持字符串和对象类型，对象会自动转换为 JSON 字符串
+ * - 默认超时时间为 180 秒，可通过 timeout 参数自定义（单位：秒）
+ * - 响应体如果是 JSON 格式会自动解析，否则返回文本
+ * - 请求失败会返回错误信息，不会抛出异常
+ *
+ * 相关代码：src/types/http.ts - HTTP 消息和结果类型定义，src/entrypoints/background.ts - 注册 HTTP 消息处理器
  */
 export class HttpExecutor {
     private mapTypeToFunction: { [key: string]: (data: any) => Promise<void> } = {};
@@ -17,18 +27,37 @@ export class HttpExecutor {
     }
 
     /**
-     * 设置发送 HTTP 结果的函数
-     * @param sendResult - 发送结果的函数
+     * 业务逻辑：设置 HTTP 执行结果的回调函数，用于将 HTTP 请求的执行结果发送到外部（如 WebSocket 服务器）
+     *
+     * 实现方式：将回调函数保存到私有属性 sendResult 中，在请求完成后通过此回调发送结果
+     *
+     * 注意事项：
+     * - 必须在处理 HTTP 消息前设置此回调，否则结果无法发送
+     * - 请求成功或失败都会通过此回调发送结果
+     * - 如果未设置回调，结果仍会生成但不会发送
+     *
+     * @param sendResult - 发送 HTTP 结果的函数，接收 HttpResult 类型参数
+     *
+     * 相关代码：src/executor/HttpExecutor.ts - handleMessage() 方法（调用此回调），src/entrypoints/background.ts - 设置 WebSocket 发送回调
      */
     public setSendResult(sendResult: (result: HttpResult) => void): void {
         this.sendResult = sendResult;
     }
 
     /**
-     * 统一的 WebSocket 消息处理接口
-     * 根据消息类型分发到相应的处理函数
-     * @param message - WebSocket 消息
-     * @returns void
+     * 业务逻辑：统一处理来自 WebSocket 的 HTTP 消息，根据消息类型分发到对应的处理方法，实现 HTTP 请求的统一入口
+     *
+     * 实现方式：使用 mapTypeToFunction 映射表查找对应的处理方法，如果找到则调用处理，如果未找到或处理出错则返回错误结果
+     *
+     * 注意事项：
+     * - 消息类型必须在 mapTypeToFunction 中注册，否则返回 "handler not found" 错误
+     * - 处理方法中的异常会被捕获并转换为错误结果返回
+     * - 所有结果都会通过 sendResult 回调发送
+     * - 会记录消息处理的日志，便于调试
+     *
+     * @param httpMessage - WebSocket HTTP 消息，必须包含 type 和 id 字段
+     *
+     * 相关代码：src/executor/HttpExecutor.ts - constructor() 方法（初始化映射表），src/types/http.ts - HttpMessage 接口（消息类型定义）
      */
     public async handleMessage(httpMessage: HttpMessage): Promise<void> {
         let defaultResult: HttpResult | undefined;
@@ -57,7 +86,30 @@ export class HttpExecutor {
         }
     }
 
-    // 执行 HTTP 请求
+    /**
+     * 业务逻辑：执行 HTTP 请求，发送请求到指定 URL 并返回响应结果，支持自定义请求方法、请求头、请求体和超时设置
+     *
+     * 实现方式：
+     * 1. 验证请求参数（method、url 必须存在）
+     * 2. 准备请求选项（method、headers、body）
+     * 3. 处理请求体：字符串直接使用，对象转换为 JSON 字符串并设置 Content-Type
+     * 4. 对于不应包含请求体的方法（GET、HEAD、DELETE、OPTIONS），忽略请求体并记录警告
+     * 5. 使用 Promise.race 实现超时控制
+     * 6. 使用 fetch API 发送请求
+     * 7. 解析响应：读取响应头、响应体，如果是 JSON 格式自动解析
+     * 8. 返回响应结果（status、statusText、headers、body、url）
+     *
+     * 注意事项：
+     * - method 和 url 必须存在且为字符串类型，否则抛出异常
+     * - headers 为可选对象，默认为空对象
+     * - body 支持字符串和对象类型，对象会自动转换为 JSON
+     * - timeout 单位为秒，默认 180 秒，转换为毫秒后用于超时控制
+     * - GET、HEAD、DELETE、OPTIONS 方法不应包含请求体，如果包含会记录警告但继续执行
+     * - 响应体只能读取一次，先读取为文本再判断是否为 JSON
+     * - 请求失败会返回错误结果，不会抛出异常
+     *
+     * 相关代码：src/types/http.ts - HttpRequestResult 接口（返回类型定义），浏览器 fetch API 文档
+     */
     private async handleHttpRequest(httpMessage: HttpMessage): Promise<void> {
         const msg: HttpRequestMessage = httpMessage as HttpRequestMessage;
         let defaultResult: HttpRequestResult | undefined;
