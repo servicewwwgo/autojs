@@ -11,7 +11,7 @@
  * - name：元素名称，必需字段，用于在 ElementManager 中标识和管理元素
  * - description：元素描述，必需字段，用于说明元素的用途
  * - selector：元素选择器，必需字段，根据 selectorType 使用不同的选择器语法
- * - selectorType：选择器类型，支持 'css'、'id'、'tag'、'text' 四种类型
+ * - selectorType：选择器类型，支持 'css'、'id'、'tag'、'text'、'ledby' 五种类型
  * - 相对关系字段（parentName、childrenName、siblingName、siblingOffset）：当存在多个元素匹配时，用于进一步筛选和定位
  * - 系统自动生成的字段（dom、nodeId、tag）用户不可手动设置
  *
@@ -27,7 +27,7 @@ export interface ElementData {
   backup?: string;                        // 元素備注
   text?: string;                           // 元素文本
   selector: string;                       // 元素选择器
-  selectorType: 'css' | 'id' | 'tag' | 'text';   // 元素选择器类型
+  selectorType: 'css' | 'id' | 'tag' | 'text' | 'ledby';   // 元素选择器类型
   parentName?: string;                    // 父元素名称 - 儅存在多個元素匹配時, 使用父元素名称來區分, 通過 elementManager 來獲取這個元素的父元素對象, 並通過相對關係匹配
   childrenName?: string;                  // 子元素名称 - 儅存在多個元素匹配時, 使用子元素名称來區分, 通過 elementManager 來獲取這個元素的子元素對象, 並通過相對關係匹配
   siblingName?: string;                   // 兄弟元素名称 - 儅存在多個元素匹配時, 使用兄弟元素名称來區分, 通過 elementManager 來獲取這個元素的兄弟元素對象, 並通過相對關係匹配

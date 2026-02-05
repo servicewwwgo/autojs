@@ -43,7 +43,7 @@ export interface IElement {
     GetSelector(): string | undefined;
 
     // 获取元素选择器类型
-    GetSelectorType(): 'css' | 'id' | 'tag' | 'text';
+    GetSelectorType(): 'css' | 'id' | 'tag' | 'text' | 'ledby';
 
     // 获取元素父元素名称
     GetParentName(): string | undefined;
@@ -88,6 +88,7 @@ export class ElementClass implements IElement {
      * 实现方式：
      * - CSS/ID/Tag 类型：使用 DOM.querySelectorAll CDP 命令查找元素
      * - Text 类型：使用 Runtime.evaluate 在页面上下文中执行 JavaScript 代码查找包含指定文本的元素，然后通过 Runtime.getProperties 和 DOM.requestNode 获取 nodeId
+     * - Ledby 类型：使用 Runtime.evaluate 查找所有包含 aria-labelledby 属性的元素，然后通过 aria-labelledby 的值找到对应的 label 元素，检查 label 元素的文本内容是否包含指定文本
      * - 所有类型都会先获取文档根节点，然后执行相应的查询操作
      *
      * 注意事项：
@@ -95,12 +96,13 @@ export class ElementClass implements IElement {
      * - Tag 类型使用 ElementTag 属性选择器，需要转义特殊字符
      * - Text 类型需要转义搜索文本和选择器，防止注入攻击
      * - Text 类型会检查元素可见性（display、visibility、opacity），只返回可见元素
+     * - Ledby 类型需要转义搜索文本，防止注入攻击，会检查 label 元素的文本内容是否包含指定文本
      * - 所有查询失败时返回空数组，不会抛出异常
-     * - Text 类型查找后需要释放对象引用，避免内存泄漏
+     * - Text 和 Ledby 类型查找后需要释放对象引用，避免内存泄漏
      *
-     * @param selectorType - 选择器类型（'css' | 'id' | 'tag' | 'text'）
+     * @param selectorType - 选择器类型（'css' | 'id' | 'tag' | 'text' | 'ledby'）
      * @param selector - 选择器字符串
-     * @param text - 文本内容（仅用于 text 类型选择器）
+     * @param text - 文本内容（用于 text 和 ledby 类型选择器）
      * @returns 元素 nodeId 列表（Promise）
      *
      * 相关代码：src/managers/ElementManager.ts - LocateElement() 方法（调用此方法查找候选元素），src/utils/index.ts - ExecuteCDPCommand() 函数（执行 CDP 命令）
@@ -256,6 +258,109 @@ export class ElementClass implements IElement {
                         throw error;
                     }
                     break;
+
+                case 'ledby':
+                    // 通过 aria-labelledby 属性查找元素
+                    try {
+                        // 检查 text 是否存在
+                        if (!text) {
+                            OutputLogToFile(`[ElementManager] Text parameter is required for ledby selector type for "${this.elementData.name}"`, { level: LogLevel.ERROR });
+                            candidateNodeIds = [];
+                            break;
+                        }
+
+                        // 转义搜索文本，防止注入攻击
+                        const escapedSearchText = text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+
+                        // 转义 selector，防止注入攻击，并用引号包裹
+                        const escapedSelector = JSON.stringify(selector);
+
+                        // 使用 Runtime.evaluate 在页面上下文中查找所有包含 aria-labelledby 属性的元素
+                        // 然后通过 aria-labelledby 的值找到对应的 label 元素，检查 label 元素的文本内容是否包含指定文本
+                        const findElementsExpression = `
+                            (function() {
+                                const searchText = '${escapedSearchText}';
+                                const searchSelector = ${escapedSelector};
+                                const allElements = document.querySelectorAll(searchSelector);
+                                const matchedElements = [];
+                                
+                                for (let element of allElements) {
+                                    // 检查元素是否有 aria-labelledby 属性
+                                    const ariaLabelledBy = element.getAttribute('aria-labelledby');
+                                    if (ariaLabelledBy) {
+                                        // 通过 id 找到对应的 label 元素
+                                        const labelElement = document.getElementById(ariaLabelledBy);
+                                        if (labelElement) {
+                                            // 获取 label 元素的文本内容
+                                            const labelText = labelElement.textContent || labelElement.innerText || '';
+                                            // 检查 label 元素的文本内容是否包含指定文本
+                                            if (labelText.includes(searchText)) {
+                                                // 检查元素是否可见
+                                                const style = window.getComputedStyle(element);
+                                                if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+                                                    matchedElements.push(element);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                return matchedElements;
+                            })()
+                        `;
+
+                        const findResult = await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.evaluate', {
+                            expression: findElementsExpression,
+                            returnByValue: false  // 返回对象引用，以便获取 nodeId
+                        });
+
+                        if (!findResult?.result?.objectId) {
+                            OutputLogToFile(`[ElementManager] No elements found with ledby selector "${selector}" and text "${text}" for "${this.elementData.name}"`, { level: LogLevel.WARN });
+                            candidateNodeIds = [];
+                            break;
+                        }
+
+                        // 获取数组的所有属性（包括索引属性）
+                        const objectId = findResult.result.objectId;
+                        const propertiesResult = await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.getProperties', {
+                            objectId: objectId,
+                            ownProperties: true
+                        });
+
+                        candidateNodeIds = [];
+
+                        if (propertiesResult?.result) {
+                            // 遍历所有属性，获取每个节点的 nodeId
+                            for (const property of propertiesResult.result) {
+                                // 只处理数字索引（数组元素）
+                                if (property.name && /^\d+$/.test(property.name) && property.value?.objectId) {
+                                    try {
+                                        const nodeIdResult = await ExecuteCDPCommand(this.elementData.tabId, 'DOM.requestNode', {
+                                            objectId: property.value.objectId
+                                        });
+                                        if (nodeIdResult?.nodeId) {
+                                            candidateNodeIds.push(nodeIdResult.nodeId);
+                                        }
+                                    } catch (nodeIdError) {
+                                        OutputLogToFile(`[ElementManager] Failed to get nodeId for ledby search result at index ${property.name}: ${nodeIdError instanceof Error ? nodeIdError.message : String(nodeIdError)}`, { level: LogLevel.WARN });
+                                    }
+                                }
+                            }
+                        }
+
+                        // 释放数组对象引用
+                        try {
+                            await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.releaseObject', {
+                                objectId: objectId
+                            });
+                        } catch (releaseError) {
+                            OutputLogToFile(`[ElementManager] Failed to release object for ledby search "${this.elementData.name}": ${releaseError instanceof Error ? releaseError.message : String(releaseError)}`, { level: LogLevel.WARN });
+                        }
+                    } catch (error) {
+                        OutputLogToFile(`[ElementManager] Ledby search failed for "${this.elementData.name}": ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+                        throw error;
+                    }
+                    break;
+
                 default:
                     throw new Error(`Unsupported selector type: ${selectorType}`);
             }
@@ -540,7 +645,7 @@ export class ElementClass implements IElement {
             return false;
         }
 
-        if (!['css', 'xpath', 'id', 'tag'].includes(this.elementData.selectorType)) {
+        if (!['css', 'xpath', 'id', 'tag', 'text', 'ledby'].includes(this.elementData.selectorType)) {
             return false;
         }
 
@@ -692,9 +797,9 @@ export class ElementClass implements IElement {
      *
      * 实现方式：直接返回 elementData.selectorType 字段
      *
-     * @returns 选择器类型（'css' | 'id' | 'tag' | 'text'）
+     * @returns 选择器类型（'css' | 'id' | 'tag' | 'text' | 'ledby'）
      */
-    public GetSelectorType(): 'css' | 'id' | 'tag' | 'text' {
+    public GetSelectorType(): 'css' | 'id' | 'tag' | 'text' | 'ledby' {
         return this.elementData.selectorType;
     }
 
