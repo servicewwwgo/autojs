@@ -15,25 +15,7 @@
 
         <div class="form-group">
             <label>指令集 (JSON格式)</label>
-            <textarea v-model="instructionsJson" class="textarea" rows="15" placeholder='请输入指令集JSON，例如：
-  [
-    {
-      "type": "navigate",
-      "tabId": 123,
-      "instructionID": "inst1",
-      "url": "https://example.com",
-      "created_at": 1234567890
-    },
-    {
-      "type": "find_element",
-      "tabId": 123,
-      "instructionID": "inst2",
-      "selector": "#search",
-      "selectorType": "css",
-      "name": "searchInput",
-      "created_at": 1234567890
-    }
-  ]'></textarea>
+            <textarea v-model="instructionsJson" class="textarea" rows="15" placeholder='请输入指令集JSON'></textarea>
         </div>
 
         <div class="actions">
@@ -54,7 +36,23 @@ import { BackgroundScriptMessageType, TabInfo } from '../../../types';
 import { SendMessageToBackgroundScript } from '../../../utils';
 
 const selectedTabId = ref<number | ''>('');
-const instructionsJson = ref('');
+const instructionsJson = ref(`[
+  {
+    "type": "find_element",
+    "tabId": 0,
+    "instructionID": "inst2",
+    "params": {
+      "element": {
+        "name": "BM View",
+        "description": "添加BM界面",
+        "selector": "div",
+        "selectorType": "text",
+        "text": "Create a business portfolio"
+      }
+    },
+    "created_at": 1234567890
+  }
+]`);
 const tabs = ref<Array<{ tabId: number; url: string }>>([]);
 const message = ref('');
 const messageType = ref<'success' | 'error'>('success');
