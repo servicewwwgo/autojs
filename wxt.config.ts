@@ -25,18 +25,14 @@ export default defineConfig({
       'alarms',
       'debugger',
       'nativeMessaging',
-      'sidePanel',
       'cookies',
       'background'
     ],
     host_permissions: [
       '<all_urls>'
     ],
-    side_panel: {
-      default_path: 'sidepanel.html'
-    },
     action: {
-      default_title: '打开SemiAutoJs侧边栏'
+      default_title: '打开SemiAutoJs'
     },
     background: {
       persistent: true,  // 保持后台页面常驻
