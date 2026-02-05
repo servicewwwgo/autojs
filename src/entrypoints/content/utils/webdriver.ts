@@ -1,10 +1,16 @@
 import { LogLevel, OutputLogToFile } from '../../../utils';
 
 /**
- * 隐藏 navigator.webdriver 属性
- * 用于防止网站检测到自动化工具
+ * 业务逻辑：隐藏 navigator.webdriver 属性，防止网站检测到浏览器自动化工具，提升自动化脚本的隐蔽性
  * 
- * 注意：由于 webdriver 属性可能是只读的，我们使用多种方法来尝试隐藏它
+ * 实现方式：使用 Object.defineProperty() 重新定义 navigator.webdriver 属性，将 getter 返回 undefined
+ * 
+ * 注意事项：
+ * - 此函数需要在页面脚本运行前执行（在 content script 的 document_start 阶段），否则可能无法覆盖只读属性
+ * - 如果定义属性失败（某些浏览器可能不允许），会记录警告日志但不抛出异常
+ * - 隐藏 webdriver 属性有助于避免反爬虫检测，但并非完全可靠
+ * 
+ * 相关代码：src/entrypoints/content.ts - content script 入口（在 document_start 阶段调用）
  */
 export function hideWebdriver(): void {
     try {

@@ -1,8 +1,20 @@
 import { CdpExecutor } from '../../../executor';
 
 /**
- * CDP事件监听服务
- * 负责监听和处理Chrome DevTools Protocol事件
+ * CDP 事件监听服务
+ * 
+ * 业务逻辑：负责监听和处理 Chrome DevTools Protocol (CDP) 事件，包括控制台日志和网络请求日志，
+ * 将 CDP 事件转换为内部日志格式并传递给 CDP 执行器处理
+ * 
+ * 实现方式：使用 browser.debugger.onEvent 监听器监听所有 CDP 事件，根据事件类型（method）过滤并处理
+ * 控制台日志（Runtime.consoleAPICalled）和网络请求事件（Network.*），将事件数据传递给 CdpExecutor
+ * 
+ * 注意事项：
+ * - 需要确保 debugger API 已正确附加到目标标签页，否则无法接收 CDP 事件
+ * - 只处理有 tabId 的事件，忽略非标签页相关的事件
+ * - 网络事件包括请求发送、响应接收、加载完成、加载失败等多种类型
+ * 
+ * 相关代码：src/executor/CdpExecutor.ts - CdpExecutor，src/entrypoints/background.ts - 后台脚本入口
  */
 export class CdpEventService {
     private cdpExecutor: CdpExecutor;
@@ -12,7 +24,17 @@ export class CdpEventService {
     }
 
     /**
-     * 初始化CDP事件监听器
+     * 业务逻辑：初始化 CDP 事件监听器，开始监听控制台日志和网络请求事件
+     * 
+     * 实现方式：注册 browser.debugger.onEvent 监听器，根据事件方法名（method）匹配对应的处理逻辑，
+     * 将控制台日志和网络事件数据传递给 CdpExecutor 的相应方法
+     * 
+     * 注意事项：
+     * - 监听器会接收所有 CDP 事件，需要根据 method 进行过滤
+     * - tabId 为 undefined 的事件会被忽略
+     * - 事件处理是同步的，避免阻塞其他事件处理
+     * 
+     * 相关代码：src/executor/CdpExecutor.ts - CdpExecutor.addConsoleLog(), CdpExecutor.addNetworkLog()
      */
     initialize(): void {
         // 监听 CDP 事件（控制台日志和网络日志）

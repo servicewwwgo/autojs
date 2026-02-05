@@ -1,9 +1,20 @@
 import { LogLevel, OutputLogToFile } from '../../../utils';
 
 /**
- * 检查父元素链是否可见（递归检查）
+ * 业务逻辑：递归检查元素的父元素链是否可见，因为父元素隐藏会导致子元素不可见
+ * 
+ * 实现方式：从元素的直接父元素开始，向上遍历父元素链直到 document.body 或 document.documentElement，
+ * 检查每个父元素的 display、visibility 和 opacity 属性
+ * 
+ * 注意事项：
+ * - 如果任何父元素的 display 为 none、visibility 为 hidden/collapse 或 opacity 为 0，返回 false
+ * - 在 document_start 阶段可能无法获取计算样式，此时跳过检查继续向上遍历
+ * - 遍历到 document.body 或 document.documentElement 时停止
+ * 
  * @param element - 要检查的元素
- * @returns 父元素链是否都可见
+ * @returns 父元素链是否都可见，true 表示所有父元素可见，false 表示至少有一个父元素不可见
+ * 
+ * 相关代码：src/entrypoints/content/utils/visibility.ts - isVisible()
  */
 export function checkParentVisibility(element: HTMLElement): boolean {
     let parent = element.parentElement;
@@ -39,9 +50,32 @@ export function checkParentVisibility(element: HTMLElement): boolean {
 }
 
 /**
- * 判断元素是否可见（采用权威且全面的检查方法）
- * @param element - 元素
- * @returns 是否可见
+ * 业务逻辑：全面检查元素是否在页面上可见，采用多维度检查确保判断准确性，用于判断元素是否可以被用户交互
+ * 
+ * 实现方式：进行 13 个维度的可见性检查：
+ * 1. 检查元素是否已连接到 DOM
+ * 2. 获取计算样式（最权威的方法）
+ * 3-5. 检查 display、visibility、opacity 属性
+ * 6. 检查父元素链的可见性
+ * 7. 检查 transform 属性（scale(0) 会使元素不可见）
+ * 8. 获取元素的边界框
+ * 9. 检查元素是否有有效的尺寸（width > 0 && height > 0）
+ * 10. 检查元素是否在视口内
+ * 11. 检查 clip 属性（已废弃但为兼容性保留）
+ * 12. 检查 clip-path 属性（现代方法）
+ * 13. 检查 offsetWidth 和 offsetHeight（辅助检查）
+ * 
+ * 注意事项：
+ * - 所有检查都必须通过，任何一项失败都返回 false
+ * - 在 document_start 阶段可能无法获取计算样式，此时返回 false
+ * - 视口检查允许 50px 的边距，用于处理部分可见的元素
+ * - 内联元素（span 等）的尺寸可能为 0，需要特殊处理
+ * 
+ * @param element - 要检查的元素
+ * @returns 是否可见，true 表示元素完全可见，false 表示元素不可见
+ * 
+ * 相关代码：src/entrypoints/content/utils/visibility.ts - checkParentVisibility(),
+ * src/entrypoints/content/handlers/element.ts - checkElementVisible()
  */
 export function isVisible(element: HTMLElement): boolean {
     // 1. 检查元素是否已连接到 DOM

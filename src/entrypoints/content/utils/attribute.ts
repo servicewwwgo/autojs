@@ -2,18 +2,25 @@ import { LogLevel, OutputLogToFile } from '../../../utils';
 import { findElementByTag } from './element';
 
 /**
- * 获取元素的属性
- * @param element - DOM元素
+ * 业务逻辑：获取 DOM 元素的属性值，支持多种属性类型（标准 HTML 属性、计算样式、图片 URL 等），
+ * 用于提取元素的各类信息以满足自动化操作需求
+ * 
+ * 实现方式：根据属性名称判断属性类型，使用不同的方法获取：
+ * - 图片相关属性：优先从 <img> 标签的 src 获取，其次从计算样式的 background-image 获取
+ * - 计算样式属性：使用 window.getComputedStyle() 获取，支持连字符和驼峰命名
+ * - 标准 HTML 属性：使用 element.getAttribute()，如果为 null 则尝试直接访问元素属性
+ * 
+ * 注意事项：
+ * - 图片属性支持多种数据源：src、data-src、data-lazy-src、background-image
+ * - 计算样式属性需要处理连字符和驼峰命名的转换
+ * - 某些属性（如 value、checked）需要通过直接访问元素属性获取
+ * - 所有错误都会被捕获并记录警告日志，返回 null
+ * 
+ * @param element - DOM 元素
  * @param attribute - 属性名称
- * @returns 属性值
- * @remarks
- * 支持的属性类型：
- * 1. 标准 HTML 属性：使用 element.getAttribute() 获取
- * 2. 图片相关：
- *    - 'src' 或 'image' - 获取 <img> 标签的 src 属性
- *    - 'background-image' 或 'backgroundImage' - 从计算样式中获取背景图片 URL
- *    - 'image' - 智能检测：优先获取 src，如果没有则获取 background-image
- * 3. 计算样式属性：使用 window.getComputedStyle() 获取
+ * @returns 属性值，如果属性不存在或获取失败则返回 null 或 undefined
+ * 
+ * 相关代码：src/entrypoints/content/utils/element.ts - findElementByTag()
  */
 export function getElementAttribute(element: HTMLElement, attribute: string): string | null | undefined {
     let attributeValue: string | null | undefined = undefined;
