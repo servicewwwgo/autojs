@@ -45,7 +45,7 @@ const instructionsJson = ref(`[
       "element": {
         "name": "BM View",
         "description": "添加BM界面",
-        "selector": "div",
+        "selector": "div[role='dialog']",
         "selectorType": "ledby",
         "text": "Create a business portfolio"
       }
