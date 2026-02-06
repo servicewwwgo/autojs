@@ -582,4 +582,3 @@ export function CloseLogConnection(): void {
         nativePort = null;
     }
 }
-

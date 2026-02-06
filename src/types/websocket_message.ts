@@ -1,4 +1,5 @@
 import type { NodeProfile } from './node';
+import type { LogLevel } from '../utils/index';
 
 /**
  * 业务逻辑：定义 WebSocket 消息的基础结构，用于扩展与服务器之间的双向通信，统一消息格式，支持多种消息类型（错误、登录、心跳、指令、CDP、HTTP 等）
@@ -15,7 +16,7 @@ import type { NodeProfile } from './node';
  * 相关代码：src/executor/WebSocketConnector.ts - handleMessage() 函数（处理接收到的消息），sendMessage() 函数（发送消息）
  */
 export interface WSMessage {
-  type: 'error' | 'login' | 'heartbeat' | 'tabs' | 'instructions' | 'cdp' | 'http';
+  type: 'error' | 'login' | 'heartbeat' | 'tabs' | 'instructions' | 'cdp' | 'http' | 'log';
   data?: any;
 }
 
@@ -112,5 +113,31 @@ export interface WSHeartbeatMessage extends WSMessage {
 export interface WSHeartbeatResponse extends WSMessage {
   type: 'heartbeat';
   data: { success: boolean };
+}
+
+/**
+ * 业务逻辑：定义 WebSocket 日志消息的结构，用于客户端向服务器发送日志信息，便于服务器端统一管理和监控客户端运行状态
+ *
+ * 实现方式：继承自 WSMessage 接口，固定 type 为 'log'，data 字段为必需且包含日志信息对象（message、level、timestamp、source 等）
+ *
+ * 注意事项：
+ * - type 字段固定为 'log'，不能为其他值
+ * - data.message 字段为必需，表示日志消息内容
+ * - data.level 字段为必需，使用 LogLevel 枚举值（DEBUG、INFO、WARN、ERROR）
+ * - data.timestamp 字段为可选，表示日志时间戳，未提供时由服务器端生成
+ * - data.source 字段为可选，表示日志来源（如模块名、函数名），便于定位问题
+ * - 日志消息可用于远程调试、问题排查和运行状态监控
+ * - 生产环境建议仅发送 WARN 和 ERROR 级别的日志，减少网络传输
+ *
+ * 相关代码：src/utils/index.ts - LogLevel 枚举（日志级别定义），LogOptions 接口（日志选项），OutputLogToFile() 函数（日志输出）
+ */
+export interface WSLogMessage extends WSMessage {
+  type: 'log';
+  data: {
+    message: string;
+    level: LogLevel;
+    timestamp?: number;
+    source?: string;
+  };
 }
 
