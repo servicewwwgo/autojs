@@ -40,6 +40,7 @@ export class WebSocketConnector {
     private connected: boolean = false; // WebSocket 连接状态
     private isLoggedIn: boolean = false; // 登录状态
     private isDisconnecting: boolean = false; // 标记是否正在断开连接，防止重连
+    private enableLogger: boolean = false; // 是否启用日志
 
     private mapMessageTypeToFunction: { [key: string]: (message: WSMessage) => Promise<void> } = {};
 
@@ -291,6 +292,12 @@ export class WebSocketConnector {
                 return;
             }
 
+            // 处理 Logger 控制消息
+            if (message.type === 'logger') {
+                this.handleLoggerMessage(message as WSLogMessage);
+                return;
+            }
+
             console.log(`[WebSocket] Received message type: ${message.type}`);
 
             const handler = this.mapMessageTypeToFunction[message.type];
@@ -377,6 +384,29 @@ export class WebSocketConnector {
     }
 
     /**
+     * 业务逻辑：处理服务器发送的 Logger 控制消息，根据消息中的 enable 字段开启或关闭日志功能
+     *
+     * 实现方式：
+     * 1. 从消息中提取 enable 字段（布尔值）
+     * 2. 更新内部的 enableLogger 状态标志
+     * 3. 记录状态变更日志
+     *
+     * 注意事项：
+     * - enable 为 true 时开启 Logger，enableLogger 设置为 true
+     * - enable 为 false 时关闭 Logger，enableLogger 设置为 false
+     * - 当 enableLogger 为 false 时，sendLogMessage() 方法不会发送日志消息到服务器
+     * - 此功能可用于动态控制日志传输，减少不必要的网络流量
+     * - 状态变更会记录 INFO 级别日志，便于调试和监控
+     *
+     * 相关代码：src/executor/WebSocketConnector.ts - sendLogMessage() 方法（根据 enableLogger 状态决定是否发送），src/types/websocket_message.ts - WSLogMessage 接口（日志消息类型定义，type 为 'logger' 时表示控制消息）
+     */
+    private handleLoggerMessage(message: WSLogMessage): void {
+        const enable = message.data?.enable ?? false;
+        this.enableLogger = enable;
+        console.log(`[WebSocket] Logger ${enable ? 'enabled' : 'disabled'}`);
+    }
+
+    /**
      * 业务逻辑：向服务器发送心跳消息，保持连接活跃并检测连接状态，定期调用以维持连接
      *
      * 实现方式：创建心跳消息对象（包含当前时间戳），调用 sendMessage() 发送
@@ -425,11 +455,13 @@ export class WebSocketConnector {
      * 业务逻辑：向服务器发送日志消息，将客户端日志信息发送到服务器端，便于服务器端统一管理和监控客户端运行状态
      *
      * 实现方式：
-     * 1. 构造日志消息对象（WSLogMessage），包含日志内容、级别、时间戳和来源
-     * 2. 如果未提供时间戳，使用当前时间（Date.now()）
-     * 3. 调用 sendMessage() 发送消息
+     * 1. 检查 enableLogger 状态，如果为 false 则直接返回 false，不发送日志
+     * 2. 构造日志消息对象（WSLogMessage），包含日志内容、级别、时间戳和来源
+     * 3. 如果未提供时间戳，使用当前时间（Date.now()）
+     * 4. 调用 sendMessage() 发送消息
      *
      * 注意事项：
+     * - 如果 enableLogger 为 false，不会发送日志消息，直接返回 false
      * - message 字段为必需，表示日志消息内容
      * - level 字段为必需，使用 LogLevel 枚举值（DEBUG、INFO、WARN、ERROR）
      * - timestamp 字段为可选，未提供时使用当前时间戳
@@ -437,16 +469,22 @@ export class WebSocketConnector {
      * - 日志消息可用于远程调试、问题排查和运行状态监控
      * - 生产环境建议仅发送 WARN 和 ERROR 级别的日志，减少网络传输
      * - 发送失败会返回 false，但不会抛出异常
+     * - enableLogger 状态可通过服务器发送 logger 消息动态控制
      *
      * @param message - 日志消息内容
      * @param level - 日志级别（DEBUG、INFO、WARN、ERROR）
      * @param timestamp - 可选的时间戳，未提供时使用当前时间
      * @param source - 可选的日志来源（如模块名、函数名）
-     * @returns 如果成功发送返回 true，否则返回 false
+     * @returns 如果成功发送返回 true，否则返回 false（包括 Logger 未启用的情况）
      *
-     * 相关代码：src/executor/WebSocketConnector.ts - sendMessage() 方法（发送消息），src/types/websocket_message.ts - WSLogMessage 接口（日志消息类型定义），src/utils/index.ts - LogLevel 枚举（日志级别定义）
+     * 相关代码：src/executor/WebSocketConnector.ts - sendMessage() 方法（发送消息），src/executor/WebSocketConnector.ts - handleLoggerMessage() 方法（处理 Logger 控制消息），src/types/websocket_message.ts - WSLogMessage 接口（日志消息类型定义），src/utils/index.ts - LogLevel 枚举（日志级别定义）
      */
     public sendLogMessage(message: string, level: LogLevel, timestamp?: number, source?: string): boolean {
+        // 如果 Logger 未启用，不发送日志消息
+        if (!this.enableLogger) {
+            return false;
+        }
+
         const logMessage: WSLogMessage = {
             type: 'log',
             data: {

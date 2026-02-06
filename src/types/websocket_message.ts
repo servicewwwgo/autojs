@@ -16,7 +16,7 @@ import type { LogLevel } from '../utils/index';
  * 相关代码：src/executor/WebSocketConnector.ts - handleMessage() 函数（处理接收到的消息），sendMessage() 函数（发送消息）
  */
 export interface WSMessage {
-  type: 'error' | 'login' | 'heartbeat' | 'tabs' | 'instructions' | 'cdp' | 'http' | 'log';
+  type: 'error' | 'login' | 'heartbeat' | 'tabs' | 'instructions' | 'cdp' | 'http' | 'log' | 'logger';
   data?: any;
 }
 
@@ -116,28 +116,33 @@ export interface WSHeartbeatResponse extends WSMessage {
 }
 
 /**
- * 业务逻辑：定义 WebSocket 日志消息的结构，用于客户端向服务器发送日志信息，便于服务器端统一管理和监控客户端运行状态
+ * 业务逻辑：定义 WebSocket 日志消息的结构，用于客户端向服务器发送日志信息，以及服务器向客户端发送的 Logger 控制消息，便于服务器端统一管理和监控客户端运行状态
  *
- * 实现方式：继承自 WSMessage 接口，固定 type 为 'log'，data 字段为必需且包含日志信息对象（message、level、timestamp、source 等）
+ * 实现方式：继承自 WSMessage 接口，type 可以是 'log'（日志消息）或 'logger'（控制消息），data 字段为必需且包含日志信息对象或控制信息对象
  *
  * 注意事项：
- * - type 字段固定为 'log'，不能为其他值
- * - data.message 字段为必需，表示日志消息内容
- * - data.level 字段为必需，使用 LogLevel 枚举值（DEBUG、INFO、WARN、ERROR）
- * - data.timestamp 字段为可选，表示日志时间戳，未提供时由服务器端生成
- * - data.source 字段为可选，表示日志来源（如模块名、函数名），便于定位问题
+ * - type 字段可以是 'log' 或 'logger'
+ * - 当 type 为 'log' 时：
+ *   - data.message 字段为必需，表示日志消息内容
+ *   - data.level 字段为必需，使用 LogLevel 枚举值（DEBUG、INFO、WARN、ERROR）
+ *   - data.timestamp 字段为可选，表示日志时间戳，未提供时由服务器端生成
+ *   - data.source 字段为可选，表示日志来源（如模块名、函数名），便于定位问题
+ * - 当 type 为 'logger' 时：
+ *   - data.enable 字段为必需，true 表示开启 Logger，false 表示关闭 Logger
  * - 日志消息可用于远程调试、问题排查和运行状态监控
  * - 生产环境建议仅发送 WARN 和 ERROR 级别的日志，减少网络传输
+ * - Logger 控制消息用于动态控制日志传输，减少不必要的网络流量
  *
- * 相关代码：src/utils/index.ts - LogLevel 枚举（日志级别定义），LogOptions 接口（日志选项），OutputLogToFile() 函数（日志输出）
+ * 相关代码：src/utils/index.ts - LogLevel 枚举（日志级别定义），LogOptions 接口（日志选项），OutputLogToFile() 函数（日志输出），src/executor/WebSocketConnector.ts - handleLoggerMessage() 函数（处理 Logger 控制消息），sendLogMessage() 函数（根据 enableLogger 状态决定是否发送）
  */
 export interface WSLogMessage extends WSMessage {
-  type: 'log';
+  type: 'log' | 'logger';
   data: {
-    message: string;
-    level: LogLevel;
+    message?: string;
+    level?: LogLevel;
     timestamp?: number;
     source?: string;
+    enable?: boolean;
   };
 }
 
