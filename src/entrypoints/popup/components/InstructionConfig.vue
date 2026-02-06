@@ -46,7 +46,7 @@ const instructionsJson = ref(`[
         "name": "BM View",
         "description": "添加BM界面",
         "selector": "div",
-        "selectorType": "text",
+        "selectorType": "ledby",
         "text": "Create a business portfolio"
       }
     },

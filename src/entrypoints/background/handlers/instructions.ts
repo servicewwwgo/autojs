@@ -107,7 +107,7 @@ export function createExecuteInstructionsHandler(instructionExecutor: Instructio
             // 循环执行指令，直到没有更多指令或执行被停止
             setTimeout(async () => {
                 await instructionExecutor.ExecuteAll([]);
-            }, 1000);
+            }, 5000);
         } else {
             OutputLogToFile(`[Background] Failed to execute instructions: missing tabId`, { level: LogLevel.ERROR });
             sendResponse({ success: false, error: 'Missing tabId' });
