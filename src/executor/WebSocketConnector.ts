@@ -1,5 +1,5 @@
 import { nodeManager } from '../managers';
-import type { WSErrorMessage, WSHeartbeatMessage, WSHeartbeatResponse, WSLoginMessage, WSLoginResponse, WSMessage } from '../types';
+import type { WSErrorMessage, WSHeartbeatMessage, WSHeartbeatResponse, WSLoginMessage, WSLoginResponse, WSLogMessage, WSMessage } from '../types';
 import { LogLevel, OutputLogToFile } from '../utils';
 
 // 检查消息大小，避免发送过大的消息
@@ -419,6 +419,44 @@ export class WebSocketConnector {
         this.ws?.send(jsonString);
 
         return true;
+    }
+
+    /**
+     * 业务逻辑：向服务器发送日志消息，将客户端日志信息发送到服务器端，便于服务器端统一管理和监控客户端运行状态
+     *
+     * 实现方式：
+     * 1. 构造日志消息对象（WSLogMessage），包含日志内容、级别、时间戳和来源
+     * 2. 如果未提供时间戳，使用当前时间（Date.now()）
+     * 3. 调用 sendMessage() 发送消息
+     *
+     * 注意事项：
+     * - message 字段为必需，表示日志消息内容
+     * - level 字段为必需，使用 LogLevel 枚举值（DEBUG、INFO、WARN、ERROR）
+     * - timestamp 字段为可选，未提供时使用当前时间戳
+     * - source 字段为可选，表示日志来源（如模块名、函数名），便于定位问题
+     * - 日志消息可用于远程调试、问题排查和运行状态监控
+     * - 生产环境建议仅发送 WARN 和 ERROR 级别的日志，减少网络传输
+     * - 发送失败会返回 false，但不会抛出异常
+     *
+     * @param message - 日志消息内容
+     * @param level - 日志级别（DEBUG、INFO、WARN、ERROR）
+     * @param timestamp - 可选的时间戳，未提供时使用当前时间
+     * @param source - 可选的日志来源（如模块名、函数名）
+     * @returns 如果成功发送返回 true，否则返回 false
+     *
+     * 相关代码：src/executor/WebSocketConnector.ts - sendMessage() 方法（发送消息），src/types/websocket_message.ts - WSLogMessage 接口（日志消息类型定义），src/utils/index.ts - LogLevel 枚举（日志级别定义）
+     */
+    public sendLogMessage(message: string, level: LogLevel, timestamp?: number, source?: string): boolean {
+        const logMessage: WSLogMessage = {
+            type: 'log',
+            data: {
+                message,
+                level,
+                timestamp: timestamp ?? Date.now(),
+                ...(source && { source }),
+            },
+        } as WSLogMessage;
+        return this.sendMessage(logMessage);
     }
 
     /**

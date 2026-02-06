@@ -4,7 +4,7 @@ export { TabInfo } from './tab';
 
 export { type BackgroundScriptMessageType, type ContentScriptMessageType, type PopupScriptMessageType } from './script_message';
 
-export { WSErrorMessage, WSHeartbeatMessage, WSHeartbeatResponse, WSLoginMessage, WSLoginResponse, WSMessage } from './websocket_message';
+export { WSErrorMessage, WSHeartbeatMessage, WSHeartbeatResponse, WSLoginMessage, WSLoginResponse, WSLogMessage, WSMessage } from './websocket_message';
 
 export { ExecutorStatus } from './executor';
 
