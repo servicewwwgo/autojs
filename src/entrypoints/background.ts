@@ -2,7 +2,7 @@ import { defineBackground } from 'wxt/utils/define-background';
 import { WEBSOCKET_CONN_URL } from '../consts';
 import { CdpExecutor, HttpExecutor, InstructionExecutor, WebSocketConnector } from '../executor';
 import { BackgroundScriptMessageType, ExecutorStatus } from '../types';
-import { LogLevel, OutputLogToFile } from '../utils';
+import { LogLevel, OutputLogToFile, setGlobalWebSocketConnector } from '../utils';
 import {
     getTabs,
     getNodeProfile,
@@ -46,6 +46,9 @@ export default defineBackground(() => {
     const cdpExecutor = new CdpExecutor();
     const httpExecutor = new HttpExecutor();
     const wsConnector: WebSocketConnector = new WebSocketConnector(WEBSOCKET_CONN_URL);
+
+    // 设置全局 WebSocketConnector 引用，使 OutputLogToFile 能够发送日志
+    setGlobalWebSocketConnector(wsConnector);
 
     // 初始化服务
     const webSocketService = new WebSocketService(wsConnector, instructionExecutor, cdpExecutor, httpExecutor);

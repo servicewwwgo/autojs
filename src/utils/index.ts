@@ -1,5 +1,9 @@
 import { DEBUG_MODE } from '../consts';
 import type { BackgroundScriptMessageType, ContentScriptMessageType, PopupScriptMessageType } from '../types';
+import { LogLevel } from '../types/websocket_message';
+
+// 重新导出 LogLevel，保持向后兼容
+export { LogLevel };
 /**
  * 业务逻辑：生成符合 RFC 4122 标准的 UUID v4，用于为节点、指令等实体分配唯一标识符，确保系统内各实体的唯一性
  *
@@ -274,25 +278,22 @@ export async function DisconnectCDP(tabId: number): Promise<void> {
     }
 }
 
+// 全局 WebSocketConnector 引用，用于日志发送
+let globalWsConnector: import('../executor').WebSocketConnector | null = null;
+
 /**
- * 业务逻辑：定义日志级别枚举，用于分类和过滤日志信息，便于调试和问题排查
+ * 业务逻辑：设置全局 WebSocketConnector 引用，使 OutputLogToFile 函数能够通过 WebSocket 发送日志消息
  *
- * 实现方式：使用 TypeScript 枚举类型定义四个日志级别，值为对应的字符串常量
+ * 实现方式：保存 WebSocketConnector 实例到全局变量
  *
  * 注意事项：
- * - DEBUG：调试信息，用于开发阶段详细追踪
- * - INFO：一般信息，记录正常操作流程
- * - WARN：警告信息，表示潜在问题但不影响功能
- * - ERROR：错误信息，表示操作失败或异常情况
- * - 日志级别可用于过滤和显示控制，生产环境可仅显示 WARN 和 ERROR
+ * - 此函数应在 background script 初始化时调用，设置 WebSocketConnector 实例
+ * - 如果未设置，OutputLogToFile 将无法发送日志消息
  *
- * 相关代码：src/utils/index.ts - OutputLogToFile() 函数（使用日志级别），src/consts/index.ts - DEBUG_MODE 常量（控制日志输出）
+ * 相关代码：src/utils/index.ts - OutputLogToFile() 函数（使用此引用），src/entrypoints/background.ts - 设置引用
  */
-export enum LogLevel {
-    DEBUG = 'DEBUG',
-    INFO = 'INFO',
-    WARN = 'WARN',
-    ERROR = 'ERROR'
+export function setGlobalWebSocketConnector(connector: import('../executor').WebSocketConnector | null): void {
+    globalWsConnector = connector;
 }
 
 /**
@@ -302,182 +303,27 @@ export enum LogLevel {
  *
  * 注意事项：
  * - level：日志级别，默认为 LogLevel.INFO
- * - includeTimestamp：是否包含时间戳，当前实现始终包含时间戳
  * - includeSource：是否包含来源信息，需要同时设置 source 字段
  * - source：来源标识（如模块名、函数名），仅在 includeSource 为 true 时生效
- * - filePath：文件路径（预留字段，当前未使用）
  *
- * 相关代码：src/utils/index.ts - OutputLogToFile() 函数（使用此接口），formatLogMessage() 函数（处理选项）
+ * 相关代码：src/utils/index.ts - OutputLogToFile() 函数（使用此接口）
  */
 export interface LogOptions {
     level?: LogLevel;
-    includeTimestamp?: boolean;
     includeSource?: boolean;
     source?: string;
-    filePath?: string;
-}
-
-// 日志缓冲队列
-let logBuffer: Array<{ message: string; timestamp: string; level: LogLevel; source?: string }> = [];
-let logBufferTimer: ReturnType<typeof setTimeout> | null = null;
-const LOG_BUFFER_SIZE = 10; // 缓冲10条日志后批量写入
-const LOG_BUFFER_TIMEOUT = 5000; // 5秒后自动刷新缓冲
-let nativePort: Browser.runtime.Port | null = null;
-
-/**
- * 业务逻辑：初始化 Chrome Native Messaging 连接，建立与本地日志应用的通信通道，用于将日志写入本地文件
- *
- * 实现方式：使用 browser.runtime.connectNative API 连接到本地应用，设置消息和断开连接监听器，管理连接状态
- *
- * 注意事项：
- * - 默认应用名称为 'com.autojs.logger'，需要在 Chrome 中注册 Native Messaging Host
- * - 如果连接已存在且有效，直接返回 true，避免重复连接
- * - 连接断开时会自动将 nativePort 设置为 null，下次调用时会重新连接
- * - 连接失败时会记录警告日志并返回 false，但不影响程序继续运行
- * - 需要配置 native messaging manifest 文件才能正常工作
- *
- * 相关代码：src/utils/index.ts - flushLogBuffer() 函数（调用此函数建立连接），OutputLogToFile() 函数（间接使用）
- */
-function initNativeConnection(applicationName: string = 'com.autojs.logger'): boolean {
-    try {
-        if (nativePort) {
-            // Check if connection is still valid by checking if port exists
-            // Note: postMessage might not throw immediately if connection is broken,
-            // so we rely on onDisconnect listener to set nativePort to null
-            // For now, assume existing port is valid if it exists
-            return true;
-        }
-
-        nativePort = browser.runtime.connectNative(applicationName);
-
-        nativePort.onMessage.addListener((message: any) => {
-            if (message.type === 'error') {
-                console.error('[LogFile] Native application error:', message.error);
-            } else if (message.type === 'success') {
-                // Log write successful
-            }
-        });
-
-        nativePort.onDisconnect.addListener(() => {
-            if (browser.runtime.lastError) {
-                console.warn('[LogFile] Native connection disconnected:', browser.runtime.lastError.message);
-            }
-            nativePort = null;
-        });
-
-        return true;
-    } catch (error) {
-        console.warn('[LogFile] Failed to connect to native application:', error);
-        nativePort = null;
-        return false;
-    }
 }
 
 /**
- * 业务逻辑：将缓冲队列中的日志批量写入本地文件，通过批量操作提高性能，减少 I/O 开销
+ * 业务逻辑：将日志消息通过 WebSocket 发送到服务器，用于远程调试和问题排查
  *
- * 实现方式：复制当前缓冲队列并清空，建立 Native Messaging 连接（如需要），通过 postMessage 发送日志数据，失败时回退到控制台输出
- *
- * 注意事项：
- * - 如果缓冲队列为空，直接返回，不执行任何操作
- * - 如果 Native Messaging 连接失败，会回退到控制台输出，确保日志不丢失
- * - 刷新前会清除定时器，避免重复刷新
- * - 发送失败时会记录错误日志，并将日志输出到控制台作为备份
- *
- * 相关代码：src/utils/index.ts - OutputLogToFile() 函数（触发刷新），FlushLogBuffer() 函数（公开接口）
- */
-function flushLogBuffer(): void {
-    if (logBuffer.length === 0) {
-        return;
-    }
-
-    const logsToWrite = [...logBuffer];
-    logBuffer = [];
-
-    if (logBufferTimer) {
-        clearTimeout(logBufferTimer);
-        logBufferTimer = null;
-    }
-
-    if (!nativePort) {
-        if (!initNativeConnection()) {
-            // Fallback to console output if unable to connect to native application
-            logsToWrite.forEach(log => {
-                const logMessage = `[${log.timestamp}] [${log.level}]${log.source ? ` [${log.source}]` : ''} ${log.message}`;
-                console.log(logMessage);
-            });
-            return;
-        }
-        // After initNativeConnection, check again in case it failed silently
-        if (!nativePort) {
-            // Fallback to console output
-            logsToWrite.forEach(log => {
-                const logMessage = `[${log.timestamp}] [${log.level}]${log.source ? ` [${log.source}]` : ''} ${log.message}`;
-                console.log(logMessage);
-            });
-            return;
-        }
-    }
-
-    try {
-        nativePort.postMessage({
-            type: 'writeLogs',
-            logs: logsToWrite,
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        console.error('[LogFile] Failed to send logs:', error);
-        // Fallback to console output
-        logsToWrite.forEach(log => {
-            const logMessage = `[${log.timestamp}] [${log.level}]${log.source ? ` [${log.source}]` : ''} ${log.message}`;
-            console.log(logMessage);
-        });
-    }
-}
-
-/**
- * 业务逻辑：格式化日志消息，统一日志格式，添加时间戳、级别和来源信息，便于日志分析和问题定位
- *
- * 实现方式：从选项获取日志级别（默认 INFO）和时间戳（ISO 格式），根据 includeSource 选项决定是否包含来源信息
+ * 实现方式：通过全局 WebSocketConnector 引用调用 sendLogMessage 方法发送日志消息
  *
  * 注意事项：
- * - 时间戳始终使用 ISO 8601 格式（如 2026-02-04T10:30:00.000Z）
- * - 如果 includeSource 为 false 或 source 未设置，返回对象中不包含 source 字段
- * - 日志级别默认为 LogLevel.INFO，可通过 options.level 覆盖
- * - 返回的对象格式与日志缓冲队列中的格式一致
- *
- * 相关代码：src/utils/index.ts - OutputLogToFile() 函数（调用此函数格式化日志）
- */
-function formatLogMessage(message: string, options: LogOptions = {}): {
-    message: string;
-    timestamp: string;
-    level: LogLevel;
-    source?: string;
-} {
-    const level = options.level || LogLevel.INFO;
-    const timestamp = new Date().toISOString();
-
-    return {
-        message: message,
-        timestamp,
-        level,
-        source: options.includeSource ? options.source : undefined
-    };
-}
-
-/**
- * 业务逻辑：将日志消息输出到本地文件，用于调试和问题排查，通过缓冲机制批量写入以提高性能，仅在调试模式启用时输出
- *
- * 实现方式：检查 DEBUG_MODE 常量，格式化日志消息并添加到缓冲队列，当缓冲达到大小限制（10条）或超时（5秒）时自动刷新
- *
- * 注意事项：
- * - 仅在 DEBUG_MODE 为 true 时输出日志，生产环境可通过环境变量禁用
  * - 支持字符串和对象类型的消息，对象会自动转换为 JSON 字符串
- * - 使用缓冲机制减少 I/O 操作，提高性能
- * - 缓冲大小：10 条日志后立即刷新
- * - 缓冲超时：5 秒后自动刷新
- * - 如果 Native Messaging 连接失败，会回退到控制台输出
- * - 异常情况下会记录错误日志并输出到控制台
+ * - 如果全局 WebSocketConnector 未设置，函数会静默失败，不抛出异常
+ * - 日志级别默认为 LogLevel.INFO，可通过 options.level 覆盖
+ * - 如果 includeSource 为 true 且 source 已设置，会将 source 信息包含在日志消息中
  *
  * @param message - 日志消息（可以是字符串或对象）
  * @param options - 日志选项（级别、来源等）
@@ -501,84 +347,24 @@ function formatLogMessage(message: string, options: LogOptions = {}): {
  * OutputLogToFile({ tabId: 123, url: 'https://example.com' }, { level: LogLevel.DEBUG });
  * ```
  *
- * 相关代码：src/consts/index.ts - DEBUG_MODE 常量（控制是否输出），src/utils/index.ts - flushLogBuffer() 函数（刷新缓冲）
+ * 相关代码：src/executor/WebSocketConnector.ts - sendLogMessage() 方法（实际发送日志），src/entrypoints/background.ts - 设置全局引用
  */
 export function OutputLogToFile(message: string | object, options: LogOptions = {}): void {
     try {
-        // 只有DEBUG_MODE为true时才输出日志
-        if (!DEBUG_MODE) {
+        // 如果全局 WebSocketConnector 未设置，静默失败
+        if (!globalWsConnector) {
             return;
         }
 
         // 格式化日志消息
-        const formattedLog = formatLogMessage(
-            typeof message === 'string' ? message : JSON.stringify(message),
-            options
-        );
+        const logMessage = typeof message === 'string' ? message : JSON.stringify(message);
+        const level = options.level || LogLevel.INFO;
+        const source = options.includeSource && options.source ? options.source : undefined;
 
-        // 添加到缓冲队列
-        logBuffer.push(formattedLog);
-
-        // 如果缓冲达到大小限制，立即刷新
-        if (logBuffer.length >= LOG_BUFFER_SIZE) {
-            // Clear existing timer before flushing
-            if (logBufferTimer) {
-                clearTimeout(logBufferTimer);
-                logBufferTimer = null;
-            }
-            flushLogBuffer();
-        } else {
-            // 设置定时器，超时后自动刷新
-            if (!logBufferTimer) {
-                logBufferTimer = setTimeout(() => {
-                    logBufferTimer = null; // Clear timer reference before flushing
-                    flushLogBuffer();
-                }, LOG_BUFFER_TIMEOUT);
-            }
-        }
+        // 通过 WebSocket 发送日志消息
+        globalWsConnector.sendLogMessage(logMessage, level, undefined, source);
     } catch (error) {
-        console.error('[LogFile] Log processing failed:', error);
-        console.log(`[${new Date().toISOString()}] [ERROR] ${typeof message === 'string' ? message : JSON.stringify(message)}`);
-    }
-}
-
-/**
- * 业务逻辑：立即刷新日志缓冲队列，确保所有待写入的日志都已保存到文件，通常在应用关闭前或关键操作后调用
- *
- * 实现方式：直接调用内部 flushLogBuffer() 函数，将当前缓冲队列中的所有日志立即写入文件
- *
- * 注意事项：
- * - 此函数会立即执行刷新操作，不等待定时器触发
- * - 建议在应用关闭、页面卸载或关键操作完成后调用，确保日志不丢失
- * - 如果缓冲队列为空，不会执行任何操作
- *
- * 相关代码：src/utils/index.ts - flushLogBuffer() 函数（实际执行刷新），CloseLogConnection() 函数（关闭连接前刷新）
- */
-export function FlushLogBuffer(): void {
-    flushLogBuffer();
-}
-
-/**
- * 业务逻辑：关闭 Native Messaging 连接并刷新日志缓冲，确保所有日志已写入文件，释放资源，通常在应用关闭时调用
- *
- * 实现方式：先刷新日志缓冲确保数据不丢失，然后断开 Native Messaging 连接，捕获并记录断开过程中的错误
- *
- * 注意事项：
- * - 关闭前会先刷新缓冲，确保所有日志都已写入
- * - 如果连接不存在，不会执行断开操作
- * - 断开失败时会记录警告日志，但不抛出异常
- * - 断开后 nativePort 会被设置为 null，下次输出日志时会自动重新连接
- *
- * 相关代码：src/utils/index.ts - flushLogBuffer() 函数（刷新缓冲），initNativeConnection() 函数（重新连接）
- */
-export function CloseLogConnection(): void {
-    flushLogBuffer();
-    if (nativePort) {
-        try {
-            nativePort.disconnect();
-        } catch (error) {
-            console.warn('[LogFile] Error disconnecting:', error);
-        }
-        nativePort = null;
+        // 静默处理错误，避免影响主流程
+        console.error('[LogFile] Failed to send log message:', error);
     }
 }

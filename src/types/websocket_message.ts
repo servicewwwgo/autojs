@@ -1,5 +1,4 @@
 import type { NodeProfile } from './node';
-import type { LogLevel } from '../utils/index';
 
 /**
  * 业务逻辑：定义 WebSocket 消息的基础结构，用于扩展与服务器之间的双向通信，统一消息格式，支持多种消息类型（错误、登录、心跳、指令、CDP、HTTP 等）
@@ -113,6 +112,28 @@ export interface WSHeartbeatMessage extends WSMessage {
 export interface WSHeartbeatResponse extends WSMessage {
   type: 'heartbeat';
   data: { success: boolean };
+}
+
+
+/**
+ * 业务逻辑：定义日志级别枚举，用于分类和过滤日志信息，便于调试和问题排查
+ *
+ * 实现方式：使用 TypeScript 枚举类型定义四个日志级别，值为对应的字符串常量
+ *
+ * 注意事项：
+ * - DEBUG：调试信息，用于开发阶段详细追踪
+ * - INFO：一般信息，记录正常操作流程
+ * - WARN：警告信息，表示潜在问题但不影响功能
+ * - ERROR：错误信息，表示操作失败或异常情况
+ * - 日志级别可用于过滤和显示控制，生产环境可仅显示 WARN 和 ERROR
+ *
+ * 相关代码：src/utils/index.ts - OutputLogToFile() 函数（使用日志级别），src/consts/index.ts - DEBUG_MODE 常量（控制日志输出）
+ */
+export enum LogLevel {
+  DEBUG = 'DEBUG',
+  INFO = 'INFO',
+  WARN = 'WARN',
+  ERROR = 'ERROR'
 }
 
 /**
