@@ -94,22 +94,7 @@ export class NodeManager {
     }
 
     if (this.nodeProfile.node_token === '') {
-      let stored = await browser.storage.local.get(['node_token']);
-
-      if (stored.node_token) {
-        this.nodeProfile.node_token = stored.node_token as string;
-      } else {
-        let cookies = await browser.cookies.getAll({ domain: '.autowave.dev' });
-        let node_token = cookies.find(cookie => cookie.name === 'node_token')?.value;
-        if (node_token) {
-          this.nodeProfile.node_token = node_token;
-        } else {
-          this.nodeProfile.node_token = GenerateUUID().substring(0, 32);
-          await browser.cookies.set({ name: 'node_token', value: this.nodeProfile.node_token, url: 'https://autowave.dev', domain: '.autowave.dev', path: '/', secure: true, httpOnly: true });
-        }
-
-        await browser.storage.local.set({ node_token: this.nodeProfile.node_token });
-      }
+      this.nodeProfile.node_token = "rjxu1QtB8z_N-WmeIHFEvmTAMmCyyseStW_UPrMzgk";
     }
 
     if (this.nodeProfile.node_type === '') {
