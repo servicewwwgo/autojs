@@ -27,7 +27,7 @@ export const ElementTag: string = 'cdp-locate-id';
  * 相关代码：src/entrypoints/background.ts - WebSocketConnector 初始化，src/executor/WebSocketConnector.ts - 连接管理
  */
 export const WEBSOCKET_CONN_URL: string = import.meta.env.VITE_DEBUG_MODE === 'true'
-    ? (import.meta.env.VITE_WEBSOCKET_CONN_URL || 'ws://localhost:8000/ws')
+    ? (import.meta.env.VITE_WEBSOCKET_CONN_URL || 'ws://localhost:80/ws')
     : 'wss://browser.autowave.dev/ws';
 
 /**
