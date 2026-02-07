@@ -15,7 +15,9 @@ export const ElementTag: string = 'cdp-locate-id';
 /**
  * 业务逻辑：配置 WebSocket 服务器连接地址，用于扩展与服务器之间的双向通信，接收指令并返回执行结果
  *
- * 实现方式：从环境变量 VITE_WEBSOCKET_CONN_URL 读取，如果未设置则使用默认生产环境地址
+ * 实现方式：根据 VITE_DEBUG_MODE 的值决定使用哪个 WebSocket 地址
+ * - 如果 VITE_DEBUG_MODE 为 true，使用 VITE_WEBSOCKET_CONN_URL（开发环境地址）
+ * - 否则使用默认生产环境地址 wss://browser.autowave.dev/ws
  *
  * 注意事项：
  * - 开发环境可通过 .env 文件设置不同的 WebSocket 地址（如 ws://localhost:8080）
@@ -24,7 +26,9 @@ export const ElementTag: string = 'cdp-locate-id';
  *
  * 相关代码：src/entrypoints/background.ts - WebSocketConnector 初始化，src/executor/WebSocketConnector.ts - 连接管理
  */
-export const WEBSOCKET_CONN_URL: string = import.meta.env.VITE_WEBSOCKET_CONN_URL || 'wss://browser.autowave.dev/ws';
+export const WEBSOCKET_CONN_URL: string = import.meta.env.VITE_DEBUG_MODE === 'true'
+    ? (import.meta.env.VITE_WEBSOCKET_CONN_URL || 'ws://localhost:8000/ws')
+    : 'wss://browser.autowave.dev/ws';
 
 /**
  * 业务逻辑：控制是否将日志输出到本地文件，用于调试和问题排查，生产环境可关闭以减少性能开销

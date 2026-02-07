@@ -1,4 +1,3 @@
-import { DEBUG_MODE } from '../consts';
 import type { BackgroundScriptMessageType, ContentScriptMessageType, PopupScriptMessageType } from '../types';
 import { LogLevel } from '../types/websocket_message';
 
