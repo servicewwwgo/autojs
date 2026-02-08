@@ -59,3 +59,18 @@ export const DEBUG_MODE: boolean = import.meta.env.VITE_DEBUG_MODE === undefined
  * 相关代码：src/entrypoints/popup/App.vue - 版本显示，sync-version.js - 版本同步脚本
  */
 export const APP_VERSION: string = import.meta.env.VITE_APP_VERSION;
+
+/**
+ * 业务逻辑：存储节点默认令牌，用于 WebSocket 连接时的身份验证，当节点未配置自定义令牌时使用此默认值
+ *
+ * 实现方式：优先从环境变量 VITE_DEFAULT_NODE_TOKEN 读取，如果未设置则使用硬编码的默认值
+ *
+ * 注意事项：
+ * - 该令牌用于节点与服务器之间的身份验证
+ * - 如果节点配置了自定义令牌，优先使用自定义令牌
+ * - 默认令牌应保持安全，避免泄露
+ * - 可通过 .env 文件设置 VITE_DEFAULT_NODE_TOKEN 环境变量来自定义默认令牌
+ *
+ * 相关代码：src/managers/NodeManager.ts - GetNodeProfile() 函数（使用此默认值）
+ */
+export const DEFAULT_NODE_TOKEN: string = import.meta.env.VITE_DEFAULT_NODE_TOKEN;

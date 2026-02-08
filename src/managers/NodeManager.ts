@@ -1,4 +1,5 @@
 import type { NodeProfile } from '../types';
+import { DEFAULT_NODE_TOKEN } from '../consts';
 import { GenerateUUID, GetBitBrowserTabSequence, LogLevel, OutputLogToFile } from '../utils';
 
 /**
@@ -94,7 +95,7 @@ export class NodeManager {
     }
 
     if (this.nodeProfile.node_token === '') {
-      this.nodeProfile.node_token = "rjxu1QtB8z_N-WmeIHFEvmTAMmCyyseStW_UPrMzgk";
+      this.nodeProfile.node_token = DEFAULT_NODE_TOKEN;
     }
 
     if (this.nodeProfile.node_type === '') {
