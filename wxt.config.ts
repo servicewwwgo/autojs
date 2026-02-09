@@ -1,6 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig } from 'wxt';
-import { readFileSync } from 'node:fs';
 
 // 从 package.json 读取版本号作为单一数据源
 const packageJson = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
@@ -24,7 +24,6 @@ export default defineConfig({
       'scripting',
       'alarms',
       'debugger',
-      'nativeMessaging',
       'cookies',
       'background'
     ],
@@ -47,7 +46,7 @@ export default defineConfig({
   vite: () => ({
     base: '', // 使用空字符串作为 base，生成相对路径
     build: {
-      sourcemap: true,
+      sourcemap: false,
       rollupOptions: {
         output: {
           // 确保资源路径是相对路径
