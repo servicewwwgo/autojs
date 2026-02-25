@@ -125,7 +125,9 @@ export class InstructionExecutor {
    *
    * 实现方式：校验标签页存在 → 建立 CDP 并启用域 → 循环取指令、执行、更新统计与结果；调用方通过 runningTabIds 保证同一 tabId 不会并发执行
    *
-   * 注意事项：仅处理当前 tabId，不阻塞其它标签页；统计与 ResultManager 为多标签页共享，由 JS 单线程保证写入顺序；执行期间新加入该 tab 的指令会在本循环下一轮被取出，无需再次触发 runTabLoop
+   * 注意事项：
+   * - 仅处理当前 tabId，不阻塞其它标签页；统计与 ResultManager 为多标签页共享，由 JS 单线程保证写入顺序；执行期间新加入该 tab 的指令会在本循环下一轮被取出，无需再次触发 runTabLoop
+   * - 若某条指令执行失败且该指令不可忽略错误（ignoreError 为 false），则不再执行后续指令，并将该 tab 队列中剩余指令全部标记为失败结果（error 为 "Skipped due to previous instruction failure (cascading failure)"）并保存后发送
    *
    * @param tabId - 要执行指令的标签页 ID
    */
@@ -161,6 +163,7 @@ export class InstructionExecutor {
 
       while (true) {
         const instruction = this.instructionManager.GetFirstInstructionByTabId(tabId);
+
         if (!instruction) {
           break;
         }
@@ -179,6 +182,23 @@ export class InstructionExecutor {
         this.resultManager.SaveResult(result);
 
         if (!instruction.ignoreError && !result.success) {
+          // 不可忽略的失败：不执行后续指令，将队列中剩余指令全部标记为失败并保存结果
+          const remaining = this.instructionManager.GetInstructionsByTabId(tabId) ?? [];
+          const remainingCopy = remaining.length > 0 ? [...remaining] : [];
+          for (const inst of remainingCopy) {
+            const failedResult: InstructionResult = {
+              tabId: inst.tabId,
+              instructionID: inst.instructionID,
+              success: false,
+              duration: 0,
+              error: 'Skipped due to previous instruction failure (cascading failure)',
+            };
+            this.executedCount++;
+            this.errorCount++;
+            this.resultManager.SaveResult(failedResult);
+            OutputLogToFile(`[InstructionExecutor] Instruction marked as failed (skipped): ${inst.instructionID} (${inst.type})`, { level: LogLevel.WARN });
+          }
+          this.instructionManager.DeleteInstructionsByTabId(tabId);
           break;
         }
       }
