@@ -16,7 +16,6 @@
     <main class="content">
       <NodeConfig v-if="activeTab === 'node'" />
       <InstructionConfig v-if="activeTab === 'instruction'" />
-      <ExecutionControl v-if="activeTab === 'control'" />
       <ExecutionLog v-if="activeTab === 'log'" />
     </main>
   </div>
@@ -25,7 +24,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { APP_VERSION } from '../../consts';
-import ExecutionControl from './components/ExecutionControl.vue';
 import ExecutionLog from './components/ExecutionLog.vue';
 import InstructionConfig from './components/InstructionConfig.vue';
 import NodeConfig from './components/NodeConfig.vue';
@@ -36,7 +34,6 @@ const version = APP_VERSION;
 const tabs = [
   { id: 'node', label: '节点配置' },
   { id: 'instruction', label: '指令配置' },
-  { id: 'control', label: '执行控制' },
   { id: 'log', label: '执行日志' }
 ];
 </script>

@@ -14,7 +14,7 @@
  * - 状态信息由 InstructionExecutor 的 GetStatus() 方法返回，会定期更新
  * - 在 popup UI 中，这些字段用于显示执行进度和状态，帮助用户了解自动化任务的执行情况
  *
- * 相关代码：src/executor/InstructionExecutor.ts - GetStatus() 方法（返回此类型状态），src/entrypoints/popup/components/ExecutionControl.vue - 执行控制组件（显示状态信息）
+ * 相关代码：src/executor/InstructionExecutor.ts - GetStatus() 方法（返回此类型状态）
  */
 export interface ExecutorStatus {
   stopRequested: boolean;

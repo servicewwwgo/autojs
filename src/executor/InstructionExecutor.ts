@@ -12,7 +12,7 @@ import { EnsureCDPConnected, ExecuteCDPCommand, LogLevel, OutputLogToFile } from
  * - 执行器采用 FIFO（先进先出）队列模式，按标签页分组执行指令
  * - 执行前会确保 CDP 连接并启用必要的 CDP 域（DOM、CSS、Page、Runtime）
  * - 如果标签页不存在，会自动清理该标签页的所有待执行指令，避免重复尝试
- * - 执行循环最多运行 10 次，每次处理完所有标签页的指令后继续下一轮
+ * - 主循环在「无待执行标签页」或「收到停止请求」时退出；每轮内各标签页并发执行，互不阻塞
  * - 暂停状态下会等待 100ms 后继续检查，不会执行新指令
  * - 停止操作会清空所有结果，重置执行状态
  * - 执行结果会通过 sendResult 回调函数发送（通常发送到 WebSocket）
@@ -140,7 +140,7 @@ export class InstructionExecutor {
    *
    * @returns 执行器状态对象，包含运行状态和统计信息
    *
-   * 相关代码：src/types/executor.ts - ExecutorStatus 接口（返回类型定义），src/entrypoints/popup/components/ExecutionControl.vue - 执行控制组件（显示状态）
+   * 相关代码：src/types/executor.ts - ExecutorStatus 接口（返回类型定义）
    */
   public GetStatus(): ExecutorStatus {
     return {
@@ -198,18 +198,19 @@ export class InstructionExecutor {
    * 实现方式：
    * 1. 将指令添加到 InstructionManager，按标签页分组管理
    * 2. 初始化执行状态（isRunning、isPaused、stopRequested、统计计数器）
-   * 3. 执行循环最多运行 10 轮，每轮处理所有标签页的指令
-   * 4. 对每个标签页：确保 CDP 连接、启用必要的 CDP 域、按顺序执行该标签页的所有指令
+   * 3. 主循环：在无待执行标签页或收到停止请求时退出；每轮并发处理所有标签页的指令（各标签页互不阻塞）
+   * 4. 每轮使用 Promise.all 并发执行各标签页的 runTabLoop，每个标签页独立：确保 CDP 连接、启用域、按顺序执行该标签页指令
    * 5. 执行每个指令后更新统计信息，保存结果到 ResultManager
    * 6. 每个标签页的指令执行完成后，通过 sendResult 回调发送结果
    * 7. 如果标签页不存在，自动清理该标签页的所有指令
-   * 8. 暂停状态下等待恢复，停止请求时退出循环
+   * 8. 暂停状态下先等待恢复，停止请求时退出主循环
    *
    * 注意事项：
    * - 如果执行器已在运行，重复调用会直接返回，不会执行新的指令
+   * - 各标签页并发执行，一个标签页的指令不会阻塞其它标签页
    * - 执行前会确保 CDP 连接并启用 DOM、CSS、Page、Runtime 域
    * - 标签页不存在时会自动清理该标签页的指令，避免重复尝试
-   * - 执行循环最多 10 轮，防止无限循环
+   * - 主循环在无待执行标签页时自然结束
    * - 暂停状态下每 100ms 检查一次是否恢复
    * - 执行结果会在每个标签页的指令全部完成后统一发送
    * - 无论是否发生异常，finally 块都会重置执行状态
@@ -219,14 +220,12 @@ export class InstructionExecutor {
    * 相关代码：src/managers/InstructionManager.ts - AddUnfilteredInstructions() 方法（添加指令），src/managers/InstructionResultManager.ts - SaveResult() 方法（保存结果），src/utils/index.ts - EnsureCDPConnected() 和 ExecuteCDPCommand() 函数（CDP 操作）
    */
   public async ExecuteAll(instructions: BaseInstructionClass[]): Promise<void> {
-
     this.instructionManager.AddUnfilteredInstructions(instructions);
 
-    if (this.isRunning === true) {
+    if (this.isRunning) {
       return;
     }
 
-    // 业务逻辑：初始化执行器状态，准备开始执行指令 | 实现方式：设置运行标志、重置暂停和停止标志 | 注意事项：必须在执行循环前设置，确保状态一致
     this.isRunning = true;
     this.isPaused = false;
     this.stopRequested = false;
@@ -234,111 +233,113 @@ export class InstructionExecutor {
     OutputLogToFile(`[InstructionExecutor] Execution started, pending instructions: ${instructions.length}`, { level: LogLevel.INFO });
 
     try {
-      // 业务逻辑：执行指令循环，最多运行 10 轮，每轮处理所有标签页的指令 | 实现方式：使用 for 循环，每轮遍历所有标签页 | 注意事项：限制轮数防止无限循环，每轮处理完所有标签页后继续下一轮
-      for (let i = 0; i < 10; i++) {
-        // 业务逻辑：检查停止请求，如果已请求停止则退出执行循环 | 实现方式：检查 stopRequested 标志 | 注意事项：停止标志在 Stop() 方法中设置，当前指令完成后才会退出
-        if (this.stopRequested) {
-          break;
-        }
-
-        // 业务逻辑：检查暂停状态，如果已暂停则等待恢复 | 实现方式：检查 isPaused 标志，等待 100ms 后继续检查 | 注意事项：暂停时不会执行新指令，但会定期检查是否恢复
-        if (this.isPaused) {
-          await this.Delay(100);
-          continue;
-        }
+      while (true) {
+        if (this.stopRequested) break;
+        await this.waitWhilePaused();
+        if (this.stopRequested) break;
 
         const tabIds = this.instructionManager.GetAllTabIds();
+        if (tabIds.length === 0) break;
 
-        if (tabIds.length === 0) {
-          break;
-        }
-
-        for (const tabId of tabIds) {
-          try {
-            // 如果标签页不存在，则跳过并清理该 tab 的指令
-            let tab;
-
-            try {
-              tab = await browser.tabs.get(tabId);
-            } catch (tabError) {
-              const errorMsg = tabError instanceof Error ? tabError.message : String(tabError);
-              // 如果 tab 不存在，清理该 tab 的所有指令，避免重复尝试
-              if (errorMsg.includes('No tab with id') || errorMsg.includes('No tab with given id')) {
-                const instructionCount = this.instructionManager.GetCountByTabId(tabId);
-                this.instructionManager.DeleteInstructionsByTabId(tabId);
-                OutputLogToFile(`[InstructionExecutor] Tab ${tabId} does not exist, removed ${instructionCount} pending instructions`, { level: LogLevel.WARN });
-                continue;
-              }
-              throw tabError;
-            }
-
-            if (!tab || tab.id !== tabId) {
-              const instructionCount = this.instructionManager.GetCountByTabId(tabId);
-              this.instructionManager.DeleteInstructionsByTabId(tabId);
-              OutputLogToFile(`[InstructionExecutor] Tab not found or ID mismatch, tabId: ${tabId}, removed ${instructionCount} pending instructions`, { level: LogLevel.WARN });
-              continue;
-            }
-
-            // 业务逻辑：确保 CDP 连接并启用必要的域，为执行指令做准备 | 实现方式：调用 EnsureCDPConnected 建立连接，然后启用 DOM、CSS、Page、Runtime 域 | 注意事项：CDP 连接是执行指令的前提条件，某些指令需要特定的域已启用
-            await EnsureCDPConnected(tabId);
-
-            // 启用必要的 CDP 域：DOM（元素查找和操作）、CSS（样式查询）、Page（页面导航和截图）、Runtime（JavaScript 执行）
-            await ExecuteCDPCommand(tabId, 'DOM.enable');
-            await ExecuteCDPCommand(tabId, 'CSS.enable');
-            await ExecuteCDPCommand(tabId, 'Page.enable');
-            await ExecuteCDPCommand(tabId, 'Runtime.enable');
-
-            // 业务逻辑：按 FIFO 顺序执行该标签页的所有指令，直到队列为空 | 实现方式：循环获取并执行第一个指令，直到没有更多指令 | 注意事项：指令按添加顺序执行，每个指令执行完成后立即保存结果
-            while (true) {
-              // 从指令管理器获取第一个待执行的指令（FIFO 队列）
-              const instruction = this.instructionManager.GetFirstInstructionByTabId(tabId);
-
-              if (!instruction) {
-                break; // 该标签页的指令已全部执行完成
-              }
-
-              // 业务逻辑：执行单个指令并获取结果 | 实现方式：调用指令的 Execute() 方法，该方法会返回执行结果 | 注意事项：执行是异步的，会等待指令完成
-              const result: InstructionResult = await instruction.Execute();
-
-              // 业务逻辑：更新执行统计信息，记录总执行数、成功数和失败数 | 实现方式：根据执行结果更新计数器 | 注意事项：统计信息用于 UI 显示和性能分析
-              this.executedCount++; // 总执行数 +1
-
-              if (result.success) {
-                this.successCount++; // 成功数 +1
-                OutputLogToFile(`[InstructionExecutor] Instruction executed successfully: ${instruction.instructionID} (${instruction.type}), duration: ${result.duration}ms`, { level: LogLevel.INFO });
-              } else {
-                this.errorCount++; // 失败数 +1
-                OutputLogToFile(`[InstructionExecutor] Instruction execution failed: ${instruction.instructionID} (${instruction.type}), error: ${result.error || 'unknown error'}, duration: ${result.duration}ms`, { level: LogLevel.ERROR });
-              }
-
-              // 业务逻辑：保存执行结果到结果管理器，用于后续发送给服务器 | 实现方式：调用 ResultManager.SaveResult() 方法 | 注意事项：结果会按标签页分组保存
-              this.resultManager.SaveResult(result);
-            }
-
-            // 业务逻辑：获取该标签页的所有执行结果并发送给服务器，然后清空结果缓存 | 实现方式：从 ResultManager 获取并删除结果，通过 sendResult 回调发送 | 注意事项：结果发送后会被删除，避免重复发送
-            const results = this.resultManager.GetResultAndDelete(tabId) ?? [];
-            this.sendResult?.({ tabId: tabId, results: results });
-          } catch (error) {
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            // 如果是因为 tab 不存在导致的错误，清理该 tab 的指令
-            if (errorMsg.includes('No tab with id') || errorMsg.includes('No tab with given id')) {
-              const instructionCount = this.instructionManager.GetCountByTabId(tabId);
-              this.instructionManager.DeleteInstructionsByTabId(tabId);
-              OutputLogToFile(`[InstructionExecutor] Tab ${tabId} does not exist, removed ${instructionCount} pending instructions`, { level: LogLevel.WARN });
-            } else {
-              OutputLogToFile(`[InstructionExecutor] Error processing tab ${tabId}: ${errorMsg}`, { level: LogLevel.ERROR });
-            }
-          }
-        }
+        await Promise.all(tabIds.map(tabId => this.runTabLoop(tabId)));
       }
     } catch (error) {
       OutputLogToFile(`[InstructionExecutor] Execution error: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
     } finally {
-      // 业务逻辑：确保无论是否发生异常，都重置执行状态，防止状态不一致 | 实现方式：在 finally 块中重置所有状态标志 | 注意事项：必须重置状态，否则下次执行可能无法正常启动
       this.isRunning = false;
       this.isPaused = false;
       this.stopRequested = false;
       OutputLogToFile(`[InstructionExecutor] Execution finished, statistics: total=${this.executedCount}, success=${this.successCount}, failed=${this.errorCount}`, { level: LogLevel.INFO });
+    }
+  }
+
+  /**
+   * 业务逻辑：在暂停状态下等待恢复，避免空转占用 CPU
+   *
+   * 实现方式：循环检查 isPaused，每次等待 100ms 再检查，直到未暂停或收到停止请求
+   *
+   * 注意事项：若已请求停止，会立即返回，不再等待
+   */
+  private async waitWhilePaused(): Promise<void> {
+    while (this.isPaused && !this.stopRequested) {
+      await this.Delay(100);
+    }
+  }
+
+  /**
+   * 业务逻辑：在单个标签页内按 FIFO 顺序执行该标签页的指令队列，确保 CDP 连接、启用域、收集结果并发送，支持暂停与停止
+   *
+   * 实现方式：校验标签页存在 → 建立 CDP 并启用域 → 循环取指令、执行、更新统计与结果，遇暂停则等待、遇停止则退出
+   *
+   * 注意事项：仅处理当前 tabId，不阻塞其它标签页；统计与 ResultManager 为多标签页共享，由 JS 单线程保证写入顺序
+   *
+   * @param tabId - 要执行指令的标签页 ID
+   */
+  private async runTabLoop(tabId: number): Promise<void> {
+    try {
+      let tab;
+
+      try {
+        tab = await browser.tabs.get(tabId);
+      } catch (tabError) {
+        const errorMsg = tabError instanceof Error ? tabError.message : String(tabError);
+        if (errorMsg.includes('No tab with id') || errorMsg.includes('No tab with given id')) {
+          const instructionCount = this.instructionManager.GetCountByTabId(tabId);
+          this.instructionManager.DeleteInstructionsByTabId(tabId);
+          OutputLogToFile(`[InstructionExecutor] Tab ${tabId} does not exist, removed ${instructionCount} pending instructions`, { level: LogLevel.WARN });
+          return;
+        }
+        throw tabError;
+      }
+
+      if (!tab || tab.id !== tabId) {
+        const instructionCount = this.instructionManager.GetCountByTabId(tabId);
+        this.instructionManager.DeleteInstructionsByTabId(tabId);
+        OutputLogToFile(`[InstructionExecutor] Tab not found or ID mismatch, tabId: ${tabId}, removed ${instructionCount} pending instructions`, { level: LogLevel.WARN });
+        return;
+      }
+
+      await EnsureCDPConnected(tabId);
+      await ExecuteCDPCommand(tabId, 'DOM.enable');
+      await ExecuteCDPCommand(tabId, 'CSS.enable');
+      await ExecuteCDPCommand(tabId, 'Page.enable');
+      await ExecuteCDPCommand(tabId, 'Runtime.enable');
+
+      while (true) {
+        if (this.stopRequested) break;
+        await this.waitWhilePaused();
+        if (this.stopRequested) break;
+
+        const instruction = this.instructionManager.GetFirstInstructionByTabId(tabId);
+        if (!instruction) {
+          break;
+        }
+
+        const result: InstructionResult = await instruction.Execute();
+
+        this.executedCount++;
+        if (result.success) {
+          this.successCount++;
+          OutputLogToFile(`[InstructionExecutor] Instruction executed successfully: ${instruction.instructionID} (${instruction.type}), duration: ${result.duration}ms`, { level: LogLevel.INFO });
+        } else {
+          this.errorCount++;
+          OutputLogToFile(`[InstructionExecutor] Instruction execution failed: ${instruction.instructionID} (${instruction.type}), error: ${result.error || 'unknown error'}, duration: ${result.duration}ms`, { level: LogLevel.ERROR });
+        }
+
+        this.resultManager.SaveResult(result);
+      }
+
+      const results = this.resultManager.GetResultAndDelete(tabId) ?? [];
+      this.sendResult?.({ tabId: tabId, results: results });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      if (errorMsg.includes('No tab with id') || errorMsg.includes('No tab with given id')) {
+        const instructionCount = this.instructionManager.GetCountByTabId(tabId);
+        this.instructionManager.DeleteInstructionsByTabId(tabId);
+        OutputLogToFile(`[InstructionExecutor] Tab ${tabId} does not exist, removed ${instructionCount} pending instructions`, { level: LogLevel.WARN });
+      } else {
+        OutputLogToFile(`[InstructionExecutor] Error processing tab ${tabId}: ${errorMsg}`, { level: LogLevel.ERROR });
+      }
     }
   }
 

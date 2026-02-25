@@ -133,7 +133,7 @@ export async function SendMessageToContentScript(tabId: number, message: Content
  * - 如果 background script 未响应或发送失败，会通过 runtime.lastError 返回错误
  * - 返回的 Promise 会在收到 background script 的响应后 resolve，如果发送失败则 reject
  *
- * 相关代码：src/entrypoints/background.ts - 消息监听器（接收消息），src/entrypoints/popup/components/ExecutionControl.vue - 执行控制组件（发送消息）
+ * 相关代码：src/entrypoints/background.ts - 消息监听器（接收消息）
  */
 export async function SendMessageToBackgroundScript(message: BackgroundScriptMessageType): Promise<any> {
     return new Promise((resolve, reject) => {
