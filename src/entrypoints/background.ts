@@ -1,7 +1,7 @@
 import { defineBackground } from 'wxt/utils/define-background';
 import { WEBSOCKET_CONN_URL } from '../consts';
 import { CdpExecutor, HttpExecutor, InstructionExecutor, WebSocketConnector } from '../executor';
-import { BackgroundScriptMessageType, ExecutorStatus } from '../types';
+import { BackgroundScriptMessageType } from '../types';
 import { LogLevel, OutputLogToFile, setGlobalWebSocketConnector } from '../utils';
 import {
     getTabs,
@@ -9,9 +9,6 @@ import {
     updateNodeProfile,
     createAddInstructionsHandler,
     createExecuteInstructionsHandler,
-    createPauseExecutionHandler,
-    createStopExecutionHandler,
-    createGetExecutorStatusHandler,
     createGetResultsHandler,
     createClearResultsHandler,
     createConnectWebSocketHandler,
@@ -108,9 +105,6 @@ export default defineBackground(() => {
         'update_node_profile': updateNodeProfile,
         'add_instructions': createAddInstructionsHandler(instructionExecutor),
         'execute_instructions': createExecuteInstructionsHandler(instructionExecutor),
-        'pause_execution': createPauseExecutionHandler(instructionExecutor),
-        'stop_execution': createStopExecutionHandler(instructionExecutor),
-        'get_executor_status': createGetExecutorStatusHandler(instructionExecutor),
         'get_results': createGetResultsHandler(instructionExecutor),
         'clear_results': createClearResultsHandler(instructionExecutor),
         'connect_websocket': createConnectWebSocketHandler(webSocketService.getConnector()),
