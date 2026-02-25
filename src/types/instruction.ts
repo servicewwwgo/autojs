@@ -539,13 +539,13 @@ export interface SetAttributeInstruction extends BaseInstruction {
 }
 
 /**
- * 业务逻辑：定义页面截图指令，用于捕获当前页面或元素的截图，支持全页面截图和指定格式
+ * 业务逻辑：定义页面截图指令，用于捕获当前页面或元素的截图，支持全页面截图、指定元素截图和指定格式
  *
- * 实现方式：继承自 BaseInstruction 接口，固定 type 为 'screenshot'，params 包含 format、quality、fullPage 字段
+ * 实现方式：继承自 BaseInstruction 接口，固定 type 为 'screenshot'，params 包含 format、quality、fullPage、elementName 字段
  *
- * 注意事项：format 为图片格式（png 或 jpeg，默认 png），quality 为 JPEG 质量（0-100，默认 90），fullPage 为是否截取整个页面（默认 false，仅截取可视区域）
+ * 注意事项：format 为图片格式（png 或 jpeg，默认 png），quality 为 JPEG 质量（0-100，默认 90），fullPage 为是否截取整个页面（默认 false，仅截取可视区域），elementName 为可选元素名称（需先通过 find_element 指令定位），指定时仅截取该元素区域
  *
- * 相关代码：src/instructions/ScreenshotInstruction.ts - ScreenshotInstructionClass 类（执行此指令）
+ * 相关代码：src/instructions/ScreenshotInstruction.ts - ScreenshotInstructionClass 类（执行此指令），src/managers/ElementManager.ts - GetElementByName() 方法（按名称获取元素）
  */
 export interface ScreenshotInstruction extends BaseInstruction {
   type: 'screenshot';
@@ -553,6 +553,8 @@ export interface ScreenshotInstruction extends BaseInstruction {
     format?: 'png' | 'jpeg';
     quality?: number;
     fullPage?: boolean;
+    /** 元素名称，需先通过 find_element 指令定位；指定时仅截取该元素区域，优先级高于 fullPage */
+    elementName?: string;
   };
 }
 
