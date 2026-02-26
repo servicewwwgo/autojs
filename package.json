@@ -2,7 +2,7 @@
   "name": "web-crawler-extension",
   "description": "Web自动化爬虫Chrome扩展",
   "private": true,
-  "version": "1.2.36",
+  "version": "1.2.40",
   "type": "module",
   "scripts": {
     "dev": "npm run sync-version && wxt -b chrome --mode development",

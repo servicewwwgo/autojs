@@ -1288,7 +1288,7 @@ export class CdpExecutor {
      *
      * 相关代码：src/executor/CdpExecutor.ts - handleCreateTabAndNavigate() 方法（创建标签页后调用）
      */
-    private async waitForTabLoadComplete(tabId: number, timeout: number = 120000): Promise<void> {
+    private async waitForTabLoadComplete(tabId: number, timeout: number = 60000): Promise<void> {
         // 首先检查标签页是否已经加载完成
         try {
             const tab = await browser.tabs.get(tabId);
