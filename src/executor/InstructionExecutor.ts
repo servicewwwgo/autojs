@@ -86,6 +86,26 @@ export class InstructionExecutor {
   }
 
   /**
+   * 业务逻辑：在标签页被关闭时清理该标签页相关的所有资源，避免内存泄漏；由 browser.tabs.onRemoved 触发调用
+   *
+   * 实现方式：从 InstructionManager 删除该 tab 的待执行指令、从 ResultManager 清除该 tab 的结果、从 runningTabIds 移除该 tabId
+   *
+   * 注意事项：
+   * - 必须在标签页关闭时调用，否则指令队列、结果缓存和 runningTabIds 会持续保留已关闭 tab 的条目，导致内存膨胀
+   * - 与 ElementManager.ClearTabElements、CdpExecutor 的 clearConsoleLogs/clearNetworkLogs 一起在 onRemoved 中调用
+   *
+   * @param tabId - 已关闭的标签页 ID
+   *
+   * 相关代码：src/entrypoints/background.ts - tabs.onRemoved 监听器中调用
+   */
+  public cleanupTab(tabId: number): void {
+    this.instructionManager.DeleteInstructionsByTabId(tabId);
+    this.resultManager.ClearResult(tabId);
+    this.runningTabIds.delete(tabId);
+    OutputLogToFile(`[InstructionExecutor] Cleaned up resources for closed tab: ${tabId}`, { level: LogLevel.INFO });
+  }
+
+  /**
    * 业务逻辑：将新指令加入队列，并为「有待执行指令且当前未在运行」的标签页启动 runTabLoop；无主循环，依赖「新指令到达时再次调用 ExecuteAll」驱动执行。
    *
    * 实现方式：
@@ -203,6 +223,7 @@ export class InstructionExecutor {
         }
       }
 
+      // 正常结束或 cascading failure 后，统一在本轮 runTabLoop 末尾上报该 tab 的所有结果
       const results = this.resultManager.GetResultAndDelete(tabId) ?? [];
       this.sendResult?.({ tabId: tabId, results: results });
     } catch (error) {

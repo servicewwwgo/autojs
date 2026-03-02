@@ -1,6 +1,7 @@
 import { defineBackground } from 'wxt/utils/define-background';
 import { WEBSOCKET_CONN_URL } from '../consts';
 import { CdpExecutor, HttpExecutor, InstructionExecutor, WebSocketConnector } from '../executor';
+import { elementManager } from '../managers';
 import { BackgroundScriptMessageType } from '../types';
 import { LogLevel, OutputLogToFile, setGlobalWebSocketConnector } from '../utils';
 import {
@@ -196,12 +197,31 @@ export default defineBackground(() => {
     });
 
     /**
+     * 业务逻辑：监听标签页关闭事件，释放该标签页占用的所有资源，防止因多次开关标签页导致内存膨胀
+     *
+     * 实现方式：在 tabs.onRemoved 中调用各管理器的按 tab 清理方法：InstructionExecutor.cleanupTab、ElementManager.ClearTabElements、CdpExecutor 的 clearConsoleLogs/clearNetworkLogs
+     *
+     * 注意事项：
+     * - 用户直接关闭标签页时不会走 close_tab 指令，若不在此清理，ElementManager/ResultManager/InstructionManager/CdpExecutor 中按 tabId 存储的数据会永久保留，造成内存泄漏
+     * - 与执行器内的 cleanupTab、ClearTabElements、clearConsoleLogs、clearNetworkLogs 配合使用
+     *
+     * 相关代码：src/executor/InstructionExecutor.ts - cleanupTab()，src/managers/ElementManager.ts - ClearTabElements()，src/executor/CdpExecutor.ts - clearConsoleLogs/clearNetworkLogs
+     */
+    browser.tabs.onRemoved.addListener((tabId: number) => {
+        OutputLogToFile(`[Background] Tab removed: ${tabId}, cleaning up resources`, { level: LogLevel.INFO });
+        instructionExecutor.cleanupTab(tabId);
+        elementManager.ClearTabElements(tabId);
+        cdpExecutor.clearConsoleLogs(tabId);
+        cdpExecutor.clearNetworkLogs(tabId);
+    });
+
+    /**
      * 业务逻辑：监听定时任务（alarm）事件，定期检查并维护 WebSocket 连接状态
-     * 
+     *
      * 实现方式：使用 browser.alarms.onAlarm 监听器，将 alarm 事件委托给初始化服务处理
-     * 
+     *
      * 注意事项：定时任务主要用于在 Service Worker 休眠后唤醒时检查 WebSocket 连接状态并重连
-     * 
+     *
      * 相关代码：src/entrypoints/background/services/initialization.ts - InitializationService.handleAlarm()
      */
     browser.alarms.onAlarm.addListener(async (alarm) => {

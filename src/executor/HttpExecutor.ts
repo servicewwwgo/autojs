@@ -1,6 +1,12 @@
 import type { HttpMessage, HttpRequestMessage, HttpRequestResult, HttpResult } from '../types';
 import { LogLevel, OutputLogToFile } from '../utils';
 
+/** 默认 HTTP 请求超时时间（毫秒），180 秒 */
+const DEFAULT_HTTP_TIMEOUT_MS = 180 * 1000;
+
+/** 不应包含请求体的 HTTP 方法 */
+const METHODS_WITHOUT_BODY: readonly string[] = ['GET', 'HEAD', 'DELETE', 'OPTIONS'];
+
 /**
  * 业务逻辑：通过 HTTP 协议执行网络请求，支持 GET、POST、PUT、DELETE 等常用 HTTP 方法，响应来自 WebSocket 的 HTTP 请求命令
  *
@@ -130,10 +136,7 @@ export class HttpExecutor {
         const url = msg.data.url;
         const headers = msg.data.headers || {};
         const body = msg.data.body;
-        const timeout = msg.data.timeout ? msg.data.timeout * 1000 : 180000; // 默认180秒超时
-
-        // HTTP 方法列表：这些方法不应该包含请求体
-        const methodsWithoutBody = ['GET', 'HEAD', 'DELETE', 'OPTIONS'];
+        const timeout = msg.data.timeout ? msg.data.timeout * 1000 : DEFAULT_HTTP_TIMEOUT_MS;
 
         // 准备请求选项
         const fetchOptions: RequestInit = {
@@ -142,7 +145,7 @@ export class HttpExecutor {
         };
 
         // 如果有请求体且方法允许请求体，添加到选项中
-        if (body !== undefined && body !== null && !methodsWithoutBody.includes(method)) {
+        if (body !== undefined && body !== null && !METHODS_WITHOUT_BODY.includes(method)) {
             if (typeof body === 'string') {
                 // 如果 body 是字符串，直接使用
                 fetchOptions.body = body;
@@ -157,21 +160,22 @@ export class HttpExecutor {
                     };
                 }
             }
-        } else if (methodsWithoutBody.includes(method) && body !== undefined && body !== null) {
+        } else if (METHODS_WITHOUT_BODY.includes(method) && body !== undefined && body !== null) {
             // 对于不应该有请求体的方法，记录警告但继续执行
             OutputLogToFile(`[HttpExecutor] Warning: Method ${method} should not have a body, ignoring body`, { level: LogLevel.WARN });
         }
 
         try {
-            // 创建超时 Promise
+            // 创建超时 Promise，并保存 timeoutId 以便在 fetch 先完成时清除，避免定时器残留导致资源占用
+            let timeoutId: ReturnType<typeof setTimeout>;
             const timeoutPromise = new Promise<never>((_, reject) => {
-                setTimeout(() => {
+                timeoutId = setTimeout(() => {
                     reject(new Error(`Request timeout after ${timeout}ms`));
                 }, timeout);
             });
 
-            // 执行 HTTP 请求（使用 fetch API）
-            const fetchPromise = fetch(url, fetchOptions);
+            // 执行 HTTP 请求（使用 fetch API）；无论成功或失败都在 settle 时清除超时定时器，避免定时器残留
+            const fetchPromise = fetch(url, fetchOptions).finally(() => clearTimeout(timeoutId));
 
             // 等待请求完成或超时
             const response = await Promise.race([fetchPromise, timeoutPromise]);

@@ -3,6 +3,9 @@ import { InstructionExecutor } from '../../../executor';
 import { BaseInstructionClass, InstructionFactory } from '../../../instructions';
 import { LogLevel, OutputLogToFile } from '../../../utils';
 
+/** 执行指令前的延迟（毫秒），确保指令添加完成后再开始执行 */
+const EXECUTE_DELAY_MS = 5000;
+
 /**
  * 业务逻辑：创建添加指令集的处理器函数，将用户配置的指令集添加到指令执行器中等待执行
  * 
@@ -79,12 +82,12 @@ export function createAddInstructionsHandler(instructionExecutor: InstructionExe
 /**
  * 业务逻辑：创建执行指令集的处理器函数，启动指令执行流程，在后台异步执行所有已添加的指令
  * 
- * 实现方式：立即返回成功响应给调用方，然后使用 setTimeout 延迟 1 秒后调用指令执行器的 ExecuteAll 方法，
+ * 实现方式：立即返回成功响应给调用方，然后使用 setTimeout 延迟 EXECUTE_DELAY_MS 后调用指令执行器的 ExecuteAll 方法，
  * 在后台循环执行所有指令直到完成或被停止
  * 
  * 注意事项：
  * - 执行是异步的，立即返回响应避免阻塞消息通道
- * - 延迟 1 秒执行是为了确保指令添加完成后再开始执行
+ * - 延迟 5 秒执行是为了确保指令添加完成后再开始执行
  * - 执行过程中可以通过暂停或停止消息中断执行
  * 
  * @param instructionExecutor - 指令执行器实例
@@ -107,7 +110,7 @@ export function createExecuteInstructionsHandler(instructionExecutor: Instructio
             // 循环执行指令，直到没有更多指令或执行被停止
             setTimeout(async () => {
                 await instructionExecutor.ExecuteAll([]);
-            }, 5000);
+            }, EXECUTE_DELAY_MS);
         } else {
             OutputLogToFile(`[Background] Failed to execute instructions: missing tabId`, { level: LogLevel.ERROR });
             sendResponse({ success: false, error: 'Missing tabId' });

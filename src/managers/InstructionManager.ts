@@ -143,15 +143,11 @@ export class InstructionManager {
   public GetFirstInstructionByTabId(tabId: number): BaseInstructionClass | undefined {
     const instructions = this.instructionsMap.get(tabId);
     if (instructions && instructions.length > 0) {
-      // 从数组头部取出第一个指令（FIFO）
+      // 从数组头部取出第一个指令（FIFO）；shift 已修改原数组，Map 中仍为同一引用
       const instruction = instructions.shift();
       if (instruction) {
-        // 如果数组为空，删除对应的 key
         if (instructions.length === 0) {
           this.instructionsMap.delete(tabId);
-        } else {
-          // 更新指令列表（shift 已修改原数组，这里确保 Map 中的引用正确）
-          this.instructionsMap.set(tabId, instructions);
         }
         return instruction;
       }

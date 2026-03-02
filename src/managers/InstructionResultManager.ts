@@ -53,21 +53,21 @@ export class ResultManager {
   /**
    * 业务逻辑：获取指定标签页的所有执行结果并删除，用于一次性获取并上报结果，避免重复处理
    *
-   * 实现方式：从 Map 中获取结果数组，如果存在且不为空则删除对应的键值对，然后返回结果
+   * 实现方式：从 Map 中获取结果数组，若该 tabId 存在条目则从 Map 中移除（含空数组），然后返回结果
    *
    * 注意事项：
-   * - 空数组不会被删除，只有非空数组才会删除
+   * - 只要该标签页在 Map 中有条目就会删除，空数组也会从 Map 中移除，避免残留键
    * - 返回 undefined 表示该标签页没有结果或结果已被删除
    *
    * @param tabId - 标签页ID
-   * @returns 结果数组，如果标签页不存在或结果为空则返回 undefined
+   * @returns 结果数组（可能为空数组），如果标签页不存在则返回 undefined
    *
    * 相关代码：src/executor/InstructionExecutor.ts - ExecuteAll() 函数（获取结果后通过 WebSocket 上报）
    */
   public GetResultAndDelete(tabId: number): InstructionResult[] | undefined {
     const results = this.results.get(tabId);
 
-    if (results && results.length > 0) {
+    if (results !== undefined) {
       this.results.delete(tabId);
     }
 

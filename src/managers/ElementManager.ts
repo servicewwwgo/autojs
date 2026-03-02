@@ -83,6 +83,64 @@ export class ElementClass implements IElement {
     }
 
     /**
+     * 构建按文本内容搜索元素的 Runtime.evaluate 表达式（已转义的 searchText 与 selector 由调用方传入）。
+     * 在页面中查找匹配选择器且文本包含 searchText 且可见的元素数组。
+     */
+    private static buildTextSearchExpression(escapedSearchText: string, escapedSelector: string): string {
+        return `
+            (function() {
+                const searchText = '${escapedSearchText}';
+                const searchSelector = ${escapedSelector};
+                const allElements = document.querySelectorAll(searchSelector);
+                const matchedElements = [];
+                
+                for (let element of allElements) {                        
+                    const text = element.textContent || element.innerText || '';
+                    if (text.includes(searchText)) {
+                        const style = window.getComputedStyle(element);
+                        if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+                            matchedElements.push(element);
+                        }
+                    }
+                }
+                return matchedElements;
+            })()
+        `;
+    }
+
+    /**
+     * 构建按 aria-labelledby 关联 label 文本搜索元素的 Runtime.evaluate 表达式（已转义的 searchText 与 selector 由调用方传入）。
+     * 在页面中查找匹配选择器、且 aria-labelledby 指向的 label 文本包含 searchText、且可见的元素数组。
+     */
+    private static buildLedbySearchExpression(escapedSearchText: string, escapedSelector: string): string {
+        return `
+            (function() {
+                const searchText = '${escapedSearchText}';
+                const searchSelector = ${escapedSelector};
+                const allElements = document.querySelectorAll(searchSelector);
+                const matchedElements = [];
+                
+                for (let element of allElements) {
+                    const ariaLabelledBy = element.getAttribute('aria-labelledby');
+                    if (ariaLabelledBy) {
+                        const labelElement = document.getElementById(ariaLabelledBy);
+                        if (labelElement) {
+                            const labelText = labelElement.textContent || labelElement.innerText || '';
+                            if (labelText.includes(searchText)) {
+                                const style = window.getComputedStyle(element);
+                                if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+                                    matchedElements.push(element);
+                                }
+                            }
+                        }
+                    }
+                }
+                return matchedElements;
+            })()
+        `;
+    }
+
+    /**
      * 业务逻辑：根据选择器类型和选择器查找页面上所有匹配的元素，返回元素的 nodeId 列表，用于后续筛选和定位
      *
      * 实现方式：
@@ -180,31 +238,8 @@ export class ElementClass implements IElement {
                         // 转义搜索文本，防止注入攻击
                         const escapedSearchText = text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
 
-                        // 转义 selector，防止注入攻击，并用引号包裹
                         const escapedSelector = JSON.stringify(selector);
-
-                        // 使用 Runtime.evaluate 在页面上下文中搜索包含指定文本的所有元素
-                        // 返回元素数组引用以便后续获取所有 nodeId
-                        const findElementsExpression = `
-                            (function() {
-                                const searchText = '${escapedSearchText}';
-                                const searchSelector = ${escapedSelector};
-                                const allElements = document.querySelectorAll(searchSelector);
-                                const matchedElements = [];
-                                
-                                for (let element of allElements) {                        
-                                    const text = element.textContent || element.innerText || '';
-                                    if (text.includes(searchText)) {
-                                        // 检查元素是否可见
-                                        const style = window.getComputedStyle(element);
-                                        if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
-                                            matchedElements.push(element);
-                                        }
-                                    }
-                                }
-                                return matchedElements;
-                            })()
-                        `;
+                        const findElementsExpression = ElementClass.buildTextSearchExpression(escapedSearchText, escapedSelector);
 
                         const findResult = await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.evaluate', {
                             expression: findElementsExpression,
@@ -272,41 +307,8 @@ export class ElementClass implements IElement {
                         // 转义搜索文本，防止注入攻击
                         const escapedSearchText = text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
 
-                        // 转义 selector，防止注入攻击，并用引号包裹
                         const escapedSelector = JSON.stringify(selector);
-
-                        // 使用 Runtime.evaluate 在页面上下文中查找所有包含 aria-labelledby 属性的元素
-                        // 然后通过 aria-labelledby 的值找到对应的 label 元素，检查 label 元素的文本内容是否包含指定文本
-                        const findElementsExpression = `
-                            (function() {
-                                const searchText = '${escapedSearchText}';
-                                const searchSelector = ${escapedSelector};
-                                const allElements = document.querySelectorAll(searchSelector);
-                                const matchedElements = [];
-                                
-                                for (let element of allElements) {
-                                    // 检查元素是否有 aria-labelledby 属性
-                                    const ariaLabelledBy = element.getAttribute('aria-labelledby');
-                                    if (ariaLabelledBy) {
-                                        // 通过 id 找到对应的 label 元素
-                                        const labelElement = document.getElementById(ariaLabelledBy);
-                                        if (labelElement) {
-                                            // 获取 label 元素的文本内容
-                                            const labelText = labelElement.textContent || labelElement.innerText || '';
-                                            // 检查 label 元素的文本内容是否包含指定文本
-                                            if (labelText.includes(searchText)) {
-                                                // 检查元素是否可见
-                                                const style = window.getComputedStyle(element);
-                                                if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
-                                                    matchedElements.push(element);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                return matchedElements;
-                            })()
-                        `;
+                        const findElementsExpression = ElementClass.buildLedbySearchExpression(escapedSearchText, escapedSelector);
 
                         const findResult = await ExecuteCDPCommand(this.elementData.tabId, 'Runtime.evaluate', {
                             expression: findElementsExpression,
@@ -645,7 +647,8 @@ export class ElementClass implements IElement {
             return false;
         }
 
-        if (!['css', 'xpath', 'id', 'tag', 'text', 'ledby'].includes(this.elementData.selectorType)) {
+        // 仅支持已实现的选择器类型（xpath 未实现，不纳入校验）
+        if (!['css', 'id', 'tag', 'text', 'ledby'].includes(this.elementData.selectorType)) {
             return false;
         }
 

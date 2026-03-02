@@ -1,6 +1,6 @@
 import { nodeManager } from '../managers';
 import type { WSErrorMessage, WSHeartbeatMessage, WSHeartbeatResponse, WSLoginMessage, WSLoginResponse, WSLogMessage, WSMessage } from '../types';
-import { LogLevel } from '../utils';
+import { LogLevel, OutputLogToFile } from '../utils';
 
 // 检查消息大小，避免发送过大的消息
 const MAX_MESSAGE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -93,7 +93,7 @@ export class WebSocketConnector {
     public async connect(): Promise<void> {
         // 检查 WebSocket 实际状态，如果存在但状态不是 OPEN，需要清理
         if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
-            console.warn(`[WebSocket] WebSocket exists but state is not OPEN (state: ${this.ws.readyState}), cleaning up`);
+            OutputLogToFile(`[WebSocket] WebSocket exists but state is not OPEN (state: ${this.ws.readyState}), cleaning up`, { level: LogLevel.WARN });
             this.clearReconnectTimer();
             this.stopHeartbeat();
             this.cleanupWebSocket();
@@ -104,19 +104,19 @@ export class WebSocketConnector {
 
         // 如果已经连接且已登录，直接返回
         if (this.isConnected()) {
-            console.log('[WebSocket] Already connected and logged in, returning');
+            OutputLogToFile('[WebSocket] Already connected and logged in, returning', { level: LogLevel.INFO });
             return;
         }
 
         // 如果正在断开连接，不进行重连
         if (this.isDisconnecting) {
-            console.log('[WebSocket] Disconnecting, waiting for disconnect to complete');
+            OutputLogToFile('[WebSocket] Disconnecting, waiting for disconnect to complete', { level: LogLevel.INFO });
             return;
         }
 
         // 如果正在连接中，等待或返回
         if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
-            console.log('[WebSocket] Connecting, waiting for connection to complete');
+            OutputLogToFile('[WebSocket] Connecting, waiting for connection to complete', { level: LogLevel.INFO });
             return;
         }
 
@@ -133,14 +133,14 @@ export class WebSocketConnector {
             this.ws = new WebSocket(this.url);
 
             this.ws.onopen = () => {
-                console.log('[WebSocket] Connection established');
+                OutputLogToFile('[WebSocket] Connection established', { level: LogLevel.INFO });
 
                 this.connected = true;
                 this.isDisconnecting = false;
 
                 // 异步发送登录消息，不阻塞连接
                 this.sendLoginMessage().catch(() => {
-                    console.error('[WebSocket] Failed to send login message');
+                    OutputLogToFile('[WebSocket] Failed to send login message', { level: LogLevel.ERROR });
                     this.cleanupWebSocket();
                 });
 
@@ -153,11 +153,11 @@ export class WebSocketConnector {
             };
 
             this.ws.onerror = (error) => {
-                console.error(`[WebSocket] Connection error: ${error instanceof Error ? error.message : String(error)}`);
+                OutputLogToFile(`[WebSocket] Connection error: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
             };
 
             this.ws.onclose = (event) => {
-                console.log(`[WebSocket] Connection closed, code: ${event.code}, reason: ${event.reason || 'none'}`);
+                OutputLogToFile(`[WebSocket] Connection closed, code: ${event.code}, reason: ${event.reason || 'none'}`, { level: LogLevel.INFO });
 
                 // 只有当关闭的是当前连接时才更新状态
                 if (event.target === this.ws) {
@@ -172,7 +172,7 @@ export class WebSocketConnector {
                 }
             };
         } catch (error) {
-            console.error(`[WebSocket] Failed to create connection: ${error instanceof Error ? error.message : String(error)}`);
+            OutputLogToFile(`[WebSocket] Failed to create connection: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
             this.connected = false;
             this.isLoggedIn = false;
             this.isDisconnecting = false; // 重置断开标记，允许后续重连
@@ -242,7 +242,7 @@ export class WebSocketConnector {
                 this.ws = null;
             }
         } catch (error) {
-            console.warn(`[WebSocket] Error cleaning up WebSocket connection: ${error instanceof Error ? error.message : String(error)}`);
+            OutputLogToFile(`[WebSocket] Error cleaning up WebSocket connection: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
         }
     }
 
@@ -298,24 +298,24 @@ export class WebSocketConnector {
                 return;
             }
 
-            console.log(`[WebSocket] Received message type: ${message.type}`);
+            OutputLogToFile(`[WebSocket] Received message type: ${message.type}`, { level: LogLevel.INFO });
 
             const handler = this.mapMessageTypeToFunction[message.type];
 
             if (!handler) {
-                console.warn(`[WebSocket] Unknown message type: ${message.type}`);
+                OutputLogToFile(`[WebSocket] Unknown message type: ${message.type}`, { level: LogLevel.WARN });
                 return;
             }
 
             // 使用 queueMicrotask 将消息处理推迟到下一个微任务，避免阻塞 WebSocket 消息接收
             queueMicrotask(() => {
                 handler(message).catch((error) => {
-                    console.error(`[WebSocket] Error processing message (type: ${message.type}): ${error instanceof Error ? error.message : String(error)}`);
+                    OutputLogToFile(`[WebSocket] Error processing message (type: ${message.type}): ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
                 });
             });
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error(`[WebSocket] Error processing message: ${errorMessage}`);
+            OutputLogToFile(`[WebSocket] Error processing message: ${errorMessage}`, { level: LogLevel.ERROR });
         }
     }
 
@@ -333,9 +333,9 @@ export class WebSocketConnector {
      */
     private handleHeartbeatResponse(message: WSHeartbeatResponse): void {
         if (message.data.success) {
-            console.log(`[WebSocket] Received heartbeat response, success: ${message.data.success}`);
+            OutputLogToFile(`[WebSocket] Received heartbeat response, success: ${message.data.success}`, { level: LogLevel.INFO });
         } else {
-            console.error(`[WebSocket] Received heartbeat response, failed: ${message.data.success}`);
+            OutputLogToFile(`[WebSocket] Received heartbeat response, failed: ${message.data.success}`, { level: LogLevel.ERROR });
         }
     }
 
@@ -358,12 +358,12 @@ export class WebSocketConnector {
     private handleLoginResponse(message: WSLoginResponse): void {
         if (message.data.success) {
             this.isLoggedIn = true;
-            console.log(`[WebSocket] Login successful, node ID: ${message.data.node_id || 'unknown'}`);
+            OutputLogToFile(`[WebSocket] Login successful, node ID: ${message.data.node_id || 'unknown'}`, { level: LogLevel.INFO });
         } else {
             this.isLoggedIn = false;
             this.disconnect();
 
-            console.error(`[WebSocket] Login failed: ${message.data.error || message.data.message || 'unknown error'}`);
+            OutputLogToFile(`[WebSocket] Login failed: ${message.data.error || message.data.message || 'unknown error'}`, { level: LogLevel.ERROR });
         }
     }
 
@@ -380,7 +380,7 @@ export class WebSocketConnector {
      * 相关代码：src/types/websocket_message.ts - WSErrorMessage 接口（错误消息类型定义）
      */
     private handleErrorMessage(message: WSErrorMessage): void {
-        console.error(`[WebSocket] Received error message: ${message.data.error || message.data.message || 'unknown error'}`);
+        OutputLogToFile(`[WebSocket] Received error message: ${message.data.error || message.data.message || 'unknown error'}`, { level: LogLevel.ERROR });
     }
 
     /**
@@ -403,7 +403,7 @@ export class WebSocketConnector {
     private handleLoggerMessage(message: WSLogMessage): void {
         const enable = message.data?.enable ?? false;
         this.enableLogger = enable;
-        console.log(`[WebSocket] Logger ${enable ? 'enabled' : 'disabled'}`);
+        OutputLogToFile(`[WebSocket] Logger ${enable ? 'enabled' : 'disabled'}`, { level: LogLevel.INFO });
     }
 
     /**
@@ -523,12 +523,12 @@ export class WebSocketConnector {
     public sendMessage(message: WSMessage): boolean {
         try {
             if (this.isWebSocketOpen() === false) {
-                console.warn(`[WebSocket] Cannot send message, WebSocket not connected or not open (message type: ${message.type})`);
+                OutputLogToFile(`[WebSocket] Cannot send message, WebSocket not connected or not open (message type: ${message.type})`, { level: LogLevel.WARN });
                 return false;
             }
 
             if (this.isConnected() === false) {
-                console.warn(`[WebSocket] Cannot send message, WebSocket not connected or not logged in (message type: ${message.type})`);
+                OutputLogToFile(`[WebSocket] Cannot send message, WebSocket not connected or not logged in (message type: ${message.type})`, { level: LogLevel.WARN });
                 return false;
             }
 
@@ -539,7 +539,7 @@ export class WebSocketConnector {
             const sizeInBytes = blob.size;
 
             if (sizeInBytes > MAX_MESSAGE_SIZE) {
-                console.error(`[WebSocket] Message too large (${sizeInBytes} bytes), exceeds limit (${MAX_MESSAGE_SIZE} bytes), message type: ${message.type}`);
+                OutputLogToFile(`[WebSocket] Message too large (${sizeInBytes} bytes), exceeds limit (${MAX_MESSAGE_SIZE} bytes), message type: ${message.type}`, { level: LogLevel.ERROR });
                 return false;
             }
 
@@ -547,7 +547,7 @@ export class WebSocketConnector {
             return true;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error(`[WebSocket] Failed to send message (type: ${message.type}): ${errorMessage}`);
+            OutputLogToFile(`[WebSocket] Failed to send message (type: ${message.type}): ${errorMessage}`, { level: LogLevel.ERROR });
             this.cleanupWebSocket();
             return false;
         }
@@ -596,7 +596,7 @@ export class WebSocketConnector {
 
         // 如果状态不一致，修正状态
         if (stateMatch && !wsOpen) {
-            console.warn('[WebSocket] State mismatch detected: marked as connected but WebSocket is not open, correcting state');
+            OutputLogToFile('[WebSocket] State mismatch detected: marked as connected but WebSocket is not open, correcting state', { level: LogLevel.WARN });
             this.connected = false;
             this.isLoggedIn = false;
             this.stopHeartbeat();
@@ -624,7 +624,7 @@ export class WebSocketConnector {
 
         this.heartbeatTimer = setInterval(() => {
             this.sendHeartbeat().catch((error) => {
-                console.warn(`[WebSocket] Error sending heartbeat message: ${error instanceof Error ? error.message : String(error)}`);
+                OutputLogToFile(`[WebSocket] Error sending heartbeat message: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
             });
         }, this.heartbeatInterval);
     }
@@ -671,9 +671,9 @@ export class WebSocketConnector {
             this.clearReconnectTimer();
             this.reconnectTimer = setTimeout(() => {
                 if (this.isDisconnecting === false) {
-                    console.log('[WebSocket] Attempting automatic reconnection...');
+                    OutputLogToFile('[WebSocket] Attempting automatic reconnection...', { level: LogLevel.INFO });
                     this.connect().catch((error) => {
-                        console.error(`[WebSocket] Automatic reconnection failed: ${error instanceof Error ? error.message : String(error)}`);
+                        OutputLogToFile(`[WebSocket] Automatic reconnection failed: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
                     });
                 }
             }, this.reconnectInterval);
@@ -728,13 +728,13 @@ export class WebSocketConnector {
     public async testConnection(url: string, timeout: number = 5000): Promise<boolean> {
         // 验证 URL
         if (!url || typeof url !== 'string') {
-            console.error(`[WebSocket] Invalid WebSocket URL: ${url}`);
+            OutputLogToFile(`[WebSocket] Invalid WebSocket URL: ${url}`, { level: LogLevel.ERROR });
             return false;
         }
 
         // 验证 URL 格式
         if (!url.startsWith('ws://') && !url.startsWith('wss://')) {
-            console.error(`[WebSocket] Invalid URL format, must start with ws:// or wss://: ${url}`);
+            OutputLogToFile(`[WebSocket] Invalid URL format, must start with ws:// or wss://: ${url}`, { level: LogLevel.ERROR });
             return false;
         }
 
@@ -766,7 +766,7 @@ export class WebSocketConnector {
                             testWs.close();
                         }
                     } catch (error) {
-                        console.warn(`[WebSocket] Error cleaning up test connection: ${error instanceof Error ? error.message : String(error)}`);
+                        OutputLogToFile(`[WebSocket] Error cleaning up test connection: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
                     }
                     testWs = null;
                 }
@@ -776,20 +776,20 @@ export class WebSocketConnector {
                 testWs = new WebSocket(url);
 
                 testWs.onopen = () => {
-                    console.log('[WebSocket] Test connection successful');
+                    OutputLogToFile('[WebSocket] Test connection successful', { level: LogLevel.INFO });
                     cleanup();
                     resolve(true);
                 };
 
                 testWs.onerror = (error) => {
-                    console.error(`[WebSocket] Test connection error: ${error instanceof Error ? error.message : String(error)}`);
+                    OutputLogToFile(`[WebSocket] Test connection error: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
                     cleanup();
                     resolve(false);
                 };
 
                 testWs.onclose = (event) => {
                     if (!resolved) {
-                        console.log(`[WebSocket] Test connection closed, code: ${event.code}`);
+                        OutputLogToFile(`[WebSocket] Test connection closed, code: ${event.code}`, { level: LogLevel.INFO });
                         cleanup();
                         resolve(false);
                     }
@@ -798,13 +798,13 @@ export class WebSocketConnector {
                 // 设置超时
                 timeoutId = setTimeout(() => {
                     if (!resolved) {
-                        console.warn(`[WebSocket] Test connection timeout (${timeout}ms)`);
+                        OutputLogToFile(`[WebSocket] Test connection timeout (${timeout}ms)`, { level: LogLevel.WARN });
                         cleanup();
                         resolve(false);
                     }
                 }, timeout);
             } catch (error) {
-                console.error(`[WebSocket] Failed to create test connection: ${error instanceof Error ? error.message : String(error)}`);
+                OutputLogToFile(`[WebSocket] Failed to create test connection: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
                 cleanup();
                 resolve(false);
             }
