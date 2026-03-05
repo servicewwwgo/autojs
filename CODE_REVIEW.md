@@ -79,4 +79,13 @@
 
 ---
 
+## 五、安全与配置
+
+### 1. 敏感配置
+
+- **DEFAULT_NODE_TOKEN**：节点默认令牌由 `src/consts/index.ts` 从环境变量 `VITE_DEFAULT_NODE_TOKEN` 读取，构建时打入扩展；`.env` 中不应提交真实令牌，且 `.env` 已列入 `.gitignore`。
+- **建议**：生产构建使用 CI 或本地临时环境变量注入令牌，避免将 `.env` 或带真实 token 的 `.env.example` 提交仓库。
+
+---
+
 *审查基于当前代码库静态阅读，未运行完整自动化测试或扩展安装验证。*

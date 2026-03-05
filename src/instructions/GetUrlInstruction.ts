@@ -1,4 +1,4 @@
-import type { GetUrlInstruction, GetUrlInstructionResult } from '../types';
+import type { GetUrlCookieItem, GetUrlInstruction, GetUrlInstructionResult } from '../types';
 import { LogLevel, OutputLogToFile } from '../utils';
 import { BaseInstructionClass } from './BaseInstruction';
 
@@ -38,7 +38,7 @@ export class GetUrlInstructionClass extends BaseInstructionClass {
    * - 如果标签页没有 URL（如 chrome://、about: 等特殊页面），会返回错误信息
    * - 优先使用 tab.url（当前 URL），如果不存在则使用 tab.pendingUrl（导航中的 URL）
    * - 获取到的 URL 会记录到日志中，便于调试和监控
-   * - 返回结果包含 usage 和 url 字段，usage 默认为 "data"
+   * - 返回结果包含 usage、url 和 cookies 字段；cookies 为当前站点（当前标签页 URL）下的全部 cookie，usage 默认为 "data"
    *
    * 相关代码：src/types/instruction.ts - GetUrlInstructionResult 接口（结果数据结构），src/instructions/BaseInstruction.ts - Retry() 方法（重试机制）
    */
@@ -72,9 +72,30 @@ export class GetUrlInstructionClass extends BaseInstructionClass {
         return { ...defaultResult, error: `Tab ${this.tabId} has no URL (may be a special page like chrome:// or about:)` } as GetUrlInstructionResult;
       }
 
-      OutputLogToFile(`[GetUrlInstruction] Current tab URL: ${url}`, { level: LogLevel.INFO });
+      let cookies: GetUrlCookieItem[] = [];
+      try {
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+          const list = await browser.cookies.getAll({ url });
+          cookies = list.map((c) => ({
+            name: c.name,
+            value: c.value,
+            ...(c.domain != null && { domain: c.domain }),
+            ...(c.path != null && { path: c.path }),
+            ...(c.secure != null && { secure: c.secure }),
+            ...(c.httpOnly != null && { httpOnly: c.httpOnly }),
+            ...(c.sameSite != null && { sameSite: c.sameSite }),
+            ...(c.expirationDate != null && { expirationDate: c.expirationDate }),
+            ...(c.hostOnly != null && { hostOnly: c.hostOnly }),
+            ...(c.session != null && { session: c.session }),
+          }));
+        }
+      } catch (cookieError) {
+        OutputLogToFile(`[GetUrlInstruction] Failed to get cookies for tab ${this.tabId}: ${cookieError instanceof Error ? cookieError.message : String(cookieError)}`, { level: LogLevel.WARN });
+      }
 
-      return { ...defaultResult, success: true, data: { usage: this.params.usage || "data", url: url } } as GetUrlInstructionResult;
+      OutputLogToFile(`[GetUrlInstruction] Current tab URL: ${url}, cookies: ${Array.isArray(cookies) ? cookies.length : 0}`, { level: LogLevel.INFO });
+
+      return { ...defaultResult, success: true, data: { usage: this.params.usage || "data", url, cookies } } as GetUrlInstructionResult;
     });
 
     return result as GetUrlInstructionResult;

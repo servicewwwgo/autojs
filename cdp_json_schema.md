@@ -811,7 +811,7 @@
 
 ## 14. CdpCreateTabAndNavigateMessage（创建标签页并导航）
 
-创建新标签页并导航到指定 URL，支持在当前窗口或新窗口中打开。
+创建新标签页并导航到指定 URL，支持在当前窗口或新窗口中打开；可选在导航前设置 cookie（先打开 about:blank，通过 CDP Network.setCookies 设置后再导航，首请求即带 cookie）。
 
 ### JSON 结构
 
@@ -822,7 +822,11 @@
   "data": {
     "url": "https://example.com",
     "active": true,
-    "newWindow": false
+    "newWindow": false,
+    "cookies": [
+      { "name": "session", "value": "abc123" },
+      { "name": "token", "value": "xyz", "path": "/", "secure": true }
+    ]
   }
 }
 ```
@@ -832,8 +836,20 @@
 - **data.url** (必需): 目标 URL（string）
 - **data.active** (可选): 是否激活新标签页（boolean，默认：true）
 - **data.newWindow** (可选): 是否在新窗口中打开（boolean，默认：false）
+- **data.cookies** (可选): 导航前要设置的 cookie 数组；若提供则先创建 about:blank、连接 CDP、设置 cookie 后再导航到 url。每项为对象：
+  - **name** (必需): Cookie 名称（string）
+  - **value** (必需): Cookie 值（string）
+  - **url** (可选): 请求 URI，用于确定 domain/path；不传时使用 data.url
+  - **domain** (可选): Cookie 的 domain（string）
+  - **path** (可选): Cookie 的 path（string）
+  - **secure** (可选): 是否仅 HTTPS（boolean）
+  - **httpOnly** (可选): 是否 HttpOnly（boolean）
+  - **sameSite** (可选): `"Strict"` | `"Lax"` | `"None"`（string）
+  - **expires** (可选): 过期时间戳（number，TimeSinceEpoch）
 
 ### 示例
+
+不带 cookie（直接打开目标 URL）：
 
 ```json
 {
@@ -843,6 +859,24 @@
     "url": "https://www.google.com",
     "active": true,
     "newWindow": false
+  }
+}
+```
+
+带 cookie（先设置 cookie 再导航）：
+
+```json
+{
+  "type": "create_tab_and_navigate",
+  "id": "create-tab-with-cookies",
+  "data": {
+    "url": "https://example.com/dashboard",
+    "active": true,
+    "newWindow": false,
+    "cookies": [
+      { "name": "session_id", "value": "sess_abc123" },
+      { "name": "pref", "value": "lang=zh", "path": "/" }
+    ]
   }
 }
 ```

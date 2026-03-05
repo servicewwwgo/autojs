@@ -281,11 +281,27 @@ export type WaitInstructionResult =
   | WaitPageLoadResult;
 
 /**
- * 业务逻辑：定义获取当前标签页 URL 指令的执行结果，返回当前页面的 URL 和用途标识，用于数据提取和变量赋值
+ * 业务逻辑：get_url 指令返回的单个 cookie 信息（与扩展 cookies API 对齐，便于序列化）
+ */
+export interface GetUrlCookieItem {
+  name: string;
+  value: string;
+  domain?: string;
+  path?: string;
+  secure?: boolean;
+  httpOnly?: boolean;
+  sameSite?: 'no_restriction' | 'lax' | 'strict';
+  expirationDate?: number;
+  hostOnly?: boolean;
+  session?: boolean;
+}
+
+/**
+ * 业务逻辑：定义获取当前标签页 URL 指令的执行结果，返回当前页面的 URL、用途标识及当前站点的全部 cookie，用于数据提取和变量赋值
  *
- * 实现方式：继承自 InstructionResult 接口，data 字段包含 usage 和 url 字段
+ * 实现方式：继承自 InstructionResult 接口，data 字段包含 usage、url 和 cookies 字段
  *
- * 注意事项：usage 标识 URL 的用途（variable 用于变量赋值、data 用于数据返回、none 仅获取），url 为当前页面的 URL
+ * 注意事项：usage 标识 URL 的用途（variable 用于变量赋值、data 用于数据返回、none 仅获取），url 为当前页面的 URL，cookies 为当前 URL 对应站点的全部 cookie（需扩展具备 cookies 权限；无权限或非 http(s) 页面时可能为空数组）
  *
  * 相关代码：src/instructions/GetUrlInstruction.ts - GetUrlInstructionClass 类（返回此类型结果）
  */
@@ -293,6 +309,8 @@ export interface GetUrlInstructionResult extends InstructionResult {
   data?: {
     usage?: "variable" | "data" | "none";
     url: string;
+    /** 当前网站（当前标签页 URL 对应域名）下的全部 cookie */
+    cookies?: GetUrlCookieItem[];
   };
 }
 

@@ -203,13 +203,15 @@ export class CdpExecutor {
      * 实现方式：
      * 1. 根据 newWindow 参数决定创建标签页（browser.tabs.create）或新窗口（browser.windows.create）
      * 2. 创建时指定 URL，浏览器会自动导航
-     * 3. 等待标签页加载完成（通过 waitForTabLoadComplete）
-     * 4. 返回标签页信息（tabId、tabIndex、url）
+     * 3. 若 data.cookies 存在且非空：连接 CDP、Network.enable、Network.setCookies（以 data.url 为 cookie url）、再 Page.navigate 到 data.url
+     * 4. 等待标签页加载完成（通过 waitForTabLoadComplete）
+     * 5. 返回标签页信息（tabId、tabIndex、url）
      *
      * 注意事项：
      * - url 必须存在且为字符串类型，否则抛出异常
      * - newWindow 为 true 时创建新窗口，false 时创建新标签页
      * - active 参数控制是否激活新标签页/窗口，默认为 true
+     * - cookies 为可选数组；若提供则先创建 about:blank，设置 cookie 后再导航到 url，从而首请求即带上 cookie
      * - 会等待页面加载完成（最多 30 秒），超时后仍会返回但页面可能未完全加载
      *
      * 相关代码：src/executor/CdpExecutor.ts - waitForTabLoadComplete() 方法（等待加载完成）
@@ -228,10 +230,13 @@ export class CdpExecutor {
             throw new Error('url is required and must be a string in create_tab_and_navigate');
         }
 
+        const hasCookies = Array.isArray(msg.data.cookies) && msg.data.cookies.length > 0;
+        const initialUrl = hasCookies ? 'about:blank' : msg.data.url;
+
         if (msg.data.newWindow === undefined || msg.data.newWindow === false) {
-            // 创建新标签页（创建时指定 URL，浏览器会自动导航）
+            // 创建新标签页（若需先设置 cookie 则用 about:blank，否则直接打开目标 url）
             const newTab = await browser.tabs.create({
-                url: msg.data.url,
+                url: initialUrl,
                 active: msg.data.active !== undefined ? msg.data.active : true
             });
 
@@ -242,7 +247,7 @@ export class CdpExecutor {
             tabId = newTab.id;
         } else {
             const newWindow = await browser.windows.create({
-                url: msg.data.url,
+                url: initialUrl,
                 type: 'normal',
                 state: 'normal',
                 focused: msg.data.active !== undefined ? msg.data.active : true
@@ -253,6 +258,24 @@ export class CdpExecutor {
             }
 
             tabId = newWindow.tabs[0].id;
+        }
+
+        if (hasCookies) {
+            await EnsureCDPConnected(tabId);
+            await ExecuteCDPCommand(tabId, 'Network.enable');
+            const targetUrl = msg.data.url;
+            const cookies = msg.data.cookies!.map((c) => {
+                const item: Record<string, unknown> = { name: c.name, value: c.value, url: c.url ?? targetUrl };
+                if (c.domain !== undefined) item.domain = c.domain;
+                if (c.path !== undefined) item.path = c.path;
+                if (c.secure !== undefined) item.secure = c.secure;
+                if (c.httpOnly !== undefined) item.httpOnly = c.httpOnly;
+                if (c.sameSite !== undefined) item.sameSite = c.sameSite;
+                if (c.expires !== undefined) item.expires = c.expires;
+                return item;
+            });
+            await ExecuteCDPCommand(tabId, 'Network.setCookies', { cookies });
+            await ExecuteCDPCommand(tabId, 'Page.navigate', { url: msg.data.url });
         }
 
         // 等待 tabId 标签页完成加载

@@ -477,11 +477,26 @@ export interface CdpCloseConsoleLogsResult extends CdpResult {
 }
 
 /**
- * 业务逻辑：定义创建标签页并导航消息，用于创建新标签页并导航到指定 URL，支持在当前窗口或新窗口中打开
+ * 可选 cookie 项，用于在导航前通过 CDP Network.setCookies 设置，与 CDP CookieParam 对齐
+ */
+export interface CdpCookieParam {
+    name: string;
+    value: string;
+    url?: string;   // 请求 URI，用于确定 cookie 的 domain/path，不传时由调用方用目标 url 填充
+    domain?: string;
+    path?: string;
+    secure?: boolean;
+    httpOnly?: boolean;
+    sameSite?: 'Strict' | 'Lax' | 'None';
+    expires?: number; // TimeSinceEpoch
+}
+
+/**
+ * 业务逻辑：定义创建标签页并导航消息，用于创建新标签页并导航到指定 URL，支持在当前窗口或新窗口中打开，支持导航前设置 cookie
  *
- * 实现方式：继承自 CdpMessage 接口，固定 type 为 'create_tab_and_navigate'，data 字段包含 url、active、newWindow
+ * 实现方式：继承自 CdpMessage 接口，固定 type 为 'create_tab_and_navigate'，data 字段包含 url、active、newWindow、cookies
  *
- * 注意事项：data.url 为目标 URL（必需），data.active 为是否激活新标签页（可选，默认 true），data.newWindow 为是否在新窗口中打开（可选，默认 false）
+ * 注意事项：data.url 为目标 URL（必需），data.active 为是否激活新标签页（可选，默认 true），data.newWindow 为是否在新窗口中打开（可选，默认 false），data.cookies 为可选数组，若提供则先创建空白页、连接 CDP、设置 cookie 后再导航到 url
  *
  * 相关代码：src/executor/CdpExecutor.ts - handleCreateTabAndNavigate() 函数（处理创建标签页消息）
  */
@@ -491,6 +506,8 @@ export interface CdpCreateTabAndNavigateMessage extends CdpMessage {
         url: string;
         active?: boolean;
         newWindow?: boolean; // 是否在新窗口中打开
+        /** 可选。若提供则先设置 cookie 再导航到 url；会先创建 about:blank 再通过 CDP Network.setCookies 设置后 Page.navigate */
+        cookies?: CdpCookieParam[];
     };
 }
 
