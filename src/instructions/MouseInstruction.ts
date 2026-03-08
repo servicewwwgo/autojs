@@ -403,7 +403,7 @@ export class MouseInstructionClass extends BaseInstructionClass {
      */
     public async Execute(): Promise<MouseInstructionResult> {
         const result = await this.Retry(async () => {
-            let defaultResult: MouseInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+            let defaultResult: MouseInstructionResult = { tabId: this.tabId, id: this.id, success: false, duration: 0 };
 
             let x: number | undefined = this.params.x;
             let y: number | undefined = this.params.y;

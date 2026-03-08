@@ -7,8 +7,8 @@ vi.mock('../utils', () => ({
   OutputLogToFile: vi.fn(),
 }));
 
-function makeResult(tabId: number, instructionID: string, success: boolean): InstructionResult {
-  return { tabId, instructionID, success, duration: 0 };
+function makeResult(tabId: number, id: string, success: boolean): InstructionResult {
+  return { tabId, id, success, duration: 0 };
 }
 
 describe('InstructionResultManager (ResultManager)', () => {
@@ -21,7 +21,7 @@ describe('InstructionResultManager (ResultManager)', () => {
   it('SaveResult 后 GetResult 可获取', () => {
     manager.SaveResult(makeResult(1, 'a', true));
     expect(manager.GetResult(1)).toHaveLength(1);
-    expect(manager.GetResult(1)![0].instructionID).toBe('a');
+    expect(manager.GetResult(1)![0].id).toBe('a');
   });
 
   it('GetResultAndDelete 有结果时返回并删除该 tab 条目', () => {

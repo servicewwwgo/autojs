@@ -44,7 +44,7 @@ export class FindElementInstructionClass extends BaseInstructionClass {
      */
     public async Execute(): Promise<FindElementInstructionResult> {
         const result = await this.Retry(async () => {
-            let defaultResult: FindElementInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+            let defaultResult: FindElementInstructionResult = { tabId: this.tabId, id: this.id, success: false, duration: 0 };
 
             // 如果设置了延迟，先等待
             await this.Delay(this.delay);

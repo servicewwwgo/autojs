@@ -1,7 +1,7 @@
 import { WEBSOCKET_CONN_URL } from '../../../consts';
 import { WebSocketConnector } from '../../../executor';
 import { CdpExecutor, HttpExecutor, InstructionExecutor } from '../../../executor';
-import { CdpMessage, CdpResult, HttpMessage, HttpResult, InstructionResults, WSMessage } from '../../../types';
+import { CdpMessage, CdpResult, HttpMessage, HttpResult, InstructionsResponsePayload, WSMessage } from '../../../types';
 import { LogLevel, OutputLogToFile } from '../../../utils';
 
 /**
@@ -57,10 +57,9 @@ export class WebSocketService {
             await this.instructionExecutor.handleMessage(message);
         });
 
-        // 设置指令执行器的结果发送回调
-        this.instructionExecutor.setSendResult((result: InstructionResults): void => {
-            // 通过 WebSocket 发送指令结果
-            this.wsConnector.sendMessage({ type: 'instructions', data: result } as WSMessage);
+        // 设置指令执行器的结果发送回调（result 为 InstructionsResponsePayload，含 id/tabId/results；顶层带 id 便于 Center send_and_wait 匹配）
+        this.instructionExecutor.setSendResult((result: InstructionsResponsePayload): void => {
+            this.wsConnector.sendMessage({ type: 'instructions', id: result.id, data: result } as WSMessage);
         });
 
         // 注册 cdp 执行器的统一消息处理器（所有 CDP 相关消息都通过 handleMessage 处理）
@@ -68,10 +67,9 @@ export class WebSocketService {
             await this.cdpExecutor.handleMessage(message.data as CdpMessage);
         });
 
-        // 设置 CDP 执行器的结果发送回调
+        // 设置 CDP 执行器的结果发送回调（顶层 id 与 data.id 一致，供 Center send_and_wait 匹配）
         this.cdpExecutor.setSendResult((result: CdpResult): void => {
-            // 通过 WebSocket 发送 CDP 结果
-            this.wsConnector.sendMessage({ type: 'cdp', data: result } as WSMessage);
+            this.wsConnector.sendMessage({ type: 'cdp', id: result.id, data: result } as WSMessage);
         });
 
         // 注册 http 执行器的统一消息处理器（所有 HTTP 相关消息都通过 handleMessage 处理）
@@ -79,10 +77,9 @@ export class WebSocketService {
             await this.httpExecutor.handleMessage(message.data as HttpMessage);
         });
 
-        // 设置 HTTP 执行器的结果发送回调
+        // 设置 HTTP 执行器的结果发送回调（顶层 id 与 data.id 一致，供 Center send_and_wait 匹配）
         this.httpExecutor.setSendResult((result: HttpResult): void => {
-            // 通过 WebSocket 发送 HTTP 结果
-            this.wsConnector.sendMessage({ type: 'http', data: result } as WSMessage);
+            this.wsConnector.sendMessage({ type: 'http', id: result.id, data: result } as WSMessage);
         });
     }
 

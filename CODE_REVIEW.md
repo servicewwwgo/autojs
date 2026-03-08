@@ -5,6 +5,7 @@
 - **技术栈**：TypeScript + WXT (Chrome 扩展) + Vue
 - **职责**：Web 自动化爬虫扩展，通过 WebSocket 接收指令、CDP/HTTP 执行、结果回传
 - **结构**：指令执行器、CDP/HTTP 执行器、WebSocket 连接、指令/元素/结果管理、background/content/popup 入口
+- **协议**：WSMessage 形态 `{ type, id?, data }`；instructions 请求/响应负载含 `id`，与 control 端一致（见 `docs/autojs-control-protocol.md`）
 
 ---
 
@@ -29,7 +30,7 @@
 - **ElementManager**：text/ledby 选择器中对搜索文本和 selector 做转义，降低注入风险；Runtime 对象用后 `releaseObject`，避免泄漏。
 
 ### 5. 类型与 Lint
-- TypeScript 使用规范，接口与联合类型清晰；当前无 Linter 报错。
+- TypeScript 使用规范，接口与联合类型清晰；InstructionsRequestPayload / InstructionsResponsePayload 与 WSMessage 约定一致。
 
 ---
 
@@ -70,12 +71,19 @@
   - `src/managers/InstructionResultManager.test.ts`：SaveResult、GetResultAndDelete（含空数组移除）、ClearResult、GetAllResults。
 - `InstructionExecutor.runTabLoop` 依赖 browser/CDP 环境，暂未加单测，可在后续用 mock 补充。
 
+### 7. 待改进项（建议）
+
+- **instructions 处理器 JSON.parse**：`src/entrypoints/background/handlers/instructions.ts` 第 36 行 `JSON.parse(instructionsJsonString)` 在非法 JSON 时会抛错；外层 background 的 onMessage 会 catch 并返回通用错误。建议在 handler 内 try/catch，返回 `{ success: false, error: 'Invalid JSON: ...' }`，便于 popup 提示更明确。
+- **_currentRequestId 与多批指令**：`InstructionExecutor._currentRequestId` 为单实例共享。若服务端在短时间内连续下发两条 instructions 消息（两个 id），第二条 handleMessage 会覆盖 _currentRequestId，导致第一条批次中尚未执行完的 tab 在 sendResult 时带上第二条的 id。当前使用方式多为「单批执行完再发下一批」，若未来有并发多批需求，可改为按批次/请求 id 存储并随结果带出（例如在入队时记录每条指令所属的 requestId）。
+- **注释与常量一致（已修复）**：`WebSocketConnector.ts` 私有字段注释已改为「15秒心跳间隔」与 `HEARTBEAT_INTERVAL` 一致。
+
 ---
 
 ## 四、小结
 
-- 整体设计清晰，类型与注释到位，错误与资源清理考虑较全，安全相关点（转义、超时、body 限制）处理得当。
-- 建议优先：修正「延迟 1 秒 vs 5000ms」的注释或实现、统一魔术数字为常量、澄清或实现 selectorType 与 xpath 的关系；其余为可维护性与测试增强。
+- 整体设计清晰，类型与注释到位，错误与资源清理考虑较全，安全相关点（转义、超时、body 限制）处理得当；协议与 control 端已对齐（instructions/cdp/http 负载与顶层 id）。
+- 历史项已修复：延迟/常量、selectorType、GetResultAndDelete 语义、runTabLoop 注释、ElementManager 抽取方法、日志统一、单元测试。
+- 建议优先：instructions 内 JSON.parse 的 try/catch 与明确错误响应；WebSocketConnector 心跳注释改为 15 秒；若有并发多批 instructions 需求再考虑 _currentRequestId 按批存储。
 
 ---
 

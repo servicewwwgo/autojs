@@ -31,7 +31,7 @@
 {
   "tabId": 123, // 必需 - 标签页ID（number）
   "type": "指令类型", // 必需 - 指令类型（string）
-  "instructionID": "unique-id", // 必需 - 指令唯一标识（string）
+  "id": "unique-id", // 必需 - 指令唯一标识（string）
   "delay": 0.5, // 可选 - 延迟时间，单位：秒（number）
   "retry": 3, // 可选 - 重试次数（number）
   "timeout": 30, // 可选 - 超时时间，单位：秒（number）
@@ -52,7 +52,7 @@
 {
   "tabId": 123,
   "type": "navigate",
-  "instructionID": "nav-001",
+  "id": "nav-001",
   "params": {
     "url": "https://example.com"
   },
@@ -74,7 +74,7 @@
 {
   "tabId": 1,
   "type": "navigate",
-  "instructionID": "nav-google",
+  "id": "nav-google",
   "params": {
     "url": "https://www.google.com"
   },
@@ -94,7 +94,7 @@
 {
   "tabId": 123,
   "type": "execute_script",
-  "instructionID": "script-001",
+  "id": "script-001",
   "params": {
     "expression": "document.title",
     "objectGroup": "console",
@@ -134,7 +134,7 @@
 {
   "tabId": 1,
   "type": "execute_script",
-  "instructionID": "get-title",
+  "id": "get-title",
   "params": {
     "expression": "document.title",
     "returnByValue": true,
@@ -156,7 +156,7 @@
 {
   "tabId": 123,
   "type": "find_element",
-  "instructionID": "find-001",
+  "id": "find-001",
   "params": {
     "element": {
       "name": "searchInput",
@@ -199,7 +199,7 @@
 {
   "tabId": 1,
   "type": "find_element",
-  "instructionID": "find-search-input",
+  "id": "find-search-input",
   "params": {
     "element": {
       "name": "searchInput",
@@ -218,7 +218,7 @@
 {
   "tabId": 1,
   "type": "find_element",
-  "instructionID": "find-submit-btn",
+  "id": "find-submit-btn",
   "params": {
     "element": {
       "name": "submitButton",
@@ -237,7 +237,7 @@
 {
   "tabId": 1,
   "type": "find_element",
-  "instructionID": "find-text-element",
+  "id": "find-text-element",
   "params": {
     "element": {
       "name": "submitButton",
@@ -257,7 +257,7 @@
 {
   "tabId": 1,
   "type": "find_element",
-  "instructionID": "find-ledby-element",
+  "id": "find-ledby-element",
   "params": {
     "element": {
       "name": "inputField",
@@ -288,7 +288,7 @@
 {
   "tabId": 1,
   "type": "find_element",
-  "instructionID": "find-specific-item",
+  "id": "find-specific-item",
   "params": {
     "element": {
       "name": "specificItem",
@@ -316,7 +316,7 @@
 {
   "tabId": 123,
   "type": "input",
-  "instructionID": "input-001",
+  "id": "input-001",
   "params": {
     "elementName": "searchInput",
     "text": "Hello World",
@@ -343,7 +343,7 @@
 {
   "tabId": 1,
   "type": "input",
-  "instructionID": "input-search",
+  "id": "input-search",
   "params": {
     "elementName": "searchInput",
     "text": "自动化测试",
@@ -366,7 +366,7 @@
 {
   "tabId": 123,
   "type": "keyboard",
-  "instructionID": "keyboard-001",
+  "id": "keyboard-001",
   "params": {
     "elementName": "searchInput",
     "action": "press",
@@ -401,7 +401,7 @@
 {
   "tabId": 1,
   "type": "keyboard",
-  "instructionID": "press-enter",
+  "id": "press-enter",
   "params": {
     "action": "press",
     "key": "Enter"
@@ -416,7 +416,7 @@
 {
   "tabId": 1,
   "type": "keyboard",
-  "instructionID": "select-all",
+  "id": "select-all",
   "params": {
     "elementName": "textInput",
     "action": "press",
@@ -432,7 +432,7 @@
 {
   "tabId": 1,
   "type": "keyboard",
-  "instructionID": "type-text-key",
+  "id": "type-text-key",
   "params": {
     "elementName": "inputField",
     "action": "type",
@@ -449,7 +449,7 @@
 {
   "tabId": 1,
   "type": "keyboard",
-  "instructionID": "type-text",
+  "id": "type-text",
   "params": {
     "elementName": "inputField",
     "action": "type",
@@ -472,7 +472,7 @@
 {
   "tabId": 123,
   "type": "mouse",
-  "instructionID": "mouse-001",
+  "id": "mouse-001",
   "params": {
     "action": "click",
     "elementName": "submitButton",
@@ -516,7 +516,7 @@
 {
   "tabId": 1,
   "type": "mouse",
-  "instructionID": "click-submit",
+  "id": "click-submit",
   "params": {
     "action": "click",
     "elementName": "submitButton",
@@ -532,7 +532,7 @@
 {
   "tabId": 1,
   "type": "mouse",
-  "instructionID": "click-coord",
+  "id": "click-coord",
   "params": {
     "action": "click",
     "x": 500,
@@ -549,7 +549,7 @@
 {
   "tabId": 1,
   "type": "mouse",
-  "instructionID": "right-click",
+  "id": "right-click",
   "params": {
     "action": "rightclick",
     "elementName": "contextMenu"
@@ -564,7 +564,7 @@
 {
   "tabId": 1,
   "type": "mouse",
-  "instructionID": "hover-menu",
+  "id": "hover-menu",
   "params": {
     "action": "hover",
     "elementName": "menuItem"
@@ -585,7 +585,7 @@
 {
   "tabId": 123,
   "type": "get_attribute",
-  "instructionID": "get-attr-001",
+  "id": "get-attr-001",
   "params": {
     "elementName": "searchInput",
     "attribute": "value",
@@ -611,7 +611,7 @@
 {
   "tabId": 1,
   "type": "get_attribute",
-  "instructionID": "get-input-value",
+  "id": "get-input-value",
   "params": {
     "elementName": "searchInput",
     "attribute": "value",
@@ -633,7 +633,7 @@
 {
   "tabId": 123,
   "type": "set_attribute",
-  "instructionID": "set-attr-001",
+  "id": "set-attr-001",
   "params": {
     "elementName": "searchInput",
     "attribute": "value",
@@ -659,7 +659,7 @@
 {
   "tabId": 1,
   "type": "set_attribute",
-  "instructionID": "set-input-value",
+  "id": "set-input-value",
   "params": {
     "elementName": "searchInput",
     "attribute": "value",
@@ -681,7 +681,7 @@
 {
   "tabId": 123,
   "type": "screenshot",
-  "instructionID": "screenshot-001",
+  "id": "screenshot-001",
   "params": {
     "format": "png",
     "quality": 100,
@@ -709,7 +709,7 @@
 {
   "tabId": 1,
   "type": "screenshot",
-  "instructionID": "screenshot-png",
+  "id": "screenshot-png",
   "params": {
     "format": "png",
     "fullPage": false
@@ -724,7 +724,7 @@
 {
   "tabId": 1,
   "type": "screenshot",
-  "instructionID": "screenshot-jpeg-full",
+  "id": "screenshot-jpeg-full",
   "params": {
     "format": "jpeg",
     "quality": 85,
@@ -746,7 +746,7 @@
 {
   "tabId": 123,
   "type": "wait",
-  "instructionID": "wait-001",
+  "id": "wait-001",
   "params": {
     "waitType": "wait_element_visible",
     "elementName": "searchInput",
@@ -790,7 +790,7 @@
 {
   "tabId": 1,
   "type": "wait",
-  "instructionID": "wait-title",
+  "id": "wait-title",
   "params": {
     "waitType": "wait_title_contains",
     "titleText": "搜索结果"
@@ -806,7 +806,7 @@
 {
   "tabId": 1,
   "type": "wait",
-  "instructionID": "wait-element-exists",
+  "id": "wait-element-exists",
   "params": {
     "waitType": "wait_element_exists",
     "elementName": "searchInput"
@@ -822,7 +822,7 @@
 {
   "tabId": 1,
   "type": "wait",
-  "instructionID": "wait-element-visible",
+  "id": "wait-element-visible",
   "params": {
     "waitType": "wait_element_visible",
     "elementName": "submitButton"
@@ -838,7 +838,7 @@
 {
   "tabId": 1,
   "type": "wait",
-  "instructionID": "wait-attribute",
+  "id": "wait-attribute",
   "params": {
     "waitType": "wait_attribute_contains",
     "elementName": "statusElement",
@@ -856,7 +856,7 @@
 {
   "tabId": 1,
   "type": "wait",
-  "instructionID": "wait-page-load",
+  "id": "wait-page-load",
   "params": {
     "waitType": "wait_page_load"
   },
@@ -877,7 +877,7 @@
 {
   "tabId": 123,
   "type": "get_url",
-  "instructionID": "get-url-001",
+  "id": "get-url-001",
   "params": {
     "usage": "variable"
   },
@@ -899,7 +899,7 @@
 {
   "tabId": 1,
   "type": "get_url",
-  "instructionID": "get-current-url",
+  "id": "get-current-url",
   "params": {
     "usage": "variable"
   },
@@ -919,7 +919,7 @@
 {
   "tabId": 123,
   "type": "activate_tab",
-  "instructionID": "activate-tab-001",
+  "id": "activate-tab-001",
   "params": {},
   "delay": 0,
   "retry": 0,
@@ -939,7 +939,7 @@
 {
   "tabId": 1,
   "type": "activate_tab",
-  "instructionID": "activate-tab",
+  "id": "activate-tab",
   "params": {},
   "created_at": 1703123456789
 }
@@ -956,7 +956,7 @@
   {
     "tabId": 1,
     "type": "navigate",
-    "instructionID": "nav-google",
+    "id": "nav-google",
     "params": {
       "url": "https://www.google.com"
     },
@@ -965,7 +965,7 @@
   {
     "tabId": 1,
     "type": "find_element",
-    "instructionID": "find-search-box",
+    "id": "find-search-box",
     "params": {
       "element": {
         "name": "searchBox",
@@ -981,7 +981,7 @@
   {
     "tabId": 1,
     "type": "input",
-    "instructionID": "input-search",
+    "id": "input-search",
     "params": {
       "elementName": "searchBox",
       "text": "自动化测试",
@@ -993,7 +993,7 @@
   {
     "tabId": 1,
     "type": "find_element",
-    "instructionID": "find-search-button",
+    "id": "find-search-button",
     "params": {
       "element": {
         "name": "searchButton",
@@ -1007,7 +1007,7 @@
   {
     "tabId": 1,
     "type": "mouse",
-    "instructionID": "click-search",
+    "id": "click-search",
     "params": {
       "action": "click",
       "elementName": "searchButton",
@@ -1018,7 +1018,7 @@
   {
     "tabId": 1,
     "type": "screenshot",
-    "instructionID": "screenshot-results",
+    "id": "screenshot-results",
     "params": {
       "format": "png",
       "fullPage": true
@@ -1043,7 +1043,7 @@
 
 5. **时间戳**：`created_at` 字段应使用 Unix 时间戳（毫秒）。
 
-6. **指令 ID 唯一性**：每个指令的 `instructionID` 应该是唯一的。
+6. **指令 ID 唯一性**：每个指令的 `id` 应该是唯一的。
 
 7. **标签页 ID**：确保 `tabId` 对应的标签页存在且已连接 CDP。
 

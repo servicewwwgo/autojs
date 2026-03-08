@@ -19,7 +19,7 @@ import { SendMessageToContentScript, ExecuteCDPCommand, OutputLogToFile, LogLeve
 export abstract class BaseInstructionClass implements BaseInstruction {
     public tabId: number;
     public type: string;
-    public instructionID: string;
+    public id: string;
     public delay?: number;
     public retry?: number;
     public timeout?: number;
@@ -30,7 +30,7 @@ export abstract class BaseInstructionClass implements BaseInstruction {
     constructor(instruction: BaseInstruction) {
         this.tabId = instruction.tabId;
         this.type = instruction.type;
-        this.instructionID = instruction.instructionID;
+        this.id = instruction.id;
         this.delay = instruction.delay;
         this.retry = instruction.retry;
         this.timeout = instruction.timeout;
@@ -52,7 +52,7 @@ export abstract class BaseInstructionClass implements BaseInstruction {
         return {
             tabId: this.tabId,
             type: this.type,
-            instructionID: this.instructionID,
+            id: this.id,
             delay: this.delay,
             retry: this.retry,
             timeout: this.timeout,
@@ -131,7 +131,7 @@ export abstract class BaseInstructionClass implements BaseInstruction {
                 lastError = error as Error;
                 // 如果不是最后一次尝试，等待后重试
                 if (i < maxAttempts) {
-                    OutputLogToFile(`[BaseInstruction] Instruction ${this.instructionID} execution failed, retrying (${i}/${maxAttempts}): ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
+                    OutputLogToFile(`[BaseInstruction] Instruction ${this.id} execution failed, retrying (${i}/${maxAttempts}): ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.WARN });
                     await this.Delay(1); // 重试前等待 1 秒
                 }
             }
@@ -139,7 +139,7 @@ export abstract class BaseInstructionClass implements BaseInstruction {
 
         // 所有重试都失败，返回错误结果
         return {
-            instructionID: this.instructionID,
+            id: this.id,
             tabId: this.tabId,
             success: false,
             error: lastError?.message || `Execution failed after ${maxAttempts} attempts`,

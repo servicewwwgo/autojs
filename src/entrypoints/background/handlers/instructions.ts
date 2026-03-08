@@ -9,13 +9,13 @@ const EXECUTE_DELAY_MS = 5000;
 /**
  * 业务逻辑：创建添加指令集的处理器函数，将用户配置的指令集添加到指令执行器中等待执行
  * 
- * 实现方式：接收 JSON 字符串格式的指令数组，反序列化后为每条指令设置必要的属性（tabId、instructionID、created_at），
+ * 实现方式：接收 JSON 字符串格式的指令数组，反序列化后为每条指令设置必要的属性（tabId、id、created_at），
  * 使用 InstructionFactory 创建指令实例，添加到指令执行器的未过滤指令列表中
  * 
  * 注意事项：
  * - 指令必须为数组格式，否则返回错误
  * - 如果指令缺少 tabId，使用消息参数中的 tabId
- * - 如果指令缺少 instructionID，自动生成唯一 ID（格式：inst_时间戳_索引）
+ * - 如果指令缺少 id，自动生成唯一 ID（格式：inst_时间戳_索引）
  * - 如果指令缺少 created_at，使用当前时间加索引，确保指令按创建时间排序
  * 
  * @param instructionExecutor - 指令执行器实例
@@ -40,7 +40,7 @@ export function createAddInstructionsHandler(instructionExecutor: InstructionExe
                 return;
             }
 
-            // 为每条指令设置必要的属性（tabId、instructionID、created_at）
+            // 为每条指令设置必要的属性（tabId、id、created_at）
             // 确保指令按创建时间排序，时间戳精确到毫秒
             const now = Date.now();
 
@@ -52,10 +52,10 @@ export function createAddInstructionsHandler(instructionExecutor: InstructionExe
                     instruction.tabId = tabId;
                 }
 
-                // 如果指令没有 instructionID，生成一个唯一的 ID
+                // 如果指令没有 id，生成一个唯一的 ID
                 // 格式：inst_时间戳_索引
-                if (!instruction.instructionID) {
-                    instruction.instructionID = `inst_${now}_${index}`;
+                if (!instruction.id) {
+                    instruction.id = `inst_${now}_${index}`;
                 }
 
                 // 如果指令没有 created_at，使用当前时间 + 索引（确保顺序）

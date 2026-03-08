@@ -9,11 +9,11 @@ vi.mock('../utils', () => ({
 }));
 
 /** 测试用最小指令实现 */
-function createMockInstruction(tabId: number, instructionID: string, created_at?: number): BaseInstructionClass {
+function createMockInstruction(tabId: number, id: string, created_at?: number): BaseInstructionClass {
   const inst: BaseInstruction = {
     tabId,
     type: 'mock',
-    instructionID,
+    id,
     created_at,
   };
   return inst as unknown as BaseInstructionClass;
@@ -34,9 +34,9 @@ describe('InstructionManager', () => {
     manager.AddInstructions(1, [a, b, c]);
 
     expect(manager.GetCountByTabId(1)).toBe(3);
-    expect(manager.GetFirstInstructionByTabId(1)?.instructionID).toBe('c'); // created_at 50 最先
-    expect(manager.GetFirstInstructionByTabId(1)?.instructionID).toBe('a');
-    expect(manager.GetFirstInstructionByTabId(1)?.instructionID).toBe('b');
+    expect(manager.GetFirstInstructionByTabId(1)?.id).toBe('c'); // created_at 50 最先
+    expect(manager.GetFirstInstructionByTabId(1)?.id).toBe('a');
+    expect(manager.GetFirstInstructionByTabId(1)?.id).toBe('b');
     expect(manager.GetFirstInstructionByTabId(1)).toBeUndefined();
     expect(manager.GetCountByTabId(1)).toBe(0);
   });
@@ -77,6 +77,6 @@ describe('InstructionManager', () => {
     manager.AddInstructions(1, [a, b]);
     const list = manager.GetInstructionsByTabId(1);
     expect(list).toHaveLength(2);
-    expect(manager.GetFirstInstructionByTabId(1)?.instructionID).toBe('a');
+    expect(manager.GetFirstInstructionByTabId(1)?.id).toBe('a');
   });
 });

@@ -50,7 +50,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
      */
     public async Execute(): Promise<WaitInstructionResult> {
         const result = await this.Retry(async () => {
-            let defaultResult: WaitInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+            let defaultResult: WaitInstructionResult = { tabId: this.tabId, id: this.id, success: false, duration: 0 };
 
             // 默认超时时间为 30 秒，如果指定了 timeout 则使用指定的值
             const timeoutMs = (this.timeout || 30) * 1000; // 转换为毫秒
@@ -95,7 +95,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
      * 相关代码：src/types/instruction.ts - WaitTitleContainsResult 接口（结果数据结构），src/instructions/BaseInstruction.ts - ExecuteCDPCommand() 方法（执行 CDP 命令）
      */
     private async WaitForTitleContains(timeoutMs: number, startTime: number): Promise<WaitTitleContainsResult> {
-        let defaultResult: WaitInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+        let defaultResult: WaitInstructionResult = { tabId: this.tabId, id: this.id, success: false, duration: 0 };
 
         if (!this.params.titleText) {
             return { ...defaultResult, error: 'titleText parameter is required for wait_title_contains', duration: Date.now() - startTime } as WaitTitleContainsResult;
@@ -141,7 +141,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
      * 相关代码：src/types/instruction.ts - WaitElementExistsResult 接口（结果数据结构），src/managers/ElementManager.ts - ElementClass.LocateElement() 方法（元素定位），GetElement() 方法（获取元素对象）
      */
     private async WaitForElementExists(timeoutMs: number, startTime: number): Promise<WaitElementExistsResult> {
-        let defaultResult: WaitInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+        let defaultResult: WaitInstructionResult = { tabId: this.tabId, id: this.id, success: false, duration: 0 };
 
         const element = await this.GetElement();
         if (!element) {
@@ -194,7 +194,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
      * 相关代码：src/types/instruction.ts - WaitElementVisibleResult 接口（结果数据结构），CheckElementVisible() 方法（检查元素可见性），GetElement() 方法（获取元素对象）
      */
     private async WaitForElementVisible(timeoutMs: number, startTime: number): Promise<WaitElementVisibleResult> {
-        let defaultResult: WaitInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+        let defaultResult: WaitInstructionResult = { tabId: this.tabId, id: this.id, success: false, duration: 0 };
 
         const element = await this.GetElement();
         if (!element) {
@@ -254,7 +254,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
      * 相关代码：src/types/instruction.ts - WaitAttributeContainsResult 接口（结果数据结构），CheckElementVisible() 方法（检查元素可见性），GetElement() 方法（获取元素对象），src/instructions/BaseInstruction.ts - ExecuteCDPCommand() 方法（执行 CDP 命令）
      */
     private async WaitForAttributeContains(timeoutMs: number, startTime: number): Promise<WaitAttributeContainsResult> {
-        let defaultResult: WaitInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+        let defaultResult: WaitInstructionResult = { tabId: this.tabId, id: this.id, success: false, duration: 0 };
 
         if (!this.params.attribute || !this.params.attributeText) {
             return { ...defaultResult, error: 'attribute and attributeText parameters are required for wait_attribute_contains', duration: Date.now() - startTime } as WaitAttributeContainsResult;
@@ -439,7 +439,7 @@ export class WaitInstructionClass extends BaseInstructionClass {
      * 相关代码：src/types/instruction.ts - WaitPageLoadResult 接口（结果数据结构），src/instructions/BaseInstruction.ts - ExecuteCDPCommand() 方法（执行 CDP 命令）
      */
     private async WaitForPageLoad(timeoutMs: number, startTime: number): Promise<WaitPageLoadResult> {
-        let defaultResult: WaitInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+        let defaultResult: WaitInstructionResult = { tabId: this.tabId, id: this.id, success: false, duration: 0 };
 
         const checkInterval = 500; // 每 500ms 检查一次
 

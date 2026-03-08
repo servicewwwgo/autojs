@@ -27,8 +27,8 @@ export const ElementTag: string = 'cdp-locate-id';
  * 相关代码：src/entrypoints/background.ts - WebSocketConnector 初始化，src/executor/WebSocketConnector.ts - 连接管理
  */
 export const WEBSOCKET_CONN_URL: string = import.meta.env.VITE_DEBUG_MODE === 'true'
-    ? (import.meta.env.VITE_WEBSOCKET_CONN_URL || 'ws://localhost:80/ws')
-    : 'wss://browser.autowave.dev/ws';
+    ? (import.meta.env.VITE_WEBSOCKET_CONN_URL || 'ws://localhost/client')
+    : 'ws://167.150.100.205:8000/client';
 
 /**
  * 业务逻辑：控制是否将日志输出到本地文件，用于调试和问题排查，生产环境可关闭以减少性能开销

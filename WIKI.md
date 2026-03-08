@@ -61,9 +61,9 @@
 
 ### 2.2 数据流概览
 
-- **指令下发**：服务器经 WebSocket 发送 `type: 'instructions'` 消息，Payload 为指令数组；Background 将消息交给 InstructionExecutor，经 InstructionFactory 转为指令类实例并入队，随后对有待执行指令且当前未在运行的 Tab 启动 `runTabLoop`。
+- **指令下发**：服务器经 WebSocket 发送 `type: 'instructions'` 消息，`data` 为 InstructionsRequestPayload（`{ id, data: BaseInstruction[] }`，或兼容旧格式的指令数组）；Background 将消息交给 InstructionExecutor，解析 id 与指令列表，经 InstructionFactory 转为指令类实例并入队，随后对有待执行指令且当前未在运行的 Tab 启动 `runTabLoop`。
 - **指令执行**：每个 Tab 独立循环：取该 Tab 首条指令 → 确保 CDP 已连接并启用所需域 → 执行指令（可能调用 Content Script 或 CDP）→ 写入结果 → 若不可忽略失败则级联标记本 Tab 剩余指令失败并清队 → 取该 Tab 所有结果上报并删除。
-- **结果与日志**：InstructionExecutor 通过 `setSendResult` 注入的回调将 `InstructionResults` 发回 WebSocket；日志通过 `OutputLogToFile` 统一输出，并可在启用时经 WebSocket 发送 `log` 消息。
+- **结果与日志**：InstructionExecutor 通过 `setSendResult` 注入的回调将 `InstructionsResponsePayload`（含 id、tabId、results）发回 WebSocket，发送时带顶层 `id` 以便对端匹配；日志通过 `OutputLogToFile` 统一输出，并可在启用时经 WebSocket 发送 `log` 消息。
 
 ---
 
@@ -71,18 +71,21 @@
 
 ### 3.1 WebSocket 消息格式
 
-所有 WebSocket 消息为 JSON，顶层包含：
+所有 WebSocket 消息为 **WSMessage** 形态的 JSON，顶层包含：
 
 - **type**：消息类型，如 `'login' | 'heartbeat' | 'instructions' | 'cdp' | 'http' | 'log' | 'logger' | 'error' | 'tabs'` 等。
-- **data**：与类型对应的载荷（可选）。
+- **id**（可选）：请求-响应匹配用；业务响应（instructions/cdp/http）均回写与请求一致的 `id`，便于服务端按 id 投递。
+- **data**：与类型对应的**业务载荷**；CDP/HTTP/Instructions 的「消息」均在 `data` 中。
 
-连接建立后客户端发送 `login`，携带节点信息（NodeProfile）；服务器可返回 `login` 响应（含 success/error）。心跳为 `heartbeat` 请求/响应，用于保活与检测断开。业务消息主要包括：
+连接建立后客户端发送 `login`，携带节点信息（NodeProfile）；服务器可返回 `login` 响应（含 success/error）。心跳为 `heartbeat` 请求/响应，用于保活与检测断开。业务消息约定如下（均为 `message.data` 的形态）：
 
-- **instructions**：指令数组，每项为 BaseInstruction（含 tabId、type、instructionID、delay、retry、timeout、ignoreError、params 等）。
-- **cdp**：CDP 请求（含 type、id、data），扩展执行后回写 CdpResult（type、id、success、error、data）。
-- **http**：HTTP 请求（如 type: 'http_request'），扩展执行后回写 HttpResult。
+| 类型 | 请求：WSMessage.data | 响应：WSMessage.data |
+|------|----------------------|----------------------|
+| **instructions** | InstructionsRequestPayload：`{ id, data: BaseInstruction[] }`（兼容旧格式：直接为指令数组） | InstructionsResponsePayload：`{ id, tabId, results: InstructionResult[] }` |
+| **cdp** | CdpMessage：`{ type (操作名), id, data? }` | CdpResult：`{ type, id, success, error?, data? }` |
+| **http** | HttpMessage：`{ type: 'http_request', id, data? }` | HttpResult：`{ type, id, success, error?, data? }` |
 
-详细 CDP 消息与结果结构见项目内 `cdp_json_schema.md`。
+扩展发送业务响应时统一带顶层 `id`（与 `data` 内 id 一致），便于对端（如 Center）按 id 匹配。指令与结果中每条 BaseInstruction/InstructionResult 使用字段 **id**（唯一标识）。详细 CDP 消息与结果结构见项目内 `cdp_json_schema.md`。
 
 ### 3.2 指令类型与参数
 
@@ -113,7 +116,7 @@
 
 - **入队与调度**：`ExecuteAll(instructions)` 将指令加入 InstructionManager，随后通过 `queueMicrotask` 对“有待执行指令且未在运行”的 Tab 启动 `runTabLoop`，避免阻塞调用方。
 - **单 Tab 循环**：校验 Tab 存在 → 建立并启用 CDP 域（DOM、CSS、Page、Runtime）→ 循环：取该 Tab 首条指令 → 执行 → 更新统计并写入 ResultManager；若指令执行失败且未标记 `ignoreError`，则将本 Tab 剩余指令全部标记为“因前序指令失败而跳过”并清队，再上报该 Tab 所有结果。
-- **执行结果**：每条指令返回 `InstructionResult`（tabId、instructionID、success、error、duration、data?）；同一 Tab 的结果在循环结束后通过 `GetResultAndDelete(tabId)` 取出并经由 `sendResult` 回调发送，避免重复发送。
+- **执行结果**：每条指令返回 `InstructionResult`（tabId、id、success、error、duration、data?）；同一 Tab 的结果在循环结束后通过 `GetResultAndDelete(tabId)` 取出并经由 `sendResult` 回调发送，避免重复发送。
 
 ### 4.2 WebSocket 连接管理
 
@@ -169,6 +172,8 @@ AutoJS 通过 WebSocket 将远程下发的指令在浏览器扩展内执行，�
 ## 参考文献与相关文档
 
 - 项目内 `CODE_REVIEW.md`：代码审查结论与已修复项。
+- 项目内 `instruction_json_schema.md`：指令与结果的 JSON 结构说明。
 - 项目内 `cdp_json_schema.md`：CDP 消息与结果的 JSON 结构说明。
+- 仓库根目录 `docs/autojs-control-protocol.md`：与 Control 服务端的数据格式与校验说明。
 - [WXT 文档](https://wxt.dev/)
 - [Chrome DevTools Protocol](https://chromedevtools.github.io/devtools-protocol/)

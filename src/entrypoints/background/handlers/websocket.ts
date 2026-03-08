@@ -120,7 +120,8 @@ export function createSendResultsToServerHandler(
     ): Promise<void> {
         if (wsConnector && wsConnector.isConnected()) {
             const results = instructionExecutor.GetResultManager().GetAllResults();
-            const message: WSMessage = { type: 'instructions', data: results };
+            const payload = { id: `report_${Date.now()}`, results };
+            const message: WSMessage = { type: 'instructions', id: payload.id, data: payload };
             wsConnector.sendMessage(message);
             OutputLogToFile(`[Background] Sent execution results to server successfully, count: ${results.length}`, { level: LogLevel.INFO });
             sendResponse({ success: true });

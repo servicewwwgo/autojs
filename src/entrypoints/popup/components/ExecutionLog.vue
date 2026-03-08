@@ -21,10 +21,10 @@
         </div>
 
         <div class="log-list">
-            <div v-for="result in filteredLogs" :key="result.instructionID"
+            <div v-for="result in filteredLogs" :key="result.id"
                 :class="['log-item', result.success ? 'success' : 'error']">
                 <div class="log-header">
-                    <span class="log-id">{{ result.instructionID }}</span>
+                    <span class="log-id">{{ result.id }}</span>
                     <span :class="['log-status', result.success ? 'success' : 'error']">
                         {{ result.success ? '✓ 成功' : '✗ 失败' }}
                     </span>

@@ -35,7 +35,7 @@ export class WebSocketConnector {
     private url: string;
     private reconnectInterval: number = RECONNECT_INTERVAL; // 5秒重连间隔
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    private heartbeatInterval: number = HEARTBEAT_INTERVAL; // 30秒心跳间隔
+    private heartbeatInterval: number = HEARTBEAT_INTERVAL; // 15秒心跳间隔，与 HEARTBEAT_INTERVAL 常量一致
     private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     private connected: boolean = false; // WebSocket 连接状态
     private isLoggedIn: boolean = false; // 登录状态

@@ -1,6 +1,6 @@
 import { BaseInstructionClass, InstructionFactory } from '../instructions';
 import { InstructionManager, ResultManager } from '../managers';
-import { BaseInstruction, InstructionResult, InstructionResults, WSMessage } from '../types';
+import { BaseInstruction, InstructionResult, InstructionResults, InstructionsRequestPayload, InstructionsResponsePayload, WSMessage } from '../types';
 import { EnsureCDPConnected, ExecuteCDPCommand, LogLevel, OutputLogToFile } from '../utils';
 
 /**
@@ -27,7 +27,10 @@ export class InstructionExecutor {
 
   private startTime: number = Date.now();
 
-  private sendResult: ((result: InstructionResults) => void) | undefined;
+  private sendResult: ((result: InstructionsResponsePayload) => void) | undefined;
+
+  /** 当前批次的请求 id（来自 WSMessage.data.id），回传结果时带入响应负载 */
+  private _currentRequestId: string = '';
 
   /** 当前正在执行 runTabLoop 的 tabId 集合，用于避免同一标签页被并发执行 */
   private runningTabIds: Set<number> = new Set();
@@ -47,11 +50,11 @@ export class InstructionExecutor {
    * - 回调函数会在 ExecuteAll() 方法中，每个标签页的指令执行完成后调用
    * - 如果未设置回调，执行结果仍会保存到 ResultManager，但不会主动发送
    *
-   * @param sendResult - 发送指令结果的函数，接收 InstructionResults 类型参数
+   * @param sendResult - 发送指令结果的函数，接收 InstructionsResponsePayload（含 id、tabId、results）
    *
    * 相关代码：src/executor/InstructionExecutor.ts - ExecuteAll() 方法（调用此回调），src/entrypoints/background.ts - 设置 WebSocket 发送回调
    */
-  public setSendResult(sendResult: (result: InstructionResults) => void): void {
+  public setSendResult(sendResult: (result: InstructionsResponsePayload) => void): void {
     this.sendResult = sendResult;
   }
 
@@ -192,10 +195,10 @@ export class InstructionExecutor {
 
         this.executedCount++;
         if (result.success) {
-          OutputLogToFile(`[InstructionExecutor] Instruction executed successfully: ${instruction.instructionID} (${instruction.type}), duration: ${result.duration}ms`, { level: LogLevel.INFO });
+          OutputLogToFile(`[InstructionExecutor] Instruction executed successfully: ${instruction.id} (${instruction.type}), duration: ${result.duration}ms`, { level: LogLevel.INFO });
           this.successCount++;
         } else {
-          OutputLogToFile(`[InstructionExecutor] Instruction execution failed: ${instruction.instructionID} (${instruction.type}), error: ${result.error || 'unknown error'}, duration: ${result.duration}ms`, { level: LogLevel.ERROR });
+          OutputLogToFile(`[InstructionExecutor] Instruction execution failed: ${instruction.id} (${instruction.type}), error: ${result.error || 'unknown error'}, duration: ${result.duration}ms`, { level: LogLevel.ERROR });
           this.errorCount++;
         }
 
@@ -208,7 +211,7 @@ export class InstructionExecutor {
           for (const inst of remainingCopy) {
             const failedResult: InstructionResult = {
               tabId: inst.tabId,
-              instructionID: inst.instructionID,
+              id: inst.id,
               success: false,
               duration: 0,
               error: 'Skipped due to previous instruction failure (cascading failure)',
@@ -216,16 +219,16 @@ export class InstructionExecutor {
             this.executedCount++;
             this.errorCount++;
             this.resultManager.SaveResult(failedResult);
-            OutputLogToFile(`[InstructionExecutor] Instruction marked as failed (skipped): ${inst.instructionID} (${inst.type})`, { level: LogLevel.WARN });
+            OutputLogToFile(`[InstructionExecutor] Instruction marked as failed (skipped): ${inst.id} (${inst.type})`, { level: LogLevel.WARN });
           }
           this.instructionManager.DeleteInstructionsByTabId(tabId);
           break;
         }
       }
 
-      // 正常结束或 cascading failure 后，统一在本轮 runTabLoop 末尾上报该 tab 的所有结果
+      // 正常结束或 cascading failure 后，统一在本轮 runTabLoop 末尾上报该 tab 的所有结果（负载带 id 以与请求匹配）
       const results = this.resultManager.GetResultAndDelete(tabId) ?? [];
-      this.sendResult?.({ tabId: tabId, results: results });
+      this.sendResult?.({ id: this._currentRequestId, tabId, results });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       if (errorMsg.includes('No tab with id') || errorMsg.includes('No tab with given id')) {
@@ -251,19 +254,29 @@ export class InstructionExecutor {
    * - 使用 InstructionFactory.create() 将指令数据转换为可执行的指令对象
    * - 如果消息格式无效，会记录警告但不会抛出异常
    *
-   * @param message - WebSocket 消息，data 字段应包含 BaseInstruction[] 数组
+   * @param message - WebSocket 消息，message.data 为 InstructionsRequestPayload（{ id, data: BaseInstruction[] }）或兼容旧格式 BaseInstruction[] 数组
    *
-   * 相关代码：src/instructions/index.ts - InstructionFactory 类（创建指令对象），src/executor/InstructionExecutor.ts - ExecuteAll() 方法（执行指令），src/types/websocket_message.ts - WSMessage 接口（消息类型定义）
+   * 相关代码：src/instructions/index.ts - InstructionFactory 类（创建指令对象），src/executor/InstructionExecutor.ts - ExecuteAll() 方法（执行指令），src/types/instruction.ts - InstructionsRequestPayload
    */
   public async handleMessage(message: WSMessage): Promise<void> {
-    // 判斷 message.data 是否是 BaseInstructionClass[]
-    if (message.data && Array.isArray(message.data)) {
-      const instructions: BaseInstruction[] = message.data as BaseInstruction[];
-      const instructionClasses: BaseInstructionClass[] = instructions.map(instruction => InstructionFactory.create(instruction));
-      OutputLogToFile(`[InstructionExecutor] Received WebSocket instruction message, count: ${instructionClasses.length}`, { level: LogLevel.INFO });
-      this.ExecuteAll(instructionClasses);
+    const payload = message.data;
+    let instructions: BaseInstruction[];
+    let requestId: string = '';
+
+    if (payload && typeof payload === 'object' && Array.isArray(payload.data) && typeof payload.id === 'string') {
+      const req = payload as InstructionsRequestPayload;
+      requestId = req.id;
+      instructions = req.data;
+    } else if (payload && Array.isArray(payload)) {
+      instructions = payload as BaseInstruction[];
     } else {
       OutputLogToFile(`[InstructionExecutor] Received invalid WebSocket instruction message: ${JSON.stringify(message)}`, { level: LogLevel.WARN });
+      return;
     }
+
+    this._currentRequestId = requestId;
+    const instructionClasses: BaseInstructionClass[] = instructions.map(instruction => InstructionFactory.create(instruction));
+    OutputLogToFile(`[InstructionExecutor] Received WebSocket instruction message, id: ${requestId || '(none)'}, count: ${instructionClasses.length}`, { level: LogLevel.INFO });
+    this.ExecuteAll(instructionClasses);
   }
 }

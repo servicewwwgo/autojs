@@ -51,7 +51,7 @@ export class InputInstructionClass extends BaseInstructionClass {
      */
     public async Execute(): Promise<InputInstructionResult> {
         const result = await this.Retry(async () => {
-            let defaultResult: InputInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+            let defaultResult: InputInstructionResult = { tabId: this.tabId, id: this.id, success: false, duration: 0 };
 
             // 从 elementManager 获取元素
             const element = elementManager.GetElementByName(this.tabId, this.params.elementName);

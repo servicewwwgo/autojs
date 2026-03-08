@@ -49,7 +49,7 @@ export class GetAttributeInstructionClass extends BaseInstructionClass {
    */
   public async Execute(): Promise<GetAttributeInstructionResult> {
     const result = await this.Retry(async () => {
-      let defaultResult: GetAttributeInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+      let defaultResult: GetAttributeInstructionResult = { tabId: this.tabId, id: this.id, success: false, duration: 0 };
 
       // 从 elementManager 获取元素
       const element = elementManager.GetElementByName(this.tabId, this.params.elementName);

@@ -37,11 +37,11 @@ export interface ElementData {
 /**
  * 业务逻辑：定义指令执行结果的基础结构，用于记录指令执行状态、错误信息和执行数据，支持指令执行统计、错误追踪和结果传递
  *
- * 实现方式：使用 TypeScript 接口定义结果结构，包含必需字段（tabId、instructionID、success、duration）和可选字段（error、data）
+ * 实现方式：使用 TypeScript 接口定义结果结构，包含必需字段（tabId、id、success、duration）和可选字段（error、data）
  *
  * 注意事项：
  * - tabId：标签页 ID，标识指令执行的标签页
- * - instructionID：指令唯一标识符，与指令的 instructionID 字段对应
+ * - id：指令唯一标识符，与指令的 id 字段对应
  * - success：执行是否成功，布尔值，用于快速判断执行状态
  * - error：错误信息，可选字段，仅在执行失败时设置
  * - duration：执行耗时（毫秒），用于性能分析和监控
@@ -53,7 +53,7 @@ export interface ElementData {
  */
 export interface InstructionResult {
   tabId: number;
-  instructionID: string;
+  id: string;
   success: boolean;
   error?: string;
   duration: number;
@@ -387,14 +387,39 @@ export interface InstructionResults {
 }
 
 /**
+ * 业务逻辑：定义 instructions 请求的 WSMessage.data 负载，与 CDP/HTTP 一致，负载内包含 id 与指令列表
+ *
+ * 注意事项：
+ * - id：请求唯一标识，与响应负载的 id 对应，用于请求-响应匹配
+ * - data：指令数组（BaseInstruction[]）
+ */
+export interface InstructionsRequestPayload {
+  id: string;
+  data: BaseInstruction[];
+}
+
+/**
+ * 业务逻辑：定义 instructions 响应的 WSMessage.data 负载，与 CDP/HTTP 一致，负载内包含 id 与结果
+ *
+ * 注意事项：
+ * - id：与请求负载的 id 对应，用于请求-响应匹配
+ * - tabId、results：与 InstructionResults 相同
+ */
+export interface InstructionsResponsePayload {
+  id: string;
+  tabId: number;
+  results: InstructionResult[];
+}
+
+/**
  * 业务逻辑：定义所有指令的基础结构，提供通用的指令属性（延迟、重试、超时等），确保指令执行的可靠性和可控性，所有具体指令类型都继承自此接口
  *
- * 实现方式：使用 TypeScript 接口定义基础指令结构，包含必需字段（tabId、type、instructionID）和可选字段（delay、retry、timeout、ignoreError、created_at、params）
+ * 实现方式：使用 TypeScript 接口定义基础指令结构，包含必需字段（tabId、type、id）和可选字段（delay、retry、timeout、ignoreError、created_at、params）
  *
  * 注意事项：
  * - tabId：标签页 ID，必需字段，指定指令执行的标签页
  * - type：指令类型，必需字段，用于识别指令类型并路由到对应的执行器
- * - instructionID：指令唯一标识符，必需字段，用于追踪和标识指令
+ * - id：指令唯一标识符，必需字段，用于追踪和标识指令
  * - delay：延迟时间（秒），可选字段，指令执行前的等待时间
  * - retry：重试次数，可选字段，执行失败时的重试次数，默认不重试
  * - timeout：超时时间（毫秒），可选字段，指令执行的最大等待时间
@@ -408,7 +433,7 @@ export interface InstructionResults {
 export interface BaseInstruction {
   tabId: number;  // 标签页ID
   type: string;  // 指令类型
-  instructionID: string;  // 指令ID
+  id: string;  // 指令ID
   delay?: number;  // 延迟时间
   retry?: number;  // 重试次数
   timeout?: number;  // 超时时间

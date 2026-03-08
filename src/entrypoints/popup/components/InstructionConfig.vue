@@ -40,7 +40,7 @@ const instructionsJson = ref(`[
   {
     "type": "find_element",
     "tabId": 0,
-    "instructionID": "inst2",
+    "id": "inst2",
     "params": {
       "element": {
         "name": "BM View",

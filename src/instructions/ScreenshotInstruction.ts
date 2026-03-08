@@ -49,7 +49,7 @@ export class ScreenshotInstructionClass extends BaseInstructionClass {
    */
   public async Execute(): Promise<ScreenshotInstructionResult> {
     const result = await this.Retry(async () => {
-      let defaultResult: ScreenshotInstructionResult = { tabId: this.tabId, instructionID: this.instructionID, success: false, duration: 0 };
+      let defaultResult: ScreenshotInstructionResult = { tabId: this.tabId, id: this.id, success: false, duration: 0 };
 
       const format = this.params.format ?? 'png';
       const quality = this.params.quality ?? 100;

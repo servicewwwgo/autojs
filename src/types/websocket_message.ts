@@ -16,6 +16,8 @@ import type { NodeProfile } from './node';
  */
 export interface WSMessage {
   type: 'error' | 'login' | 'heartbeat' | 'tabs' | 'instructions' | 'cdp' | 'http' | 'log' | 'logger';
+  /** 可选，用于 instructions/cdp/http 响应时与请求匹配（如 Center send_and_wait 按顶层 id 投递） */
+  id?: string;
   data?: any;
 }
 
