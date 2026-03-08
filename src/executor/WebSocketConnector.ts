@@ -170,7 +170,14 @@ export class WebSocketConnector {
 
             this.ws.onmessage = (event) => {
                 const raw = typeof event.data === 'string' ? event.data : String(event.data);
-                this.pushWsLog('received', raw);
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (parsed?.type !== 'heartbeat') {
+                        this.pushWsLog('received', raw);
+                    }
+                } catch {
+                    this.pushWsLog('received', raw);
+                }
                 this.handleMessage(event);
             };
 
@@ -566,7 +573,9 @@ export class WebSocketConnector {
                 return false;
             }
 
-            this.pushWsLog('sent', jsonString);
+            if (message.type !== 'heartbeat') {
+                this.pushWsLog('sent', jsonString);
+            }
             this.ws?.send(jsonString);
             return true;
         } catch (error) {

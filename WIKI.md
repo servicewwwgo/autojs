@@ -123,7 +123,7 @@
 - **连接与登录**：连接建立后自动发送 `login`（NodeProfile）；在未登录前不处理业务消息。支持 `isDisconnecting` 防止主动断开时触发重连。
 - **心跳与重连**：定时发送 `heartbeat`（如 15 秒间隔）；断线后按间隔（如 5 秒）重连。`isConnected()` 会校验 WebSocket 实际 `readyState`，以应对 Service Worker 休眠导致的状态不一致。
 - **消息大小**：发送前检查消息体，超过 10MB 拒绝发送，避免异常大包导致连接或内存问题。
-- **WebSocket 收发日志**：在 `onmessage` 收到数据后（在 `JSON.parse` 之前）与每次 `ws.send` 发送前，将原始字符串（`event.data` / `jsonString`）及方向（sent/received）、时间戳写入内部 FIFO 缓冲区，最多保留 200 条；不按消息 type 过滤，记录所有类型。Popup 通过 `get_ws_logs`、`clear_ws_logs` 与 Background 通信获取或清空日志；ExecutionLog 页面（标题「WebSocket 日志」）每 2 秒轮询展示，支持按方向筛选与条目展开查看原始 JSON。详见 `WIKI-ExecutionLog-WebSocket-Log.md`。
+- **WebSocket 收发日志**：在 `onmessage` 收到数据后与每次 `ws.send` 发送前，将原始字符串及方向、时间戳写入内部 FIFO 缓冲区，最多保留 200 条；丢弃 heartbeat 类型，其余类型（login、instructions、cdp、http、error、logger、tabs 等）全部记录。Popup 通过 `get_ws_logs`、`clear_ws_logs` 与 Background 通信获取或清空日志；ExecutionLog 页面（标题「WebSocket 日志」）每 2 秒轮询展示，支持按方向筛选与条目展开查看原始 JSON。详见 `WIKI-ExecutionLog-WebSocket-Log.md`。
 
 ### 4.3 资源与生命周期
 

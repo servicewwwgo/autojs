@@ -15,7 +15,7 @@
 | 3. 发送到服务器按钮 | 去掉 | 不再提供 |
 | 4. 刷新方式 | 自动轮询 | 无需手动刷新按钮 |
 | 5. 原指令执行结果 | 完全替换 | 本页仅展示 WebSocket 日志 |
-| 6. 消息类型范围 | 记录所有类型 | 不按 type 过滤，login、heartbeat、instructions、cdp、http、error、logger、tabs 等全部记录 |
+| 6. 消息类型范围 | 记录所有类型（不含 heartbeat） | 不记录 heartbeat；其余 login、instructions、cdp、http、error、logger、tabs 等全部记录 |
 
 ---
 
@@ -28,7 +28,7 @@
 
 **实现要点：**
 
-- **Background**：在 WebSocket 收发处打点记录，**不按 type 过滤，记录所有类型的消息**（login、heartbeat、instructions、cdp、http、error、logger、tabs 等）：
+- **Background**：在 WebSocket 收发处打点记录，**记录所有类型，但丢弃 heartbeat**（login、instructions、cdp、http、error、logger、tabs 等）：
   - **收**：在 `WebSocketConnector` 的 `onmessage` 回调中，收到 `MessageEvent` 后，**在 `JSON.parse` 之前** 将 `event.data`（原始字符串）及方向、时间戳写入 WS 日志存储。
   - **发**：在 `WebSocketConnector.sendMessage()`、`sendLoginMessage()` 等实际调用 `ws.send(jsonString)` 之前，将待发送的 **原始字符串**（即 `jsonString`）及方向、时间戳写入同一存储。
 - **Popup**：不再使用 `get_results` / `clear_results` / `send_results_to_server`，改为：
