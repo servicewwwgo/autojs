@@ -15,7 +15,9 @@ import {
     createConnectWebSocketHandler,
     createDisconnectWebSocketHandler,
     createTestWebSocketHandler,
-    createSendResultsToServerHandler
+    createSendResultsToServerHandler,
+    createGetWsLogsHandler,
+    createClearWsLogsHandler
 } from './background/handlers';
 import { WebSocketService, CdpEventService, InitializationService } from './background/services';
 
@@ -112,6 +114,8 @@ export default defineBackground(() => {
         'disconnect_websocket': createDisconnectWebSocketHandler(webSocketService.getConnector()),
         'test_websocket': createTestWebSocketHandler(webSocketService.getConnector()),
         'send_results_to_server': createSendResultsToServerHandler(webSocketService.getConnector(), instructionExecutor),
+        'get_ws_logs': createGetWsLogsHandler(webSocketService.getConnector()),
+        'clear_ws_logs': createClearWsLogsHandler(webSocketService.getConnector()),
         'content_script_loaded': contentScriptLoaded,
         'setCallbacks': setCallbacks,
     };

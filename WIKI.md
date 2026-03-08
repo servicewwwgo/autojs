@@ -43,7 +43,7 @@
 1. **入口与运行时**
    - **Background（Service Worker）**：扩展主逻辑所在；初始化各执行器与服务，处理来自 Popup/Content 的消息，管理 WebSocket 连接与浏览器事件（启动、安装、Alarm、Tab 关闭）。
    - **Content Script**：注入到页面，负责元素查找（含 text/ledby 等选择器）、属性读写、可见性判断等，通过消息与 Background 协作。
-   - **Popup**：Vue 界面，用于连接/断开 WebSocket、查看节点与标签页、触发指令等。
+   - **Popup**：Vue 界面，用于连接/断开 WebSocket、查看节点与标签页、触发指令等；内含「WebSocket 日志」页，展示与 Center 之间的原始 WebSocket 收发数据（最近 200 条），支持按方向筛选与清空。
 
 2. **执行层**
    - **InstructionExecutor**：指令执行引擎；维护按 Tab 分组的 FIFO 队列，在每 Tab 上串行执行指令，并收集结果通过回调上报。
@@ -51,7 +51,7 @@
    - **HttpExecutor**：处理 HTTP 类消息，在扩展上下文中发起 HTTP 请求并返回结果。
 
 3. **连接与消息**
-   - **WebSocketConnector**：维护与服务器的 WebSocket 连接，负责登录、心跳、重连、消息收发与按类型分发。
+   - **WebSocketConnector**：维护与服务器的 WebSocket 连接，负责登录、心跳、重连、消息收发与按类型分发；同时维护 WebSocket 收发原始数据日志（FIFO 最多 200 条），供 Popup「WebSocket 日志」页展示。
 
 4. **管理层**
    - **InstructionManager**：按 tabId 分组的指令队列（入队、按 Tab 取首条、按 Tab 删除）。
@@ -123,6 +123,7 @@
 - **连接与登录**：连接建立后自动发送 `login`（NodeProfile）；在未登录前不处理业务消息。支持 `isDisconnecting` 防止主动断开时触发重连。
 - **心跳与重连**：定时发送 `heartbeat`（如 15 秒间隔）；断线后按间隔（如 5 秒）重连。`isConnected()` 会校验 WebSocket 实际 `readyState`，以应对 Service Worker 休眠导致的状态不一致。
 - **消息大小**：发送前检查消息体，超过 10MB 拒绝发送，避免异常大包导致连接或内存问题。
+- **WebSocket 收发日志**：在 `onmessage` 收到数据后（在 `JSON.parse` 之前）与每次 `ws.send` 发送前，将原始字符串（`event.data` / `jsonString`）及方向（sent/received）、时间戳写入内部 FIFO 缓冲区，最多保留 200 条；不按消息 type 过滤，记录所有类型。Popup 通过 `get_ws_logs`、`clear_ws_logs` 与 Background 通信获取或清空日志；ExecutionLog 页面（标题「WebSocket 日志」）每 2 秒轮询展示，支持按方向筛选与条目展开查看原始 JSON。详见 `WIKI-ExecutionLog-WebSocket-Log.md`。
 
 ### 4.3 资源与生命周期
 
@@ -174,6 +175,7 @@ AutoJS 通过 WebSocket 将远程下发的指令在浏览器扩展内执行，�
 - 项目内 `CODE_REVIEW.md`：代码审查结论与已修复项。
 - 项目内 `instruction_json_schema.md`：指令与结果的 JSON 结构说明。
 - 项目内 `cdp_json_schema.md`：CDP 消息与结果的 JSON 结构说明。
+- 项目内 `WIKI-ExecutionLog-WebSocket-Log.md`：ExecutionLog 改造为 WebSocket 收发日志页的计划与实现要点。
 - 仓库根目录 `docs/autojs-control-protocol.md`：与 Control 服务端的数据格式与校验说明。
 - [WXT 文档](https://wxt.dev/)
 - [Chrome DevTools Protocol](https://chromedevtools.github.io/devtools-protocol/)

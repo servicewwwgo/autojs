@@ -131,3 +131,37 @@ export function createSendResultsToServerHandler(
         }
     };
 }
+
+/**
+ * 业务逻辑：创建获取 WebSocket 收发日志的处理器，供 popup 展示原始 ws 收发数据
+ *
+ * @param wsConnector - WebSocket 连接器实例
+ */
+export function createGetWsLogsHandler(wsConnector: WebSocketConnector) {
+    return async function getWsLogs(
+        message: BackgroundScriptMessageType,
+        sender: Browser.runtime.MessageSender,
+        sendResponse: (response?: any) => void
+    ): Promise<void> {
+        const logs = wsConnector ? wsConnector.getWsLogs() : [];
+        sendResponse({ success: true, data: logs });
+    };
+}
+
+/**
+ * 业务逻辑：创建清空 WebSocket 收发日志的处理器
+ *
+ * @param wsConnector - WebSocket 连接器实例
+ */
+export function createClearWsLogsHandler(wsConnector: WebSocketConnector) {
+    return async function clearWsLogs(
+        message: BackgroundScriptMessageType,
+        sender: Browser.runtime.MessageSender,
+        sendResponse: (response?: any) => void
+    ): Promise<void> {
+        if (wsConnector) {
+            wsConnector.clearWsLogs();
+        }
+        sendResponse({ success: true });
+    };
+}

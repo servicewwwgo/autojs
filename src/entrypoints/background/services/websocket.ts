@@ -1,6 +1,4 @@
-import { WEBSOCKET_CONN_URL } from '../../../consts';
-import { WebSocketConnector } from '../../../executor';
-import { CdpExecutor, HttpExecutor, InstructionExecutor } from '../../../executor';
+import { CdpExecutor, HttpExecutor, InstructionExecutor, WebSocketConnector } from '../../../executor';
 import { CdpMessage, CdpResult, HttpMessage, HttpResult, InstructionsResponsePayload, WSMessage } from '../../../types';
 import { LogLevel, OutputLogToFile } from '../../../utils';
 

@@ -169,3 +169,12 @@ export interface WSLogMessage extends WSMessage {
   };
 }
 
+/**
+ * 单条 WebSocket 收发日志（原始数据，供 popup 展示）
+ */
+export interface WSLogEntry {
+  direction: 'sent' | 'received';
+  timestamp: number;
+  raw: string;
+}
+

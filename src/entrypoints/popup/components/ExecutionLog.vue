@@ -1,40 +1,37 @@
 <template>
-    <div class="execution-log">
+    <div class="ws-log">
         <div class="header-actions">
-            <h2>执行日志</h2>
+            <h2>WebSocket 日志</h2>
             <div class="actions">
-                <button @click="loadLogs" class="btn btn-secondary">刷新</button>
                 <button @click="clearLogs" class="btn btn-danger">清空</button>
-                <button @click="sendToServer" class="btn btn-primary">发送到服务器</button>
             </div>
         </div>
 
         <div class="filter">
             <label>
-                <input v-model="filterSuccess" type="checkbox" />
-                仅显示成功
+                <input v-model="filterDirection" type="radio" value="all" />
+                全部
             </label>
             <label>
-                <input v-model="filterError" type="checkbox" />
-                仅显示失败
+                <input v-model="filterDirection" type="radio" value="sent" />
+                发送
+            </label>
+            <label>
+                <input v-model="filterDirection" type="radio" value="received" />
+                接收
             </label>
         </div>
 
         <div class="log-list">
-            <div v-for="result in filteredLogs" :key="result.id"
-                :class="['log-item', result.success ? 'success' : 'error']">
-                <div class="log-header">
-                    <span class="log-id">{{ result.id }}</span>
-                    <span :class="['log-status', result.success ? 'success' : 'error']">
-                        {{ result.success ? '✓ 成功' : '✗ 失败' }}
-                    </span>
-                    <span class="log-duration">{{ result.duration }}ms</span>
+            <div v-for="(entry, index) in filteredLogs" :key="`${entry.timestamp}-${index}`"
+                :class="['log-item', entry.direction]">
+                <div class="log-header" @click="toggleExpand(entry.timestamp)">
+                    <span class="log-direction">{{ entry.direction === 'sent' ? '↑ 发送' : '↓ 接收' }}</span>
+                    <span class="log-time">{{ formatTime(entry.timestamp) }}</span>
+                    <span class="log-toggle">{{ expanded.has(entry.timestamp) ? '▼' : '▶' }}</span>
                 </div>
-                <div v-if="result.error" class="log-error">
-                    {{ result.error }}
-                </div>
-                <div v-if="result.data" class="log-data">
-                    <pre>{{ JSON.stringify(result.data, null, 2) }}</pre>
+                <div v-show="expanded.has(entry.timestamp)" class="log-raw">
+                    <pre>{{ entry.raw }}</pre>
                 </div>
             </div>
             <div v-if="filteredLogs.length === 0" class="empty">
@@ -46,90 +43,84 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { BackgroundScriptMessageType, InstructionResult } from '../../../types';
+import { BackgroundScriptMessageType, WSLogEntry } from '../../../types';
 import { SendMessageToBackgroundScript, OutputLogToFile, LogLevel } from '../../../utils';
 
-let logInterval: number | null = null;
+const WS_LOG_POLL_INTERVAL_MS = 2000;
 
-const logs = ref<InstructionResult[]>([]);
-const filterSuccess = ref(false);
-const filterError = ref(false);
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+const logs = ref<WSLogEntry[]>([]);
+const filterDirection = ref<'all' | 'sent' | 'received'>('all');
+const expanded = ref<Set<number>>(new Set());
 
 const filteredLogs = computed(() => {
-    let filtered = logs.value;
-    if (filterSuccess.value) {
-        filtered = filtered.filter(log => log.success);
+    let list = logs.value;
+    if (filterDirection.value !== 'all') {
+        list = list.filter((e) => e.direction === filterDirection.value);
     }
-    if (filterError.value) {
-        filtered = filtered.filter(log => !log.success);
-    }
-    return filtered.reverse(); // 最新的在前
+    return [...list].reverse();
 });
+
+function formatTime(ts: number): string {
+    const d = new Date(ts);
+    return d.toLocaleTimeString('zh-CN', { hour12: false }) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+}
+
+function toggleExpand(ts: number): void {
+    const next = new Set(expanded.value);
+    if (next.has(ts)) {
+        next.delete(ts);
+    } else {
+        next.add(ts);
+    }
+    expanded.value = next;
+}
 
 const loadLogs = async () => {
     try {
         const response = await SendMessageToBackgroundScript({
-            type: 'get_results'
+            type: 'get_ws_logs'
         } as BackgroundScriptMessageType);
 
-        if (response.success) {
-            logs.value = response.data as InstructionResult[];
+        if (response?.success && Array.isArray(response.data)) {
+            logs.value = response.data as WSLogEntry[];
         }
     } catch (error) {
-        OutputLogToFile(`[ExecutionLog] Failed to load logs: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+        OutputLogToFile(`[ExecutionLog] Failed to load WS logs: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
     }
 };
 
 const clearLogs = async () => {
-    if (confirm('确定要清空所有日志吗？')) {
+    if (confirm('确定要清空 WebSocket 日志吗？')) {
         try {
             const response = await SendMessageToBackgroundScript({
-                type: 'clear_results'
+                type: 'clear_ws_logs'
             } as BackgroundScriptMessageType);
 
-            if (response.success) {
-                logs.value = [] as InstructionResult[];
+            if (response?.success) {
+                logs.value = [];
             }
         } catch (error) {
-            OutputLogToFile(`[ExecutionLog] Failed to clear logs: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
+            OutputLogToFile(`[ExecutionLog] Failed to clear WS logs: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
         }
-    }
-};
-
-const sendToServer = async () => {
-    try {
-        const response = await SendMessageToBackgroundScript({
-            type: 'send_results_to_server'
-        } as BackgroundScriptMessageType);
-
-        if (response.success) {
-            alert('日志已发送到服务器');
-        } else {
-            alert('发送失败: ' + response.error);
-        }
-    } catch (error) {
-        alert('发送失败: ' + (error instanceof Error ? error.message : String(error)));
     }
 };
 
 onMounted(() => {
-    // 定期刷新日志
-    logInterval = setInterval(() => {
-        loadLogs().catch((error) => {
-            OutputLogToFile(`[ExecutionLog] Failed to refresh logs: ${error instanceof Error ? error.message : String(error)}`, { level: LogLevel.ERROR });
-        });
-    }, 2000) as any;
+    loadLogs();
+    pollTimer = setInterval(loadLogs, WS_LOG_POLL_INTERVAL_MS);
 });
 
 onUnmounted(() => {
-    if (logInterval !== null) {
-        clearInterval(logInterval);
+    if (pollTimer !== null) {
+        clearInterval(pollTimer);
     }
 });
 </script>
 
 <style scoped>
-.execution-log {
+.ws-log {
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -159,24 +150,6 @@ h2 {
     font-size: 14px;
     cursor: pointer;
     transition: all 0.3s;
-}
-
-.btn-primary {
-    background: #667eea;
-    color: white;
-}
-
-.btn-primary:hover {
-    background: #5568d3;
-}
-
-.btn-secondary {
-    background: #e0e0e0;
-    color: #333;
-}
-
-.btn-secondary:hover {
-    background: #d0d0d0;
 }
 
 .btn-danger {
@@ -219,62 +192,54 @@ h2 {
     background: white;
 }
 
-.log-item.success {
-    border-left: 4px solid #28a745;
+.log-item.sent {
+    border-left: 4px solid #667eea;
 }
 
-.log-item.error {
-    border-left: 4px solid #dc3545;
+.log-item.received {
+    border-left: 4px solid #28a745;
 }
 
 .log-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
+    cursor: pointer;
 }
 
-.log-id {
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    color: #666;
-}
-
-.log-status {
+.log-direction {
     font-weight: bold;
     font-size: 14px;
 }
 
-.log-status.success {
+.log-item.sent .log-direction {
+    color: #667eea;
+}
+
+.log-item.received .log-direction {
     color: #28a745;
 }
 
-.log-status.error {
-    color: #dc3545;
+.log-time {
+    font-size: 12px;
+    color: #666;
+    font-family: 'Courier New', monospace;
 }
 
-.log-duration {
+.log-toggle {
     font-size: 12px;
     color: #999;
 }
 
-.log-error {
-    padding: 8px;
-    background: #f8d7da;
-    color: #721c24;
-    border-radius: 4px;
-    font-size: 13px;
-    margin-top: 8px;
-}
-
-.log-data {
+.log-raw {
     margin-top: 8px;
     padding: 8px;
     background: #f5f5f5;
     border-radius: 4px;
 }
 
-.log-data pre {
+.log-raw pre {
     margin: 0;
     font-size: 12px;
     font-family: 'Courier New', monospace;

@@ -1,9 +1,11 @@
 import { nodeManager } from '../managers';
-import type { WSErrorMessage, WSHeartbeatMessage, WSHeartbeatResponse, WSLoginMessage, WSLoginResponse, WSLogMessage, WSMessage } from '../types';
+import type { WSErrorMessage, WSHeartbeatMessage, WSHeartbeatResponse, WSLoginMessage, WSLoginResponse, WSLogEntry, WSLogMessage, WSMessage } from '../types';
 import { LogLevel, OutputLogToFile } from '../utils';
 
 // 检查消息大小，避免发送过大的消息
 const MAX_MESSAGE_SIZE = 10 * 1024 * 1024; // 10MB
+/** popup WebSocket 日志最多保留条数（FIFO） */
+const MAX_WS_LOG_ENTRIES = 200;
 
 const HEARTBEAT_INTERVAL = 15000; // 15秒心跳间隔（缩短以更快检测断开）
 const RECONNECT_INTERVAL = 5000; // 5秒重连间隔
@@ -44,8 +46,26 @@ export class WebSocketConnector {
 
     private mapMessageTypeToFunction: { [key: string]: (message: WSMessage) => Promise<void> } = {};
 
+    /** WebSocket 收发原始数据日志，最多 MAX_WS_LOG_ENTRIES 条，供 popup 展示 */
+    private wsLogs: WSLogEntry[] = [];
+
     constructor(url: string) {
         this.url = url;
+    }
+
+    private pushWsLog(direction: 'sent' | 'received', raw: string): void {
+        this.wsLogs.push({ direction, timestamp: Date.now(), raw });
+        if (this.wsLogs.length > MAX_WS_LOG_ENTRIES) {
+            this.wsLogs.shift();
+        }
+    }
+
+    public getWsLogs(): WSLogEntry[] {
+        return [...this.wsLogs];
+    }
+
+    public clearWsLogs(): void {
+        this.wsLogs.length = 0;
     }
 
     /**
@@ -149,6 +169,8 @@ export class WebSocketConnector {
             };
 
             this.ws.onmessage = (event) => {
+                const raw = typeof event.data === 'string' ? event.data : String(event.data);
+                this.pushWsLog('received', raw);
                 this.handleMessage(event);
             };
 
@@ -446,6 +468,7 @@ export class WebSocketConnector {
 
         const jsonString = JSON.stringify(message);
 
+        this.pushWsLog('sent', jsonString);
         this.ws?.send(jsonString);
 
         return true;
@@ -543,6 +566,7 @@ export class WebSocketConnector {
                 return false;
             }
 
+            this.pushWsLog('sent', jsonString);
             this.ws?.send(jsonString);
             return true;
         } catch (error) {

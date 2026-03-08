@@ -13,7 +13,7 @@
  * 相关代码：src/utils/index.ts - SendMessageToPopupWindow() 函数（发送消息到 popup），src/entrypoints/background.ts - 消息监听器（接收消息），src/entrypoints/popup/components/ - popup 组件（发送消息）
  */
 export interface PopupScriptMessageType {
-    type: 'get_results' | 'clear_results' | 'send_results_to_server' | 'instruction_result' | 'connect_websocket' | 'disconnect_websocket' | 'execute_instructions';
+    type: 'get_results' | 'clear_results' | 'send_results_to_server' | 'instruction_result' | 'connect_websocket' | 'disconnect_websocket' | 'execute_instructions' | 'get_ws_logs' | 'clear_ws_logs';
     params?: any;
 }
 
@@ -32,7 +32,7 @@ export interface PopupScriptMessageType {
  * 相关代码：src/utils/index.ts - SendMessageToBackgroundScript() 函数（发送消息到 background script），src/entrypoints/background.ts - 消息监听器（接收和处理消息），src/entrypoints/popup/components/ - popup 组件（发送消息），src/entrypoints/content.ts - content script（发送消息）
  */
 export interface BackgroundScriptMessageType {
-    type: 'content_script_loaded' | 'get_tabs' | 'send_tabs' | 'get_node_profile' | 'update_node_profile' | 'add_instructions' | 'execute_instructions' | 'get_results' | 'clear_results' | 'connect_websocket' | 'disconnect_websocket' | 'test_websocket' | 'send_results_to_server' | 'setCallbacks';
+    type: 'content_script_loaded' | 'get_tabs' | 'send_tabs' | 'get_node_profile' | 'update_node_profile' | 'add_instructions' | 'execute_instructions' | 'get_results' | 'clear_results' | 'connect_websocket' | 'disconnect_websocket' | 'test_websocket' | 'send_results_to_server' | 'get_ws_logs' | 'clear_ws_logs' | 'setCallbacks';
     params?: any;
 }
 

@@ -4,7 +4,7 @@ export { TabInfo } from './tab';
 
 export { type BackgroundScriptMessageType, type ContentScriptMessageType, type PopupScriptMessageType } from './script_message';
 
-export { WSErrorMessage, WSHeartbeatMessage, WSHeartbeatResponse, WSLoginMessage, WSLoginResponse, WSLogMessage, WSMessage } from './websocket_message';
+export { WSErrorMessage, WSHeartbeatMessage, WSHeartbeatResponse, WSLoginMessage, WSLoginResponse, WSLogEntry, WSLogMessage, WSMessage } from './websocket_message';
 
 export { ElementData, BaseInstruction, Instruction, InstructionResult, InstructionResults, InstructionsRequestPayload, InstructionsResponsePayload, ActivateTabInstruction, ActivateTabInstructionResult, ExecuteScriptInstruction, ExecuteScriptInstructionResult, FindElementInstruction, FindElementInstructionResult, GetAttributeInstruction, GetAttributeInstructionResult, GetUrlCookieItem, GetUrlInstruction, GetUrlInstructionResult, InputInstruction, InputInstructionResult, KeyboardInstruction, KeyboardInstructionResult, MouseInstruction, MouseInstructionResult, NavigateInstruction, NavigateInstructionResult, ScreenshotInstruction, ScreenshotInstructionResult, SetAttributeInstruction, SetAttributeInstructionResult, WaitAttributeContainsResult, WaitElementExistsResult, WaitElementVisibleResult, WaitInstruction, WaitInstructionResult, WaitPageLoadResult, WaitTitleContainsResult } from './instruction';
 
