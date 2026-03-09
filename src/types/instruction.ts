@@ -58,6 +58,8 @@ export interface InstructionResult {
   error?: string;
   duration: number;
   data?: any;
+  /** 所属请求 id，用于与请求匹配；若无则上报时按空字符串分组 */
+  requestId?: string;
 }
 
 /**

@@ -29,9 +29,6 @@ export class InstructionExecutor {
 
   private sendResult: ((result: InstructionsResponsePayload) => void) | undefined;
 
-  /** 当前批次的请求 id（来自 WSMessage.data.id），回传结果时带入响应负载 */
-  private _currentRequestId: string = '';
-
   /** 当前正在执行 runTabLoop 的 tabId 集合，用于避免同一标签页被并发执行 */
   private runningTabIds: Set<number> = new Set();
 
@@ -192,6 +189,7 @@ export class InstructionExecutor {
         }
 
         const result: InstructionResult = await instruction.Execute();
+        result.requestId = instruction.requestId;
 
         this.executedCount++;
         if (result.success) {
@@ -215,6 +213,7 @@ export class InstructionExecutor {
               success: false,
               duration: 0,
               error: 'Skipped due to previous instruction failure (cascading failure)',
+              requestId: inst.requestId,
             };
             this.executedCount++;
             this.errorCount++;
@@ -226,9 +225,17 @@ export class InstructionExecutor {
         }
       }
 
-      // 正常结束或 cascading failure 后，统一在本轮 runTabLoop 末尾上报该 tab 的所有结果（负载带 id 以与请求匹配）
+      // 正常结束或 cascading failure 后，按 requestId 分组上报该 tab 的结果（每条结果带 requestId 以与请求匹配）
       const results = this.resultManager.GetResultAndDelete(tabId) ?? [];
-      this.sendResult?.({ id: this._currentRequestId, tabId, results });
+      const byRequestId = new Map<string, InstructionResult[]>();
+      for (const r of results) {
+        const rid = r.requestId ?? '';
+        if (!byRequestId.has(rid)) byRequestId.set(rid, []);
+        byRequestId.get(rid)!.push(r);
+      }
+      for (const [rid, arr] of byRequestId) {
+        this.sendResult?.({ id: rid, tabId, results: arr });
+      }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       if (errorMsg.includes('No tab with id') || errorMsg.includes('No tab with given id')) {
@@ -274,8 +281,10 @@ export class InstructionExecutor {
       return;
     }
 
-    this._currentRequestId = requestId;
     const instructionClasses: BaseInstructionClass[] = instructions.map(instruction => InstructionFactory.create(instruction));
+    for (const ic of instructionClasses) {
+      ic.requestId = requestId;
+    }
     OutputLogToFile(`[InstructionExecutor] Received WebSocket instruction message, id: ${requestId || '(none)'}, count: ${instructionClasses.length}`, { level: LogLevel.INFO });
     this.ExecuteAll(instructionClasses);
   }

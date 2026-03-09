@@ -20,6 +20,10 @@
                 <input v-model="filterDirection" type="radio" value="received" />
                 接收
             </label>
+            <label class="filter-tabid">
+                tabId
+                <input v-model.trim="filterTabId" type="text" placeholder="留空显示全部" class="input-tabid" />
+            </label>
         </div>
 
         <div class="log-list">
@@ -52,12 +56,40 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 const logs = ref<WSLogEntry[]>([]);
 const filterDirection = ref<'all' | 'sent' | 'received'>('all');
+const filterTabId = ref('');
 const expanded = ref<Set<number>>(new Set());
+
+/** 解析 raw 并判断消息中是否包含指定 tabId（顶层 tabId、data.tabId、data.data[].tabId 等） */
+function rawContainsTabId(raw: string, tabIdStr: string): boolean {
+    if (!tabIdStr) return true;
+    const want = Number(tabIdStr);
+    if (Number.isNaN(want)) return true;
+    try {
+        const obj = JSON.parse(raw) as Record<string, unknown>;
+        if (typeof obj?.tabId === 'number' && obj.tabId === want) return true;
+        const data = obj?.data;
+        if (data == null) return false;
+        if (typeof data === 'object' && 'tabId' in data && (data as { tabId: number }).tabId === want) return true;
+        if (Array.isArray(data)) {
+            return data.some((item: unknown) => typeof item === 'object' && item != null && (item as Record<string, unknown>).tabId === want);
+        }
+        const inner = (data as Record<string, unknown>)?.data;
+        if (Array.isArray(inner)) {
+            return inner.some((item: unknown) => typeof item === 'object' && item != null && (item as Record<string, unknown>).tabId === want);
+        }
+        return false;
+    } catch {
+        return false;
+    }
+}
 
 const filteredLogs = computed(() => {
     let list = logs.value;
     if (filterDirection.value !== 'all') {
         list = list.filter((e) => e.direction === filterDirection.value);
+    }
+    if (filterTabId.value) {
+        list = list.filter((e) => rawContainsTabId(e.raw, filterTabId.value));
     }
     return [...list].reverse();
 });
@@ -175,6 +207,18 @@ h2 {
     gap: 6px;
     font-size: 14px;
     cursor: pointer;
+}
+
+.filter-tabid {
+    cursor: default;
+}
+
+.input-tabid {
+    width: 100px;
+    padding: 4px 8px;
+    font-size: 13px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
 }
 
 .log-list {

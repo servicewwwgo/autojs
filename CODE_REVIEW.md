@@ -78,7 +78,7 @@
 ### 7. 待改进项（建议）
 
 - **instructions 处理器 JSON.parse**：`src/entrypoints/background/handlers/instructions.ts` 第 36 行 `JSON.parse(instructionsJsonString)` 在非法 JSON 时会抛错；外层 background 的 onMessage 会 catch 并返回通用错误。建议在 handler 内 try/catch，返回 `{ success: false, error: 'Invalid JSON: ...' }`，便于 popup 提示更明确。
-- **_currentRequestId 与多批指令**：`InstructionExecutor._currentRequestId` 为单实例共享。若服务端在短时间内连续下发两条 instructions 消息（两个 id），第二条 handleMessage 会覆盖 _currentRequestId，导致第一条批次中尚未执行完的 tab 在 sendResult 时带上第二条的 id。当前使用方式多为「单批执行完再发下一批」，若未来有并发多批需求，可改为按批次/请求 id 存储并随结果带出。
+- **_currentRequestId（已修复）**：已改为每条指令/结果携带 `requestId`，上报时按 requestId 分组，不再使用全局 `_currentRequestId`；多批次、多 tab 并发时 id 与请求正确匹配。
 - **ExecutionLog 展开 key**：`expanded` 使用 `timestamp` 作为 key，同一毫秒内多条消息会共用同一 key，点击展开时可能同时展开/折叠。建议改为 `${timestamp}-${index}` 或条目唯一 id 以区分。
 - **清空后 expanded 状态**：`clearLogs` 成功后未清空 `expanded`，旧 timestamp 可能与新日志冲突（概率极低）。可按需在 clearLogs 成功时清空 expanded。
 
@@ -92,7 +92,7 @@
 
 - 整体设计清晰，类型与注释到位，错误与资源清理考虑较全，安全相关点（转义、超时、body 限制）处理得当；协议与 control 端已对齐；WebSocket 收发日志（FIFO 200 条、get_ws_logs/clear_ws_logs、ExecutionLog 页）实现完整。
 - 历史项已修复：延迟/常量、selectorType、GetResultAndDelete 语义、runTabLoop 注释、ElementManager 抽取方法、日志统一、单元测试。
-- 建议优先：instructions 内 JSON.parse 的 try/catch；ExecutionLog 展开 key 改为唯一标识；清空时可选清空 expanded；WS 日志含敏感数据（login token）需在不可信环境中注意。
+- 建议优先：instructions 内 JSON.parse 的 try/catch；ExecutionLog 展开 key 改为唯一标识；清空时可选清空 expanded；WS 日志含敏感数据（login token）需在不可信环境中注意。_currentRequestId 已改为按 instruction.requestId 分组上报。
 
 ---
 

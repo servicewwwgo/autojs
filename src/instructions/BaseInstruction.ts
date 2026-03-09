@@ -26,6 +26,8 @@ export abstract class BaseInstructionClass implements BaseInstruction {
     public ignoreError?: boolean;
     public created_at?: number;
     public params?: any;
+    /** 所属请求 id，用于结果上报时与请求匹配 */
+    public requestId?: string;
 
     constructor(instruction: BaseInstruction) {
         this.tabId = instruction.tabId;
