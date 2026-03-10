@@ -106,6 +106,21 @@ export class InstructionExecutor {
   }
 
   /**
+   * 业务逻辑：按“当前仍存在的标签页”清理指令队列、结果缓存和运行中标记，用于长期运行时回收已关闭标签页占用的内存（兜底）
+   *
+   * 实现方式：委托 InstructionManager/ResultManager 按 liveTabIds 清理；从 runningTabIds 中移除已不存在的 tabId
+   *
+   * @param liveTabIds - 当前存在的标签页 ID 集合
+   */
+  public pruneStaleTabs(liveTabIds: Set<number>): void {
+    this.instructionManager.pruneStaleTabs(liveTabIds);
+    this.resultManager.pruneStaleTabs(liveTabIds);
+    for (const id of [...this.runningTabIds]) {
+      if (!liveTabIds.has(id)) this.runningTabIds.delete(id);
+    }
+  }
+
+  /**
    * 业务逻辑：将新指令加入队列，并为「有待执行指令且当前未在运行」的标签页启动 runTabLoop；无主循环，依赖「新指令到达时再次调用 ExecuteAll」驱动执行。
    *
    * 实现方式：

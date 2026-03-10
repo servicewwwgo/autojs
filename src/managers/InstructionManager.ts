@@ -196,4 +196,17 @@ export class InstructionManager {
       }
     }
   }
+
+  /**
+   * 业务逻辑：按“当前仍存在的标签页”清理指令 Map，用于长期运行时回收已关闭标签页占用的内存（兜底）
+   *
+   * 实现方式：删除 instructionsMap 中 tabId 不在 liveTabIds 内的所有键
+   *
+   * @param liveTabIds - 当前存在的标签页 ID 集合
+   */
+  public pruneStaleTabs(liveTabIds: Set<number>): void {
+    for (const tabId of [...this.instructionsMap.keys()]) {
+      if (!liveTabIds.has(tabId)) this.instructionsMap.delete(tabId);
+    }
+  }
 }

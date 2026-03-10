@@ -113,4 +113,17 @@ export class ResultManager {
     this.results.clear();
     OutputLogToFile(`[ResultManager] Cleared all tab results successfully, count: ${count}`, { level: LogLevel.INFO });
   }
+
+  /**
+   * 业务逻辑：按“当前仍存在的标签页”清理结果 Map，用于长期运行时回收已关闭标签页占用的内存（兜底）
+   *
+   * 实现方式：删除 results 中 tabId 不在 liveTabIds 内的所有键
+   *
+   * @param liveTabIds - 当前存在的标签页 ID 集合
+   */
+  public pruneStaleTabs(liveTabIds: Set<number>): void {
+    for (const tabId of [...this.results.keys()]) {
+      if (!liveTabIds.has(tabId)) this.results.delete(tabId);
+    }
+  }
 }

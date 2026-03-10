@@ -25,6 +25,9 @@ export class CdpExecutor {
 
     private sendResult: ((result: CdpResult) => void) | undefined;
 
+    /** 正在关闭的 tabId，关闭过程中若出现页面弹窗（如 beforeunload）则自动接受以便顺利关闭 */
+    private pendingCloseTabIds: Set<number> = new Set();
+
     constructor() {
         // 初始化类型到函数的映射，使用箭头函数确保 this 绑定正确
         this.mapTypeToFunction = {
@@ -1097,6 +1100,34 @@ export class CdpExecutor {
     }
 
     /**
+     * 业务逻辑：按“当前仍存在的标签页”清理控制台/网络日志 Map，用于长期运行时回收已关闭标签页占用的内存（兜底，正常应在 tabs.onRemoved 中清理）
+     *
+     * 实现方式：遍历 consoleLogs/networkLogs 的 key（格式为 "console_${tabId}" / "network_${tabId}"），若 tabId 不在 liveTabIds 中则删除该 key
+     *
+     * 注意事项：由定时任务（如 alarm）周期性调用，避免 onRemoved 漏报导致 Map 键长期残留
+     *
+     * @param liveTabIds - 当前存在的标签页 ID 集合
+     */
+    public pruneStaleTabLogs(liveTabIds: Set<number>): void {
+        for (const key of [...this.consoleLogs.keys()]) {
+            const m = /^console_(\d+)$/.exec(key);
+            if (m && !liveTabIds.has(Number(m[1]))) {
+                this.consoleLogs.delete(key);
+            }
+        }
+        for (const key of [...this.networkLogs.keys()]) {
+            const m = /^network_(\d+)$/.exec(key);
+            if (m && !liveTabIds.has(Number(m[1]))) {
+                this.networkLogs.delete(key);
+            }
+        }
+        // 已关闭的 tab 不再需要“关闭中”标记
+        for (const id of [...this.pendingCloseTabIds]) {
+            if (!liveTabIds.has(id)) this.pendingCloseTabIds.delete(id);
+        }
+    }
+
+    /**
      * 业务逻辑：根据过滤条件筛选网络日志，支持按事件类型、URL、请求方法、状态码、时间范围等条件过滤，用于精确查找特定的网络请求
      *
      * 实现方式：使用 Array.filter() 方法，根据 filter 对象的各个字段逐一检查日志条目，只有满足所有条件的日志才会被保留
@@ -1392,35 +1423,53 @@ export class CdpExecutor {
      *
      * 相关代码：src/utils/index.ts - DisconnectCDP() 函数（断开 CDP 连接），src/executor/CdpExecutor.ts - clearConsoleLogs() 和 clearNetworkLogs() 方法（清理日志）
      */
+    /** 是否处于“关闭中”的 tabId，用于在 CDP 事件里自动接受该 tab 的 JS 弹窗（如 beforeunload） */
+    public hasPendingCloseTabId(tabId: number): boolean {
+        return this.pendingCloseTabIds.has(tabId);
+    }
+
+    public addPendingCloseTabId(tabId: number): void {
+        this.pendingCloseTabIds.add(tabId);
+    }
+
+    public removePendingCloseTabId(tabId: number): void {
+        this.pendingCloseTabIds.delete(tabId);
+    }
+
     private async handleCloseTab(cdpMessage: CdpMessage): Promise<void> {
         const msg: CdpCloseTabMessage = cdpMessage as CdpCloseTabMessage;
+        const tabId = msg.data?.tabId;
         let defaultResult: CdpCloseTabResult | undefined;
 
         if (msg.data === undefined) {
             throw new Error('data is undefined in close_tab');
         }
 
-        if (msg.data.tabId === undefined || typeof msg.data.tabId !== 'number') {
+        if (tabId === undefined || typeof tabId !== 'number') {
             throw new Error('tabId is required and must be a number in close_tab');
         }
 
-        // 关闭标签页前，先断开 CDP 连接（如果已连接）
         try {
-            await DisconnectCDP(msg.data.tabId);
-        } catch (error) {
-            // 如果 CDP 未连接，忽略错误
-            OutputLogToFile(`[CdpExecutor] CDP not connected for tab ${msg.data.tabId}, skipping disconnect`, { level: LogLevel.WARN });
+            // 先连接并启用 Page，以便接收 Page.javascriptDialogOpening 并在关页时自动接受弹窗
+            await EnsureCDPConnected(tabId);
+            await ExecuteCDPCommand(tabId, 'Page.enable');
+            this.addPendingCloseTabId(tabId);
+
+            // 关闭标签页（若页面有 beforeunload 等弹窗，CdpEventService 会收到事件并 handleJavaScriptDialog(accept: true)）
+            await browser.tabs.remove(tabId);
+        } finally {
+            this.removePendingCloseTabId(tabId);
+            this.clearConsoleLogs(tabId);
+            this.clearNetworkLogs(tabId);
+            try {
+                await DisconnectCDP(tabId);
+            } catch {
+                // 标签页已关闭时 detach 可能失败，忽略
+            }
         }
 
-        // 关闭标签页
-        await browser.tabs.remove(msg.data.tabId);
-
-        // 清理该标签页的日志
-        this.clearConsoleLogs(msg.data.tabId);
-        this.clearNetworkLogs(msg.data.tabId);
-
-        defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId: msg.data.tabId } } as CdpCloseTabResult;
-        OutputLogToFile(`[CdpExecutor] Tab closed successfully, tabId: ${msg.data.tabId}`, { level: LogLevel.INFO });
+        defaultResult = { type: msg.type, id: msg.id, success: true, data: { tabId } } as CdpCloseTabResult;
+        OutputLogToFile(`[CdpExecutor] Tab closed successfully, tabId: ${tabId}`, { level: LogLevel.INFO });
         this.sendResult?.(defaultResult as CdpCloseTabResult);
     }
 }

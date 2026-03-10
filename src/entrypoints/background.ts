@@ -220,16 +220,25 @@ export default defineBackground(() => {
     });
 
     /**
-     * 业务逻辑：监听定时任务（alarm）事件，定期检查并维护 WebSocket 连接状态
+     * 业务逻辑：监听定时任务（alarm）事件，定期检查并维护 WebSocket 连接状态，并清理已关闭标签页占用的内存
      *
-     * 实现方式：使用 browser.alarms.onAlarm 监听器，将 alarm 事件委托给初始化服务处理
+     * 实现方式：将 alarm 委托给初始化服务处理；随后获取当前存在的标签页 ID，对各管理器/执行器执行 prune，回收已关闭 tab 的键值
      *
-     * 注意事项：定时任务主要用于在 Service Worker 休眠后唤醒时检查 WebSocket 连接状态并重连
+     * 注意事项：prune 作为兜底，防止 tabs.onRemoved 漏报时 Map 键长期残留导致长期运行内存膨胀
      *
-     * 相关代码：src/entrypoints/background/services/initialization.ts - InitializationService.handleAlarm()
+     * 相关代码：src/entrypoints/background/services/initialization.ts - InitializationService.handleAlarm()，各 manager/executor 的 pruneStaleTabs/pruneStaleTabLogs
      */
     browser.alarms.onAlarm.addListener(async (alarm) => {
         await initializationService.handleAlarm(alarm);
+        try {
+            const tabs = await browser.tabs.query({});
+            const liveTabIds = new Set(tabs.map((t) => t.id).filter((id): id is number => id !== undefined));
+            instructionExecutor.pruneStaleTabs(liveTabIds);
+            elementManager.pruneStaleTabs(liveTabIds);
+            cdpExecutor.pruneStaleTabLogs(liveTabIds);
+        } catch (e) {
+            OutputLogToFile(`[Background] Prune stale tabs failed: ${e instanceof Error ? e.message : String(e)}`, { level: LogLevel.WARN });
+        }
     });
 
     /**

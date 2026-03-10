@@ -1,4 +1,5 @@
 import { CdpExecutor } from '../../../executor';
+import { ExecuteCDPCommand } from '../../../utils';
 
 /**
  * CDP 事件监听服务
@@ -105,6 +106,14 @@ export class CdpEventService {
                     errorText: networkParams.errorText,
                     canceled: networkParams.canceled,
                     blockedReason: networkParams.blockedReason
+                });
+            }
+
+            // 关页过程中若出现 JS 弹窗（如 beforeunload），自动接受以便标签页能关闭
+            if (method === 'Page.javascriptDialogOpening' && this.cdpExecutor.hasPendingCloseTabId(tabId)) {
+                this.cdpExecutor.removePendingCloseTabId(tabId);
+                ExecuteCDPCommand(tabId, 'Page.handleJavaScriptDialog', { accept: true }).catch(() => {
+                    // 弹窗已处理或 tab 已关闭，忽略
                 });
             }
         });

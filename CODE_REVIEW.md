@@ -86,6 +86,13 @@
 
 - **login 消息含 node_token**：WS 日志记录 login 等所有类型，原始 raw 包含 NodeProfile（含 node_token）。Popup 中可查看，若为调试/开发工具可接受；若部署到不可信环境，需注意不要在生产环境长期开启或对敏感字段做脱敏。
 
+### 9. 长期运行与内存回收（已加强）
+
+- **即时清理**：`tabs.onRemoved` 时调用 `InstructionExecutor.cleanupTab`、`ElementManager.ClearTabElements`、`CdpExecutor.clearConsoleLogs/clearNetworkLogs`，按 tab 释放指令队列、结果、元素缓存、控制台/网络日志。
+- **有界集合**：`CdpExecutor` 控制台/网络日志每 tab 最多 `MAX_LOG_ENTRIES`（10000）条，超出 FIFO 删最旧；`WebSocketConnector.wsLogs` 最多 200 条 FIFO。
+- **定时 prune 兜底**：扩展长期运行且不下线，若 `onRemoved` 漏报或异常，按 tabId 存储的 Map 键可能残留。在 `browser.alarms.onAlarm` 中（与 `connect_websocket` 同一周期，约每分钟）：查询当前存在的 tabId 集合，对 `InstructionExecutor`、`ElementManager`、`CdpExecutor` 执行 `pruneStaleTabs(liveTabIds)` / `pruneStaleTabLogs(liveTabIds)`，删除“已不存在 tab”的键，回收内存。
+- **涉及模块**：`InstructionManager.pruneStaleTabs`、`ResultManager.pruneStaleTabs`、`ElementManager.pruneStaleTabs`、`InstructionExecutor.pruneStaleTabs`（含 `runningTabIds`）、`CdpExecutor.pruneStaleTabLogs`（含 `consoleLogs`/`networkLogs`/`pendingCloseTabIds`）。
+
 ---
 
 ## 四、小结
